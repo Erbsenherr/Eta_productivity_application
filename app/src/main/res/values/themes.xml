@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Only has to carry the app to the first Compose frame: Compose paints
+        everything after that. The window background is themed so a cold start
+        does not flash white on a dark device.
+    -->
+    <style name="Theme.ERIK_Iteration_2" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/erik_window_background</item>
+    </style>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ERIK_Iteration_2" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/erik_window_background</item>
+    </style>
+</resources>

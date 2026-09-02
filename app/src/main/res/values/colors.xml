@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors LightErikColors.background; painted before the first Compose frame. -->
+    <color name="erik_window_background">#FAFAF8</color>
+</resources>
