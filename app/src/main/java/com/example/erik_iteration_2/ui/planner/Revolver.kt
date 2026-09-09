@@ -176,7 +176,8 @@ private fun CentreChamber(
     onPullEnd: () -> Unit,
 ) {
     // Whether the current gesture turned out to be a turn or a pull. Decided once,
-    // on the first movement, and kept until the finger lifts.
+    // on the first movement, and kept until the finger lifts. [onPullStart] fires
+    // at that decision rather than at the touch, so start and end stay a pair.
     var pulling by remember(entry.id) { mutableStateOf(false) }
     var travel by remember(entry.id) { mutableStateOf(Offset.Zero) }
     val scale by animateFloatAsState(if (pulling) 1.06f else 1f, label = "chamberScale")
@@ -193,11 +194,14 @@ private fun CentreChamber(
             }
             .pointerInput(entry.id, enabled) {
                 if (!enabled) return@pointerInput
+                // Where the finger went down, so the pull can report an absolute
+                // position the moment it turns out to be one.
+                var origin = Offset.Zero
                 detectDragGestures(
                     onDragStart = { start ->
                         pulling = false
                         travel = Offset.Zero
-                        onPullStart(start)
+                        origin = start
                     },
                     onDragEnd = {
                         if (pulling) {
@@ -218,6 +222,12 @@ private fun CentreChamber(
                     travel += amount
                     if (!pulling && abs(travel.y) > abs(travel.x) && travel.y > 0f) {
                         pulling = true
+                        // Announced *here*, not in onDragStart. A start that turns
+                        // out to be a turn never ends with `onPullEnd`, so telling
+                        // the caller a pull had begun left it holding a ghost — and,
+                        // once the day scrolls at the edges, a finger position that
+                        // never went away.
+                        onPullStart(origin + travel)
                     }
                     if (pulling) onPull(amount)
                 }

@@ -5,6 +5,7 @@ import com.example.erik_iteration_2.domain.planning.PLANNING_SNOOZE
 import com.example.erik_iteration_2.domain.planning.PlanningPhase
 import com.example.erik_iteration_2.domain.planning.deferredFrom
 import com.example.erik_iteration_2.domain.planning.nextPlanning
+import com.example.erik_iteration_2.domain.planning.nextWake
 import com.example.erik_iteration_2.domain.planning.shouldRing
 import com.example.erik_iteration_2.domain.planning.snoozedFrom
 import com.example.erik_iteration_2.domain.setup.UserSetup
@@ -15,6 +16,7 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,6 +32,37 @@ class PlanningScheduleTest {
     )
 
     private fun at(text: String) = LocalDateTime.parse(text)
+
+    @Test
+    fun `the wake alarm is off until it is switched on`() {
+        // The default has to be off: nobody agreed to be woken by answering a
+        // questionnaire, and a null is what tells the scheduler to cancel.
+        assertNull(nextWake(setup(), at("2026-09-07T09:00")))
+    }
+
+    @Test
+    fun `the wake alarm is due tomorrow once the morning has passed`() {
+        val waking = setup().copy(wakeAlarm = true, wakeTime = LocalTime(7, 0))
+        assertEquals(
+            at("2026-09-07T07:00"),
+            nextWake(waking, at("2026-09-07T02:00")),
+        )
+        assertEquals(
+            at("2026-09-08T07:00"),
+            nextWake(waking, at("2026-09-07T09:00")),
+        )
+    }
+
+    @Test
+    fun `ringing at the appointed minute books tomorrow, not the same minute again`() {
+        // Strictly after, or the alarm would reschedule itself onto the instant
+        // it just fired at and loop.
+        val waking = setup().copy(wakeAlarm = true, wakeTime = LocalTime(7, 0))
+        assertEquals(
+            at("2026-09-08T07:00"),
+            nextWake(waking, at("2026-09-07T07:00")),
+        )
+    }
 
     @Test
     fun `the daily phase is due tonight when the evening is still ahead`() {

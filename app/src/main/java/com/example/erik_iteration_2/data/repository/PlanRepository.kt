@@ -23,6 +23,10 @@ class PlanRepository(
     fun observeDay(date: LocalDate): Flow<List<BlockWithItem>> =
         blockDao.observeForDateWithItems(date)
 
+    /** One day, read once. What the alarms need, which cannot hold a flow open. */
+    suspend fun findDay(date: LocalDate): List<BlockWithItem> =
+        blockDao.findForDateWithItems(date)
+
     fun observeRange(from: LocalDate, to: LocalDate): Flow<List<BlockWithItem>> =
         blockDao.observeForRangeWithItems(from, to)
 
@@ -84,6 +88,25 @@ class PlanRepository(
 
     suspend fun reopen(block: PlannedBlock) {
         blockDao.upsert(block.copy(completedAt = null, updatedAt = clock.now()))
+    }
+
+    /**
+     * Calls an occurrence off in advance, without removing it.
+     *
+     * Deleting would not hold: `expandRecurring` skips only the item/date pairs
+     * currently materialized, so a deleted occurrence of a day still ahead comes
+     * back on the next top-up. The row has to stay for the schedule to know the
+     * day was already decided — and a discarded block is also one the evening
+     * reevaluation no longer asks about.
+     */
+    suspend fun discard(block: PlannedBlock) {
+        val now = clock.now()
+        blockDao.upsert(block.copy(discardedAt = now, updatedAt = now))
+    }
+
+    /** Taking a calling-off back. The mirror of [discard], for a change of mind. */
+    suspend fun undiscard(block: PlannedBlock) {
+        blockDao.upsert(block.copy(discardedAt = null, updatedAt = clock.now()))
     }
 
     /** Total points earned by everything checked off on [date]. */

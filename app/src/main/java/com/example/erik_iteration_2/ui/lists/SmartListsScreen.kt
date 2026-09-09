@@ -59,6 +59,12 @@ fun SmartListsScreen(
     // The two long lists start closed: they are history and backlog, not today.
     var collapsed by remember { mutableStateOf(setOf(ListSection.SPERRLISTE, ListSection.ERFOLG)) }
 
+    // A tapped row. The card it holds says what to show; the flag says whether the
+    // popup may offer more than reading, which is a property of the *list* it came
+    // from rather than of the card.
+    var opened by remember { mutableStateOf<OpenedRow?>(null) }
+    var editing by remember { mutableStateOf<Item?>(null) }
+
     fun toggle(section: ListSection) {
         collapsed = if (section in collapsed) collapsed - section else collapsed + section
     }
@@ -88,10 +94,14 @@ fun SmartListsScreen(
                 emptyHint = "Nichts gesperrt.",
             ) {
                 state.locked.forEach { entry ->
+                    val detail = entry.until?.let { "bis ${it.formatLong()}" } ?: "gesperrt"
                     ItemLine(
                         item = entry.item,
-                        detail = entry.until?.let { "bis ${it.formatLong()}" } ?: "gesperrt",
+                        detail = detail,
                         detailColor = ErikTheme.colors.danger,
+                        // Read-only: the ban is a rule with a date on it, not a
+                        // card whose attributes are up for correction.
+                        onOpen = { opened = OpenedRow(entry.item, detail, editable = false) },
                     )
                 }
             }
@@ -104,20 +114,22 @@ fun SmartListsScreen(
                 emptyHint = "Leer — nichts notiert.",
             ) {
                 state.collection.forEach { entry ->
+                    val detail = when {
+                        !entry.item.isConcretized -> "unvollständig"
+                        entry.daysLeft == null -> ""
+                        entry.daysLeft <= 0 -> "läuft ab"
+                        entry.daysLeft == 1 -> "noch 1 Tag"
+                        else -> "noch ${entry.daysLeft} Tage"
+                    }
                     ItemLine(
                         item = entry.item,
-                        detail = when {
-                            !entry.item.isConcretized -> "unvollständig"
-                            entry.daysLeft == null -> ""
-                            entry.daysLeft <= 0 -> "läuft ab"
-                            entry.daysLeft == 1 -> "noch 1 Tag"
-                            else -> "noch ${entry.daysLeft} Tage"
-                        },
+                        detail = detail,
                         detailColor = if (entry.daysLeft != null && entry.daysLeft <= 7) {
                             ErikTheme.colors.danger
                         } else {
                             ErikTheme.colors.textMuted
                         },
+                        onOpen = { opened = OpenedRow(entry.item, detail, editable = true) },
                     )
                 }
             }
@@ -130,7 +142,12 @@ fun SmartListsScreen(
                 emptyHint = "Für diese Woche ist nichts vorgenommen.",
             ) {
                 state.week.forEach { item ->
-                    ItemLine(item = item, detail = item.estimatedDuration?.formatShort().orEmpty())
+                    val detail = item.estimatedDuration?.formatShort().orEmpty()
+                    ItemLine(
+                        item = item,
+                        detail = detail,
+                        onOpen = { opened = OpenedRow(item, detail, editable = true) },
+                    )
                 }
                 ErikButton(
                     text = "Wochenliste füllen",
@@ -146,7 +163,9 @@ fun SmartListsScreen(
                 onToggle = ::toggle,
                 emptyHint = "Heute steht nichts im Plan.",
             ) {
-                state.todayBlocks.forEach { BlockLine(it) }
+                state.todayBlocks.forEach { entry ->
+                    BlockLine(entry) { opened = OpenedRow(entry.item, blockDetail(entry), false) }
+                }
             }
 
             // Long-pressing this one is how the concept reopens tomorrow's plan.
@@ -159,7 +178,9 @@ fun SmartListsScreen(
                 emptyHint = "Erscheint, sobald die Planung für morgen bestätigt ist.",
             ) {
                 if (!state.tomorrowConfirmed) return@ListCard
-                state.tomorrowBlocks.forEach { BlockLine(it) }
+                state.tomorrowBlocks.forEach { entry ->
+                    BlockLine(entry) { opened = OpenedRow(entry.item, blockDetail(entry), false) }
+                }
                 ErikText(
                     text = "Lange drücken, um die Planung wieder zu öffnen.",
                     style = ErikTheme.typography.caption,
@@ -180,7 +201,9 @@ fun SmartListsScreen(
                             text = entry.name,
                             style = ErikTheme.typography.body,
                             modifier = Modifier.weight(1f),
-                            maxLines = 1,
+                            // History has no card behind it to open, so the name
+                            // simply gets the room it needs here.
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                         )
                         ErikText(
@@ -195,6 +218,61 @@ fun SmartListsScreen(
             Spacer(Modifier.size(ErikTheme.spacing.xl))
         }
     }
+
+    opened?.let { row ->
+        ItemDetailDialog(
+            item = row.item,
+            detail = row.detail,
+            editable = row.editable,
+            onDismiss = { opened = null },
+            onEdit = {
+                editing = row.item
+                opened = null
+            },
+            onDelete = {
+                viewModel.delete(row.item)
+                opened = null
+            },
+        )
+    }
+
+    editing?.let { item ->
+        ItemEditDialog(
+            item = item,
+            today = viewModel.today,
+            onDismiss = { editing = null },
+            onSaveTodo = { name, note, attributes ->
+                viewModel.saveTodo(item, name, note, attributes)
+                editing = null
+            },
+            onSaveRecurring = { name, note, attributes ->
+                viewModel.saveRecurring(item, name, note, attributes)
+                editing = null
+            },
+        )
+    }
+}
+
+/**
+ * A row the user tapped.
+ *
+ * [editable] belongs to the list rather than to the card: the Sammelliste and the
+ * Wochenliste hold definitions whose attributes are the user's to correct, while
+ * everything else on this screen is a block, a ban or history.
+ */
+private data class OpenedRow(
+    val item: Item,
+    val detail: String,
+    val editable: Boolean,
+)
+
+/** What a block adds to its card: when it stands, and whether it still does. */
+private fun blockDetail(entry: BlockWithItem): String = buildString {
+    append(entry.block.start.formatClock())
+    append(" · ")
+    append(entry.block.effectiveDuration.formatShort())
+    if (entry.block.isCompleted) append(" · erledigt")
+    if (entry.block.isDiscarded) append(" · ausgefallen")
 }
 
 /** The six lists of `Konzept.md`, in the order it names them. */
@@ -275,13 +353,26 @@ private fun ListCard(
     }
 }
 
+/**
+ * One card in a list.
+ *
+ * Tap and long-press both open the same popup: the note asked for both gestures,
+ * and having them differ would only be a thing to remember. A row is the only
+ * place a long name can be cut off, so this is where reading it starts.
+ */
 @Composable
 private fun ItemLine(
     item: Item,
     detail: String,
     detailColor: androidx.compose.ui.graphics.Color = ErikTheme.colors.textMuted,
+    onOpen: () -> Unit = {},
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.fillMaxWidth().pointerInput(item.id) {
+            detectTapGestures(onTap = { onOpen() }, onLongPress = { onOpen() })
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -312,8 +403,13 @@ private fun ItemLine(
 }
 
 @Composable
-private fun BlockLine(entry: BlockWithItem) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun BlockLine(entry: BlockWithItem, onOpen: () -> Unit = {}) {
+    Row(
+        modifier = Modifier.fillMaxWidth().pointerInput(entry.block.id) {
+            detectTapGestures(onTap = { onOpen() }, onLongPress = { onOpen() })
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             modifier = Modifier
                 .size(8.dp)

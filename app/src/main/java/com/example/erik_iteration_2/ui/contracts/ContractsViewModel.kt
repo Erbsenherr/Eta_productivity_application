@@ -92,6 +92,13 @@ class ContractsViewModel(
         }
     }
 
+    /** Changing a contract's wording; the dialog has already stated what it costs. */
+    fun editWording(contract: Contract, title: String, conditions: String, breach: String) {
+        viewModelScope.launch {
+            contractRepository.editWording(contract, title, conditions, breach)
+        }
+    }
+
     fun upgradeToLegacy(contract: Contract) {
         viewModelScope.launch { contractRepository.upgradeToLegacy(contract) }
     }

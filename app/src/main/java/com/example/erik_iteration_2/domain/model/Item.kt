@@ -56,6 +56,22 @@ data class Item(
     val recurrenceRule: RecurrenceRule? = null,
     /** RECURRING only: the time of day its blocks are placed at. */
     val startTime: LocalTime? = null,
+    /**
+     * Defaults stamped onto every block this definition produces: the journey
+     * there and the break afterwards. See [PlannedBlock.travelBefore].
+     */
+    val travelBefore: Duration? = null,
+    val breakAfter: Duration? = null,
+    /**
+     * Whether `task_end.mp3` announces the end of this task's planned time.
+     *
+     * On the definition rather than the block, because it is a property of the
+     * kind of thing this is — a task worth being told the end of stays one on
+     * every occurrence. Off for everything that existed before the switch did:
+     * the setup's frame of the day would otherwise start chiming all day, and
+     * nobody agreed to that by upgrading.
+     */
+    val endSound: Boolean = false,
     /** SPEND only, signed: Custom Earn is positive (+1.5/h), Custom Spend negative (-5/h). */
     val pointsPerHour: Double? = null,
     /**
@@ -87,13 +103,52 @@ data class Item(
         availableFrom?.let { date >= it } ?: true
 
     /**
-     * Quick-Add ToDos are created bare from the dashboard and gain their attributes
-     * during the daily planning phase. Only concretized ToDos can be planned.
+     * Quick-Add cards are created bare from the dashboard and gain their
+     * attributes in the evening. Only concretized cards can be planned.
+     *
+     * The question differs by type, because what "plannable" means does: a ToDo
+     * needs the three the revolver sorts and bills by, a recurring definition
+     * needs exactly what `expandRecurring` refuses to guess at — without a rule,
+     * a start time and a duration it lays down no occurrence at all.
      */
     @get:Ignore
     val isConcretized: Boolean
-        get() = type != ItemType.TODO ||
-            (category != null && priority != null && estimatedDuration != null)
+        get() = when (type) {
+            ItemType.TODO ->
+                category != null && priority != null && estimatedDuration != null
+
+            ItemType.RECURRING ->
+                recurrenceRule != null && startTime != null && estimatedDuration != null
+
+            else -> true
+        }
+
+    /**
+     * The card with every answer a plannable ToDo owes, filled in.
+     *
+     * On the model rather than in a repository because it carries an invariant:
+     * whatever it is handed, what comes back satisfies [isConcretized]. Three
+     * screens now finish a card — the evening step, the Listen-Tab's editor and
+     * the weekly planning — and each of them writing its own `copy` is three
+     * places for one of the three fields to be forgotten.
+     */
+    fun concretized(
+        category: Category,
+        priority: Priority,
+        targetDate: LocalDate,
+        estimatedDuration: Duration,
+        travelBefore: Duration? = this.travelBefore,
+        breakAfter: Duration? = this.breakAfter,
+        endSound: Boolean = this.endSound,
+    ): Item = copy(
+        category = category,
+        priority = priority,
+        targetDate = targetDate,
+        estimatedDuration = estimatedDuration,
+        travelBefore = travelBefore,
+        breakAfter = breakAfter,
+        endSound = endSound,
+    )
 
     /** Renames while keeping [normalizedName] consistent. Prefer this over a plain copy. */
     fun renamed(newName: String, now: Instant) = copy(
@@ -109,6 +164,26 @@ data class Item(
             now: Instant,
         ) = Item(
             type = ItemType.TODO,
+            name = name,
+            stage = Stage.COLLECTION,
+            enteredCollectionAt = now,
+            createdAt = now,
+            updatedAt = now,
+        )
+
+        /**
+         * The recurring counterpart of [newQuickTodo]: a name and nothing else.
+         *
+         * It waits in the Sammelliste like any other note — same one-month clock,
+         * same Sperrliste at the end of it — and the evening's concretizing step
+         * asks it which days, when and how long. Until then it carries no rule,
+         * so the expansion passes over it and it occupies no day.
+         */
+        fun newQuickRecurring(
+            name: String,
+            now: Instant,
+        ) = Item(
+            type = ItemType.RECURRING,
             name = name,
             stage = Stage.COLLECTION,
             enteredCollectionAt = now,
@@ -198,6 +273,11 @@ data class Item(
             category = missed.category,
             priority = Priority.MUST,
             estimatedDuration = missed.estimatedDuration,
+            // It is the same task on another day, so it keeps the journey it
+            // needs, the break it earns and whether its end announces itself.
+            travelBefore = missed.travelBefore,
+            breakAfter = missed.breakAfter,
+            endSound = missed.endSound,
             enteredCollectionAt = now,
             createdAt = now,
             updatedAt = now,

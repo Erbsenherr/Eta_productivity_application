@@ -3,6 +3,8 @@ package com.example.erik_iteration_2.di
 import android.content.Context
 import androidx.room3.Room
 import com.example.erik_iteration_2.alarm.PlanningAlarmCoordinator
+import com.example.erik_iteration_2.alarm.TaskStartCoordinator
+import com.example.erik_iteration_2.alarm.WakeAlarmCoordinator
 import com.example.erik_iteration_2.data.backup.BackupService
 import com.example.erik_iteration_2.data.local.ErikDatabase
 import com.example.erik_iteration_2.data.local.MIGRATION_1_2
@@ -14,6 +16,8 @@ import com.example.erik_iteration_2.data.local.MIGRATION_6_7
 import com.example.erik_iteration_2.data.local.MIGRATION_7_8
 import com.example.erik_iteration_2.data.local.MIGRATION_8_9
 import com.example.erik_iteration_2.data.local.MIGRATION_10_11
+import com.example.erik_iteration_2.data.local.MIGRATION_11_12
+import com.example.erik_iteration_2.data.local.MIGRATION_12_13
 import com.example.erik_iteration_2.data.local.MIGRATION_9_10
 import com.example.erik_iteration_2.data.repository.CatchUpService
 import com.example.erik_iteration_2.data.repository.ContractRepository
@@ -48,7 +52,7 @@ class AppContainer(
             ErikDatabase::class.java,
             ErikDatabase.NAME,
         )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
         .build()
 
     val backupService: BackupService = BackupService(appContext)
@@ -121,5 +125,20 @@ class AppContainer(
         context = appContext,
         phaseService = planningPhaseService,
         isAppInForeground = isAppInForeground,
+    )
+
+    /**
+     * Announces the start of every planned block. Takes no foreground flag: a
+     * task beginning is about the world, not about which screen is open.
+     */
+    val taskStartCoordinator: TaskStartCoordinator = TaskStartCoordinator(
+        context = appContext,
+        planRepository = planRepository,
+    )
+
+    /** Off unless the setup says otherwise; rings at the setup's wake time. */
+    val wakeAlarmCoordinator: WakeAlarmCoordinator = WakeAlarmCoordinator(
+        context = appContext,
+        setupRepository = setupRepository,
     )
 }

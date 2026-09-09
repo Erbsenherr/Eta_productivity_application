@@ -28,7 +28,7 @@ import com.example.erik_iteration_2.domain.setup.UserSetup
         Vacation::class,
         VacationRule::class,
     ],
-    version = 11,
+    version = 13,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -45,6 +45,34 @@ abstract class ErikDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "erik.db"
+    }
+}
+
+/**
+ * Everything the first round of real use needed.
+ *
+ * Three unrelated features share one migration because they arrived together and
+ * a version per column would only be a longer list to keep in step:
+ *
+ * - **`travelBefore` / `breakAfter`** on both tables — the journey there and the
+ *   break afterwards. Null on every existing row, which is exactly "no margins",
+ *   so nothing already planned changes shape.
+ * - **`items.endSound`**, `NOT NULL DEFAULT 0`. Zero rather than one on purpose:
+ *   the setup lays down the frame of the day — Morgenzeit, Pause, Freizeit — and
+ *   defaulting to on would have every one of those chime at its end for a user
+ *   who only upgraded. New cards get it ticked in the concretizing step instead.
+ * - **`contracts.editedAt`**, the once-only flag on changing a contract's wording.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `travelBefore` INTEGER")
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `breakAfter` INTEGER")
+        connection.execSQL(
+            "ALTER TABLE `items` ADD COLUMN `endSound` INTEGER NOT NULL DEFAULT 0",
+        )
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `travelBefore` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `breakAfter` INTEGER")
+        connection.execSQL("ALTER TABLE `contracts` ADD COLUMN `editedAt` INTEGER")
     }
 }
 
@@ -113,6 +141,20 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
  * Null keeps it on the weekly planning day, which is where it always was — so
  * every existing row keeps behaving exactly as before.
  */
+/**
+ * The wake alarm's on/off switch.
+ *
+ * Defaults to 0 for every existing row, which is the only safe answer: nobody who
+ * has been using the app agreed to be woken by it.
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `wakeAlarm` INTEGER NOT NULL DEFAULT 0",
+        )
+    }
+}
+
 val MIGRATION_10_11 = object : Migration(10, 11) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `inflationDay` TEXT")

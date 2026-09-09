@@ -66,6 +66,22 @@ data class PlannedBlock(
     val completedAt: Instant? = null,
     /** Recorded when checking off; falls back to [plannedDuration] for the yield. */
     val actualDuration: Duration? = null,
+    /**
+     * The journey there, which runs *before* [start], and the break that follows
+     * the task.
+     *
+     * Two columns rather than two extra blocks. Each extra block would need an
+     * [Item] to point at, and with it an extra definition, two more rows in every
+     * list, two more questions in the evening reevaluation, and a moved task that
+     * has to drag two other rows along atomically. As columns there is nothing to
+     * keep in step: the block still starts when it says it starts, and the
+     * **container** it occupies is [startMinute] − [travelBefore] to end +
+     * [breakAfter]. That container is what every question about *time* is asked;
+     * every question about *points* still gets [effectiveDuration], because
+     * travelling and resting pay nothing.
+     */
+    val travelBefore: Duration? = null,
+    val breakAfter: Duration? = null,
     /** Set when the evening reevaluation drops this occurrence instead of completing it. */
     val discardedAt: Instant? = null,
     /** The "Nachholen von …" ToDo this discarded occurrence spawned, if any. */
@@ -94,4 +110,8 @@ data class PlannedBlock(
     /** Duration to bill: the corrected one if given, otherwise what was planned. */
     @get:Ignore
     val effectiveDuration: Duration get() = actualDuration ?: plannedDuration
+
+    /** Whether this block brings a journey or a break with it. */
+    @get:Ignore
+    val hasMargins: Boolean get() = travelBefore != null || breakAfter != null
 }

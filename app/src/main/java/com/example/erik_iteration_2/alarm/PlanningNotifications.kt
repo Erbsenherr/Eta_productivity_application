@@ -5,14 +5,25 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import android.net.Uri
 import androidx.core.content.getSystemService
+import androidx.core.net.toUri
 import com.example.erik_iteration_2.R
 import com.example.erik_iteration_2.domain.planning.PlanningPhase
 
-private const val CHANNEL_ID = "planning"
+/**
+ * A channel's sound is fixed when it is created and cannot be changed afterwards,
+ * so giving the alarm its own sound meant a **new channel id**. The old one is
+ * deleted with it, or every existing install would keep a dead "Planungsphasen"
+ * entry in the system settings next to the live one.
+ */
+private const val CHANNEL_ID = "planning_v2"
+private const val LEGACY_CHANNEL_ID = "planning"
 
 /** One id per phase, so the daily and weekly alarms never overwrite each other. */
 private fun notificationId(phase: PlanningPhase) = 2000 + phase.ordinal
@@ -30,6 +41,8 @@ object PlanningNotifications {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager: NotificationManager = context.getSystemService() ?: return
+
+        manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -37,9 +50,23 @@ object PlanningNotifications {
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "Erinnert an die Tages- und Wochenplanung."
+                setSound(
+                    soundUri(context),
+                    AudioAttributes.Builder()
+                        // On the alarm stream, like the alarm it belongs to: this
+                        // one is meant to interrupt an evening, and it carries
+                        // `setAlarmClock` on the other side.
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
             },
         )
     }
+
+    /** The user's own `planning_start.mp3`, from `res/raw`. */
+    private fun soundUri(context: Context): Uri =
+        "android.resource://${context.packageName}/${R.raw.planning_start}".toUri()
 
     fun show(context: Context, phase: PlanningPhase) {
         ensureChannel(context)
@@ -59,6 +86,10 @@ object PlanningNotifications {
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            // Ignored from Android 8 on, where the channel above carries the
+            // sound. It is what makes 7.x — which this app still supports — hear
+            // anything at all.
+            .setSound(soundUri(context), AudioManager.STREAM_ALARM)
             .setAutoCancel(true)
             // Both land *in* the phase rather than on the dashboard: an alarm that
             // says "time to plan" and then drops the user somewhere else has made

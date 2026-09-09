@@ -386,6 +386,16 @@ private fun RewardStep(settlement: DailySettlement?) {
                     style = ErikTheme.typography.caption,
                     color = ErikTheme.colors.textMuted,
                 )
+                // Says which half of those hours was the user's own doing. Empty
+                // hours were never claimed; these were promised and given back.
+                if (settlement.droppedHours > 0.0) {
+                    ErikText(
+                        text = "Davon ${formatPoints(settlement.droppedHours)} h, " +
+                            "die verplant und dann fallen gelassen wurden.",
+                        style = ErikTheme.typography.caption,
+                        color = ErikTheme.colors.warning,
+                    )
+                }
             }
 
             Spacer(Modifier.size(ErikTheme.spacing.xs))

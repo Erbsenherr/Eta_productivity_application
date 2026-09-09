@@ -8,4 +8,16 @@
     <style name="Theme.ERIK_Iteration_2" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/erik_window_background</item>
     </style>
+
+    <!--
+        The widget's sheet. Translucent so the home screen stays visible behind
+        it: this is a note taken in passing, not a visit to the app, and a full
+        opaque screen would read as one.
+    -->
+    <style name="Theme.ERIK_QuickAdd" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

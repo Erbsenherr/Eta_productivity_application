@@ -51,10 +51,22 @@ class MainActivity : ComponentActivity() {
         readDeferPhase(intent)
     }
 
+    /**
+     * Reads the alarm's answer out of the intent — **once**.
+     *
+     * The extras are removed as they are read, because a configuration change
+     * recreates the activity with the very same intent. Without this, rotating
+     * the phone re-opened the planning phase or brought `DeferDialog` back up:
+     * these are one-shot instructions, and leaving them in the intent made them
+     * standing ones.
+     */
     private fun readDeferPhase(intent: Intent?) {
-        deferPhase = intent.phaseExtra(PlanningAlarmContract.EXTRA_DEFER_PHASE)
-        openPhase = intent.phaseExtra(PlanningAlarmContract.EXTRA_OPEN_PHASE)
+        deferPhase = intent.takePhaseExtra(PlanningAlarmContract.EXTRA_DEFER_PHASE)
+        openPhase = intent.takePhaseExtra(PlanningAlarmContract.EXTRA_OPEN_PHASE)
     }
+
+    private fun Intent?.takePhaseExtra(key: String): PlanningPhase? =
+        phaseExtra(key).also { if (this != null) removeExtra(key) }
 
     private fun Intent?.phaseExtra(key: String): PlanningPhase? =
         this?.getStringExtra(key)?.let { runCatching { PlanningPhase.valueOf(it) }.getOrNull() }

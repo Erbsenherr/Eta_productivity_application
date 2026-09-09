@@ -28,14 +28,46 @@ fun PlannedBlock.startMinute(): Int = start.minuteOfDay()
 fun PlannedBlock.endMinute(): Int =
     (startMinute() + effectiveDuration.inWholeMinutes.toInt()).coerceAtMost(MINUTES_PER_DAY)
 
+/**
+ * Where the whole thing starts and ends, journey and break included.
+ *
+ * Two spans, not one, because they answer different questions. [startMinute] and
+ * [endMinute] are the task, and are what points are billed for. The **container**
+ * is what the task *occupies*, and is what every question about time is asked —
+ * overlap, placement, and how much of a day carries a plan. Clamped to the day at
+ * both ends: the planner draws one day, and a margin that would run off it is
+ * shown ending at the edge.
+ */
+fun PlannedBlock.containerStartMinute(): Int =
+    (startMinute() - (travelBefore?.inWholeMinutes?.toInt() ?: 0)).coerceAtLeast(0)
+
+fun PlannedBlock.containerEndMinute(): Int =
+    (endMinute() + (breakAfter?.inWholeMinutes?.toInt() ?: 0)).coerceAtMost(MINUTES_PER_DAY)
+
 /** Half-open ranges, so a block ending at 10:00 and one starting there do not clash. */
 fun overlaps(fromA: Int, toA: Int, fromB: Int, toB: Int): Boolean = fromA < toB && fromB < toA
 
+/**
+ * Whether two blocks want the same minutes.
+ *
+ * Compared as containers: a task with a quarter of an hour of travel in front of
+ * it genuinely holds that quarter of an hour, and something else planned into it
+ * would be planned into a journey already under way.
+ */
 fun PlannedBlock.overlaps(other: PlannedBlock): Boolean =
-    overlaps(startMinute(), endMinute(), other.startMinute(), other.endMinute())
+    overlaps(
+        containerStartMinute(),
+        containerEndMinute(),
+        other.containerStartMinute(),
+        other.containerEndMinute(),
+    )
 
 fun snapToGrid(minute: Int, step: Int = SNAP_MINUTES): Int =
     ((minute + step / 2) / step) * step
+
+/** The next grid line at or after [minute] — what a lead-in has to clear. */
+private fun ceilToGrid(minute: Int, step: Int = SNAP_MINUTES): Int =
+    ((minute + step - 1) / step) * step
 
 /**
  * Whether [candidate] can go where it wants to.
@@ -47,6 +79,23 @@ fun snapToGrid(minute: Int, step: Int = SNAP_MINUTES): Int =
  */
 fun canPlace(existing: List<PlannedBlock>, candidate: PlannedBlock): Boolean =
     existing.none { it.id != candidate.id && it.overlaps(candidate) }
+
+/**
+ * Whether [duration] plus its margins fits anywhere at all from [preferredStart].
+ *
+ * The question the break prompt asks twice: once with the break and once without
+ * it. The journey is never dropped — it is the time the task takes to reach, and
+ * a task placed without it is simply planned wrong — so only the tail moves
+ * between the two calls.
+ */
+fun fitsSomewhere(
+    existing: List<PlannedBlock>,
+    duration: Duration,
+    preferredStart: Int,
+    ignoreId: String? = null,
+    leadIn: Duration? = null,
+    tailOut: Duration? = null,
+): Boolean = firstFreeStart(existing, duration, preferredStart, ignoreId, leadIn, tailOut) != null
 
 /** What [candidate] would run into. Empty when it fits. */
 fun collisionsFor(existing: List<PlannedBlock>, candidate: PlannedBlock): List<PlannedBlock> =
@@ -64,24 +113,33 @@ fun firstFreeStart(
     duration: Duration,
     preferredStart: Int,
     ignoreId: String? = null,
+    leadIn: Duration? = null,
+    tailOut: Duration? = null,
 ): Int? {
     val length = duration.inWholeMinutes.toInt()
     if (length <= 0) return null
 
+    val lead = leadIn?.inWholeMinutes?.toInt() ?: 0
+    val tail = tailOut?.inWholeMinutes?.toInt() ?: 0
+
     val obstacles = existing
         .filter { it.id != ignoreId }
-        .map { it.startMinute() to it.endMinute() }
+        .map { it.containerStartMinute() to it.containerEndMinute() }
         .sortedBy { it.first }
 
-    var candidate = snapToGrid(preferredStart.coerceAtLeast(0))
-    while (candidate + length <= MINUTES_PER_DAY) {
+    // The returned minute is the **task's** start; the journey reaches back
+    // before it, so the earliest possible one is the first grid line that leaves
+    // room for it.
+    var candidate = maxOf(snapToGrid(preferredStart.coerceAtLeast(0)), ceilToGrid(lead))
+    while (candidate + length + tail <= MINUTES_PER_DAY) {
         val blocking = obstacles.firstOrNull { (from, to) ->
-            overlaps(candidate, candidate + length, from, to)
+            overlaps(candidate - lead, candidate + length + tail, from, to)
         }
         if (blocking == null) return candidate
-        // Jump to just after whatever was in the way, still on the grid.
-        candidate = snapToGrid(blocking.second)
-        if (candidate < blocking.second) candidate += SNAP_MINUTES
+        // Jump to just after whatever was in the way, still on the grid — and far
+        // enough that the journey clears it too.
+        candidate = snapToGrid(blocking.second + lead)
+        if (candidate < blocking.second + lead) candidate += SNAP_MINUTES
     }
     return null
 }

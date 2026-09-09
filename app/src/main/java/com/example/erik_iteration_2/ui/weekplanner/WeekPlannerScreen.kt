@@ -171,10 +171,8 @@ fun WeekPlannerScreen(
         AddGoalDialog(
             today = viewModel.today,
             onDismiss = { adding = false },
-            onCreate = { name, category, priority, inDays, duration ->
-                viewModel.addToCollection(name, category, priority, inDays, duration) {
-                    adding = false
-                }
+            onCreate = { name, attributes ->
+                viewModel.addToCollection(name, attributes) { adding = false }
             },
         )
     }

@@ -11,6 +11,8 @@ import com.example.erik_iteration_2.data.repository.WeekPlanningService
 import com.example.erik_iteration_2.data.repository.WeekScope
 import com.example.erik_iteration_2.domain.model.Category
 import com.example.erik_iteration_2.domain.model.Item
+import com.example.erik_iteration_2.ui.attributes.TodoAttributes
+import com.example.erik_iteration_2.domain.model.ItemType
 import com.example.erik_iteration_2.domain.model.Priority
 import com.example.erik_iteration_2.domain.model.Stage
 import com.example.erik_iteration_2.domain.planning.WeekBudget
@@ -101,8 +103,13 @@ class WeekPlannerViewModel(
             unfinished = unfinished,
             weekStart = weekStart,
             weekEnd = weekEnd,
-            // A ToDo whose week has not come round yet cannot be pulled in.
-            collection = collection.filter { it.isAvailableOn(weekEnd) },
+            // A ToDo whose week has not come round yet cannot be pulled in — and
+            // the Sammelliste now also holds bare recurring notes, which are not
+            // week goals at all: they belong to the standing schedule, and the
+            // evening's concretizing step is what puts them there.
+            collection = collection.filter {
+                it.type == ItemType.TODO && it.isAvailableOn(weekEnd)
+            },
             weekList = weekList,
             budget = weekBudget(setup, blocks, weekList),
         )
@@ -161,23 +168,22 @@ class WeekPlannerViewModel(
      * never planned, because the revolver only offers finished cards. The
      * Sperrliste can still veto the name — that check is the whole point of it.
      */
-    fun addToCollection(
-        name: String,
-        category: Category,
-        priority: Priority,
-        inDays: Int,
-        duration: Duration,
-        onDone: () -> Unit,
-    ) {
+    fun addToCollection(name: String, attributes: TodoAttributes, onDone: () -> Unit) {
         viewModelScope.launch {
+            val now = clock.now()
             itemRepository.add(
                 Item.newTodo(
                     name = name,
-                    category = category,
-                    priority = priority,
-                    targetDate = weekPlanningService.today().plus(DatePeriod(days = inDays.coerceAtLeast(0))),
-                    estimatedDuration = duration,
-                    now = clock.now(),
+                    category = attributes.category,
+                    priority = attributes.priority,
+                    targetDate = weekPlanningService.today()
+                        .plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                    estimatedDuration = attributes.duration,
+                    now = now,
+                ).copy(
+                    travelBefore = attributes.travelBefore,
+                    breakAfter = attributes.breakAfter,
+                    endSound = attributes.endSound,
                 ),
             )
             onDone()

@@ -14,6 +14,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +46,8 @@ import com.example.erik_iteration_2.ui.lists.SmartListsScreen
 import com.example.erik_iteration_2.ui.lists.SmartListsViewModel
 import com.example.erik_iteration_2.ui.planner.DayPlannerScreen
 import com.example.erik_iteration_2.ui.planner.DayPlannerViewModel
+import com.example.erik_iteration_2.ui.planner.PlannerDay
+import com.example.erik_iteration_2.ui.quickadd.QuickAddViewModel
 import com.example.erik_iteration_2.ui.reevaluation.ReevaluationScreen
 import com.example.erik_iteration_2.ui.reevaluation.ReevaluationViewModel
 import com.example.erik_iteration_2.ui.settings.SettingsScreen
@@ -116,8 +120,12 @@ private fun MainScaffold(
     openPhase: PlanningPhase? = null,
     onOpenHandled: () -> Unit = {},
 ) {
-    var tab by remember { mutableStateOf(ErikTab.Today) }
-    var flow by remember { mutableStateOf<AppFlow?>(null) }
+    // Saveable, not merely remembered: a rotation is a configuration change, and
+    // losing these two to one used to throw the user out of a planning phase and
+    // back onto the dashboard. Saved by name, so what goes into the bundle is a
+    // plain String rather than anything that needs a parcelling story.
+    var tab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(ErikTab.Today) }
+    var flow by rememberSaveable(stateSaver = FLOW_SAVER) { mutableStateOf<AppFlow?>(null) }
 
     // Answering the alarm lands in the phase itself. Dropping the user on the
     // dashboard would make them do the navigating they were interrupted for.
@@ -150,7 +158,22 @@ private fun MainScaffold(
     if (flow != null) {
         when (flow) {
             AppFlow.Planner -> DayPlannerScreen(
-                viewModel = viewModel(key = "planner-$dateKey", factory = plannerViewModelFactory(container)),
+                viewModel = viewModel(
+                    key = "planner-$dateKey",
+                    factory = plannerViewModelFactory(container, PlannerDay.TOMORROW),
+                ),
+                onClose = { flow = null },
+                onTopUpWeek = { flow = AppFlow.WeekTopUp },
+            )
+
+            // The same screen on the day already running. A flow rather than a
+            // tab: it is something you are in the middle of, and it leaves by
+            // being done with.
+            AppFlow.PlannerToday -> DayPlannerScreen(
+                viewModel = viewModel(
+                    key = "planner-today-$dateKey",
+                    factory = plannerViewModelFactory(container, PlannerDay.TODAY),
+                ),
                 onClose = { flow = null },
                 onTopUpWeek = { flow = AppFlow.WeekTopUp },
             )
@@ -199,7 +222,12 @@ private fun MainScaffold(
             when (tab) {
                 ErikTab.Today -> DashboardScreen(
                     viewModel = viewModel(key = "dashboard-$dateKey", factory = dashboardViewModelFactory(container)),
+                    quickAddViewModel = viewModel(
+                        key = "quickadd-$dateKey",
+                        factory = quickAddViewModelFactory(container),
+                    ),
                     onPlanTomorrow = { flow = AppFlow.Planner },
+                    onReplanToday = { flow = AppFlow.PlannerToday },
                     onPlanWeek = { flow = AppFlow.WeekPlanner },
                     onCloseDay = { flow = AppFlow.Reevaluation },
                 )
@@ -259,8 +287,33 @@ private enum class ErikTab(val label: String) {
     Settings("Einstellungen"),
 }
 
+/**
+ * Savers for the two, by name.
+ *
+ * A null flow saves nothing, which restores as the initial null — exactly right:
+ * "no flow" is what the screen comes back to anyway.
+ */
+private val TAB_SAVER: Saver<ErikTab, Any> = Saver(
+    save = { it.name },
+    restore = { runCatching { ErikTab.valueOf(it as String) }.getOrNull() },
+)
+
+private val FLOW_SAVER: Saver<AppFlow?, Any> = Saver(
+    save = { it?.name },
+    restore = { runCatching { AppFlow.valueOf(it as String) }.getOrNull() },
+)
+
 /** Things you are in the middle of. They cover the bar until they are done. */
-private enum class AppFlow { Planner, WeekPlanner, WeekTopUp, Reevaluation, Concretize, Vacation }
+private enum class AppFlow {
+    Planner,
+    /** The day planner turned on today, for changing a plan while it runs. */
+    PlannerToday,
+    WeekPlanner,
+    WeekTopUp,
+    Reevaluation,
+    Concretize,
+    Vacation,
+}
 
 /**
  * Asks for the notification permission once, on the versions that have one.
@@ -298,6 +351,7 @@ private fun rootViewModelFactory(container: AppContainer): ViewModelProvider.Fac
             RootViewModel(
                 container.setupRepository,
                 container.planningAlarmCoordinator,
+                container.taskStartCoordinator,
                 container.scheduleMaintenance,
                 container.weekPlanningService,
             )
@@ -318,11 +372,15 @@ private fun dashboardViewModelFactory(container: AppContainer): ViewModelProvide
                 pointsRepository = container.pointsRepository,
                 contractRepository = container.contractRepository,
                 setupRepository = container.setupRepository,
+                taskStartCoordinator = container.taskStartCoordinator,
             )
         }
     }
 
-private fun plannerViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+private fun plannerViewModelFactory(
+    container: AppContainer,
+    day: PlannerDay,
+): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             DayPlannerViewModel(
@@ -330,7 +388,16 @@ private fun plannerViewModelFactory(container: AppContainer): ViewModelProvider.
                 planRepository = container.planRepository,
                 setupRepository = container.setupRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
+                weekPlanningService = container.weekPlanningService,
+                day = day,
             )
+        }
+    }
+
+private fun quickAddViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            QuickAddViewModel(itemRepository = container.itemRepository)
         }
     }
 
@@ -353,7 +420,12 @@ private fun weekPlannerViewModelFactory(
 
 private fun concretizeViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { ConcretizeViewModel(container.itemRepository) }
+        initializer {
+            ConcretizeViewModel(
+                itemRepository = container.itemRepository,
+                scheduleMaintenance = container.scheduleMaintenance,
+            )
+        }
     }
 
 private fun vacationViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
@@ -365,16 +437,26 @@ private fun vacationViewModelFactory(container: AppContainer): ViewModelProvider
 
 private fun settingsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { SettingsViewModel(
-                container.setupRepository,
-                container.backupService,
-                container.catchUpService,
-            ) }
+        initializer {
+            SettingsViewModel(
+                setupRepository = container.setupRepository,
+                backupService = container.backupService,
+                catchUpService = container.catchUpService,
+                phaseService = container.planningPhaseService,
+                wakeAlarmCoordinator = container.wakeAlarmCoordinator,
+            )
+        }
     }
 
 private fun smartListsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { SmartListsViewModel(container.itemRepository, container.planRepository) }
+        initializer {
+            SmartListsViewModel(
+                itemRepository = container.itemRepository,
+                planRepository = container.planRepository,
+                scheduleMaintenance = container.scheduleMaintenance,
+            )
+        }
     }
 
 private fun contractsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =

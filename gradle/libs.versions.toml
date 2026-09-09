@@ -1,5 +1,5 @@
 [versions]
-agp = "9.3.1"
+agp = "9.3.2"
 coreKtx = "1.10.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -10,7 +10,7 @@ kotlin = "2.2.10"
 composeBom = "2026.02.01"
 kotlinxDatetime = "0.8.0"
 room = "3.0.1"
-ksp = "2.2.10-2.0.2"
+ksp = "2.3.6"
 desugarJdkLibs = "2.1.5"
 
 [libraries]

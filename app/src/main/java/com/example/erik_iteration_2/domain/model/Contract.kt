@@ -76,6 +76,15 @@ data class Contract(
     val closedAt: Instant? = null,
     /** The last day the evening check was answered, so it is only asked once. */
     val lastCheckedOn: LocalDate? = null,
+    /**
+     * When the wording was changed, if it ever was.
+     *
+     * One change per contract, and this is the flag that enforces it. A contract
+     * you may rewrite whenever it becomes inconvenient is not a promise, so the
+     * allowance is exactly one — and it costs the term, which restarts from the
+     * day of the change.
+     */
+    val editedAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
@@ -112,6 +121,16 @@ data class Contract(
     /** Has run uninterrupted long enough to become a legacy contract. */
     fun canUpgradeToLegacy(today: LocalDate): Boolean =
         state == ContractState.ACTIVE && today >= signedOn.plus(LEGACY_QUALIFYING_TERM)
+
+    /**
+     * Whether the wording may still be changed.
+     *
+     * A legacy contract may not: it already got its reduction by running a month,
+     * and rewriting what it asks would make that month meaningless. Neither may a
+     * broken or fulfilled one — those are closed.
+     */
+    @get:Ignore
+    val isEditable: Boolean get() = state == ContractState.ACTIVE && editedAt == null
 
     /** Whether the evening still owes this contract its question on [date]. */
     fun needsCheckOn(date: LocalDate): Boolean =

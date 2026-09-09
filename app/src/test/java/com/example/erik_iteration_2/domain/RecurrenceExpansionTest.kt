@@ -9,6 +9,7 @@ import com.example.erik_iteration_2.domain.recurrence.expandRecurring
 import com.example.erik_iteration_2.domain.recurrence.isoWeekNumber
 import com.example.erik_iteration_2.domain.recurrence.matches
 import com.example.erik_iteration_2.domain.recurrence.occurrencesBetween
+import com.example.erik_iteration_2.domain.recurrence.rulesForWeekdays
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlinx.datetime.DayOfWeek
@@ -32,6 +33,30 @@ class RecurrenceExpansionTest {
         estimatedDuration = 1.hours,
         now = now,
     )
+
+    @Test
+    fun `all seven weekdays collapse into the daily rule`() {
+        assertEquals(
+            listOf(RecurrenceRule.Daily),
+            rulesForWeekdays(DayOfWeek.entries.toSet()),
+        )
+    }
+
+    @Test
+    fun `fewer weekdays become one weekly rule each, in weekday order`() {
+        assertEquals(
+            listOf(
+                RecurrenceRule.Weekly(DayOfWeek.TUESDAY),
+                RecurrenceRule.Weekly(DayOfWeek.THURSDAY),
+            ),
+            rulesForWeekdays(setOf(DayOfWeek.THURSDAY, DayOfWeek.TUESDAY)),
+        )
+    }
+
+    @Test
+    fun `no weekday is no answer, and yields no definition`() {
+        assertTrue(rulesForWeekdays(emptySet()).isEmpty())
+    }
 
     @Test
     fun `weekly fires on its weekday only`() {

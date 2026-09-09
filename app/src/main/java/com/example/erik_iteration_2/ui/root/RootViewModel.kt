@@ -3,6 +3,7 @@ package com.example.erik_iteration_2.ui.root
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.erik_iteration_2.alarm.PlanningAlarmCoordinator
+import com.example.erik_iteration_2.alarm.TaskStartCoordinator
 import com.example.erik_iteration_2.data.repository.ScheduleMaintenance
 import com.example.erik_iteration_2.data.repository.SetupRepository
 import com.example.erik_iteration_2.data.repository.WeekPlanningService
@@ -24,6 +25,7 @@ enum class RootDestination { Loading, Setup, Dashboard }
 class RootViewModel(
     private val setupRepository: SetupRepository,
     private val planningAlarmCoordinator: PlanningAlarmCoordinator,
+    private val taskStartCoordinator: TaskStartCoordinator,
     private val scheduleMaintenance: ScheduleMaintenance,
     private val weekPlanningService: WeekPlanningService,
 ) : ViewModel() {
@@ -47,6 +49,10 @@ class RootViewModel(
             // first launch after its day rather than waiting for a screen visit.
             weekPlanningService.applyInflation()
             planningAlarmCoordinator.rescheduleAll()
+            // Runs on leaving every flow, which is where the day's blocks get
+            // moved, added and taken off — so this is where the announcement
+            // of the next one has to be re-aimed.
+            taskStartCoordinator.reschedule()
         }
     }
 
@@ -59,6 +65,7 @@ class RootViewModel(
             setupRepository.resetEverything()
             // Without a setup there is nothing to ring for; this clears the alarms.
             planningAlarmCoordinator.rescheduleAll()
+            taskStartCoordinator.reschedule()
         }
     }
 }

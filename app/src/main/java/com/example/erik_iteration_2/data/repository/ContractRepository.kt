@@ -1,6 +1,7 @@
 package com.example.erik_iteration_2.data.repository
 
 import com.example.erik_iteration_2.data.local.ContractDao
+import com.example.erik_iteration_2.domain.contract.editedContract
 import com.example.erik_iteration_2.domain.contract.rejectionReason
 import com.example.erik_iteration_2.domain.model.Contract
 import com.example.erik_iteration_2.domain.model.ContractEffort
@@ -103,6 +104,37 @@ class ContractRepository(
                 updatedAt = now,
             ),
         )
+    }
+
+    /**
+     * Changing a running contract's wording. Once, and the term restarts.
+     *
+     * Only the text: the effort, and with it the daily payout, stays where it was
+     * — an edit that could raise the rate would make this a way to pay yourself
+     * more for a promise already half-served. The term keeps its **length** and
+     * loses its run-up, so a contract two weeks in is back at zero and needs a
+     * full month again before it can become legacy.
+     *
+     * Returns false when the contract may not be changed; [editRefusal] in the
+     * dialog is what says which of the reasons applies.
+     */
+    suspend fun editWording(
+        contract: Contract,
+        title: String,
+        conditions: String,
+        breachDefinition: String,
+    ): Boolean {
+        val edited = editedContract(
+            contract = contract,
+            title = title,
+            conditions = conditions,
+            breachDefinition = breachDefinition,
+            today = today(),
+            now = clock.now(),
+        ) ?: return false
+
+        contractDao.upsert(edited)
+        return true
     }
 
     /** Extending a contract that ran its term — no breach, no lock. */

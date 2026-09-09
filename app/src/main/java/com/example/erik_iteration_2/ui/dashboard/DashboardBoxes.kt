@@ -1,6 +1,9 @@
 package com.example.erik_iteration_2.ui.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.erik_iteration_2.data.local.BlockWithItem
@@ -35,6 +39,7 @@ import com.example.erik_iteration_2.ui.components.ErikCheckbox
 import com.example.erik_iteration_2.ui.components.ErikStepperButton
 import com.example.erik_iteration_2.ui.components.ErikSurface
 import com.example.erik_iteration_2.ui.components.ErikText
+import com.example.erik_iteration_2.ui.components.ErikTimePickerDialog
 import com.example.erik_iteration_2.ui.format.formatClock
 import com.example.erik_iteration_2.ui.format.formatCountdown
 import com.example.erik_iteration_2.ui.format.formatPoints
@@ -44,6 +49,7 @@ import com.example.erik_iteration_2.ui.theme.colorOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.datetime.LocalTime
 
 /** How much one tap on the duration stepper moves the needle. */
 private val DURATION_STEP = 15.minutes
@@ -309,53 +315,82 @@ private fun StreakBadge(streak: Streak) {
     }
 }
 
-/** Box 1 — the account, plus what today would add once harvested. */
+/**
+ * Box 1 — the account, plus what today would add once harvested.
+ *
+ * Long-pressing it books points by hand. The gesture sits here rather than on a
+ * settings row because this is where the number the correction is about is being
+ * looked at.
+ */
 @Composable
 fun PointsBox(
     balance: Double,
     pendingHarvest: Double,
     modifier: Modifier = Modifier,
     crowned: Boolean = false,
+    onLongPress: () -> Unit = {},
 ) {
-    ErikSurface(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(modifier = Modifier.weight(1f)) {
-                ErikText(
-                    text = if (crowned) "Punktestand 👑" else "Punktestand",
-                    style = ErikTheme.typography.label,
-                    color = ErikTheme.colors.textSecondary,
-                )
-                Spacer(Modifier.size(ErikTheme.spacing.xs))
-                ErikText(
-                    text = formatPoints(balance),
-                    style = ErikTheme.typography.display,
-                    color = if (balance < 0) ErikTheme.colors.danger else ErikTheme.colors.textPrimary,
-                )
-            }
-            if (pendingHarvest != 0.0) {
-                Column(horizontalAlignment = Alignment.End) {
+    ErikSurface(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { onLongPress() }) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.xs)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(modifier = Modifier.weight(1f)) {
                     ErikText(
-                        text = "heute erarbeitet",
-                        style = ErikTheme.typography.caption,
-                        color = ErikTheme.colors.textMuted,
+                        text = if (crowned) "Punktestand 👑" else "Punktestand",
+                        style = ErikTheme.typography.label,
+                        color = ErikTheme.colors.textSecondary,
                     )
+                    Spacer(Modifier.size(ErikTheme.spacing.xs))
                     ErikText(
-                        text = "+${formatPoints(pendingHarvest)}",
-                        style = ErikTheme.typography.title,
-                        color = ErikTheme.colors.success,
-                    )
-                    ErikText(
-                        text = "wird abends gutgeschrieben",
-                        style = ErikTheme.typography.caption,
-                        color = ErikTheme.colors.textMuted,
+                        text = formatPoints(balance),
+                        style = ErikTheme.typography.display,
+                        color = if (balance < 0) {
+                            ErikTheme.colors.danger
+                        } else {
+                            ErikTheme.colors.textPrimary
+                        },
                     )
                 }
+                if (pendingHarvest != 0.0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        ErikText(
+                            text = "heute erarbeitet",
+                            style = ErikTheme.typography.caption,
+                            color = ErikTheme.colors.textMuted,
+                        )
+                        ErikText(
+                            text = "+${formatPoints(pendingHarvest)}",
+                            style = ErikTheme.typography.title,
+                            color = ErikTheme.colors.success,
+                        )
+                        ErikText(
+                            text = "wird abends gutgeschrieben",
+                            style = ErikTheme.typography.caption,
+                            color = ErikTheme.colors.textMuted,
+                        )
+                    }
+                }
             }
+            ErikText(
+                text = "Lange drücken, um von Hand zu buchen.",
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+            )
         }
     }
 }
 
-/** Box 2 — the day's blocks, checkable, with the duration correctable once done. */
+/**
+ * Box 2 — the day's blocks, checkable, and correctable where the day has already
+ * departed from the plan.
+ *
+ * Both halves of "07:00 · 1 h" are editable, and neither waits for the block to
+ * be ticked off: something starting later than planned is the correction a
+ * running day needs most often, and the duration is what the evening bills.
+ */
 @Composable
 fun TasksBox(
     title: String,
@@ -363,6 +398,7 @@ fun TasksBox(
     modifier: Modifier = Modifier,
     onToggle: ((BlockWithItem) -> Unit)? = null,
     onDurationChange: ((BlockWithItem, Duration) -> Unit)? = null,
+    onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
     emptyHint: String = "Nichts geplant.",
 ) {
     ErikSurface(modifier = modifier.fillMaxWidth()) {
@@ -380,6 +416,7 @@ fun TasksBox(
                         entry = entry,
                         onToggle = onToggle,
                         onDurationChange = onDurationChange,
+                        onStartChange = onStartChange,
                     )
                 }
             }
@@ -392,7 +429,10 @@ private fun TaskRow(
     entry: BlockWithItem,
     onToggle: ((BlockWithItem) -> Unit)?,
     onDurationChange: ((BlockWithItem, Duration) -> Unit)?,
+    onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
 ) {
+    var pickingStart by remember(entry.block.id) { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onToggle != null) {
@@ -422,10 +462,13 @@ private fun TaskRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                ErikText(
-                    text = "${entry.block.start.formatClock()} · ${entry.block.effectiveDuration.formatShort()}",
-                    style = ErikTheme.typography.caption,
-                    color = ErikTheme.colors.textMuted,
+                // The clock half is the control: a full picker field in every
+                // row would swamp the list it belongs to.
+                StartAndDuration(
+                    start = entry.block.start,
+                    duration = entry.block.effectiveDuration,
+                    editable = onStartChange != null,
+                    onEditStart = { pickingStart = true },
                 )
             }
         }
@@ -438,6 +481,49 @@ private fun TaskRow(
                 modifier = Modifier.padding(start = 46.dp),
             )
         }
+    }
+
+    if (pickingStart && onStartChange != null) {
+        ErikTimePickerDialog(
+            initial = entry.block.start,
+            onDismiss = { pickingStart = false },
+            onConfirm = {
+                onStartChange(entry, it)
+                pickingStart = false
+            },
+        )
+    }
+}
+
+/** "07:00 · 1 h", with the time tappable where the caller can act on it. */
+@Composable
+private fun StartAndDuration(
+    start: LocalTime,
+    duration: Duration,
+    editable: Boolean,
+    onEditStart: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ErikText(
+            text = start.formatClock(),
+            style = ErikTheme.typography.caption,
+            color = if (editable) ErikTheme.colors.accent else ErikTheme.colors.textMuted,
+            modifier = if (editable) {
+                Modifier.clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onEditStart,
+                )
+            } else {
+                Modifier
+            },
+        )
+        ErikText(
+            text = " · ${duration.formatShort()}",
+            style = ErikTheme.typography.caption,
+            color = ErikTheme.colors.textMuted,
+        )
     }
 }
 

@@ -315,6 +315,15 @@ data class UserSetup(
     val bedPrepTime: LocalTime,
     val sleepTime: LocalTime,
     val wakeTime: LocalTime,
+    /**
+     * Whether ERIK itself rings at [wakeTime].
+     *
+     * Off by default: an app that starts waking someone because they answered
+     * a questionnaire has overstepped. It hangs off [wakeTime] rather than
+     * carrying a time of its own so the two can never disagree — the hour the
+     * planner shades as the end of the night is the hour it rings at.
+     */
+    val wakeAlarm: Boolean = false,
     /** How much of the morning belongs to getting going, starting at [wakeTime]. */
     val morningDuration: Duration,
     val meals: MealPlan,

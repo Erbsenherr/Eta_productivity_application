@@ -56,6 +56,19 @@ private fun nextWeekly(setup: UserSetup, after: LocalDateTime): LocalDateTime {
     return LocalDateTime(after.date.plus(DatePeriod(days = 7)), time)
 }
 
+/** What a tap on the wake alarm's snooze buys. Longer than the planning one. */
+val WAKE_SNOOZE: Duration = 9.minutes
+
+/**
+ * When the wake alarm is next due, or null when the user has not asked for one.
+ *
+ * Shares [nextDaily] with the planning alarm, and is strict about "after" for the
+ * same reason: ringing at the appointed minute must not be able to schedule that
+ * same minute again and loop.
+ */
+fun nextWake(setup: UserSetup, after: LocalDateTime): LocalDateTime? =
+    if (setup.wakeAlarm) nextDaily(setup.wakeTime, after) else null
+
 /**
  * Whether the alarm should sound.
  *

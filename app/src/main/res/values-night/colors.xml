@@ -2,4 +2,11 @@
 <resources>
     <!-- Mirrors DarkErikColors.background. -->
     <color name="erik_window_background">#111113</color>
+
+    <!-- Mirrors DarkErikColors; see the light file for why these are by hand. -->
+    <color name="erik_widget_surface">#1B1B1F</color>
+    <color name="erik_widget_border">#2E2E36</color>
+    <color name="erik_widget_text">#F2F2F0</color>
+    <color name="erik_widget_muted">#77756F</color>
+    <color name="erik_widget_accent">#818CF8</color>
 </resources>

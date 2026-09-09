@@ -100,8 +100,14 @@ fun ErikTimePicker(
     }
 }
 
+/**
+ * The dial on its own, for callers that already have something to tap.
+ *
+ * A list row cannot afford the field above — it would swamp the row it belongs
+ * to — but it can afford a caption that opens this.
+ */
 @Composable
-private fun ErikTimePickerDialog(
+fun ErikTimePickerDialog(
     initial: LocalTime,
     onDismiss: () -> Unit,
     onConfirm: (LocalTime) -> Unit,

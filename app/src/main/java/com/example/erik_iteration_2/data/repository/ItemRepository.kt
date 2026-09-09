@@ -6,6 +6,7 @@ import com.example.erik_iteration_2.domain.model.Item
 import com.example.erik_iteration_2.domain.model.Priority
 import com.example.erik_iteration_2.domain.model.Stage
 import com.example.erik_iteration_2.domain.model.normalizeName
+import com.example.erik_iteration_2.domain.recurrence.rulesForWeekdays
 import com.example.erik_iteration_2.domain.staging.collectionTimeoutThreshold
 import com.example.erik_iteration_2.domain.staging.criticalThreshold
 import com.example.erik_iteration_2.domain.staging.isCriticalInCollection
@@ -16,8 +17,11 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import java.util.UUID
 
 /** Outcome of trying to create a ToDo, which the Sperrliste can veto. */
 sealed interface AddItemResult {
@@ -65,6 +69,23 @@ class ItemRepository(
         return AddItemResult.Added(item)
     }
 
+    /**
+     * The recurring Quick-Add: also name only, and refused by the same lock.
+     *
+     * It lands in the Sammelliste rather than the schedule, because it has no
+     * rule yet — asking for weekdays and a duration at the moment of the thought
+     * is what a Quick-Add is supposed to spare the user.
+     */
+    suspend fun addQuickRecurring(name: String): AddItemResult {
+        val now = clock.now()
+        itemDao.findActiveLock(normalizeName(name), now)?.let { locked ->
+            return AddItemResult.BlockedByLock(locked.lockedUntil ?: now)
+        }
+        val item = Item.newQuickRecurring(name, now)
+        itemDao.upsert(item)
+        return AddItemResult.Added(item)
+    }
+
     suspend fun add(item: Item): AddItemResult {
         val now = clock.now()
         itemDao.findActiveLock(item.normalizedName, now)?.let { locked ->
@@ -80,21 +101,82 @@ class ItemRepository(
 
     suspend fun delete(item: Item) = itemDao.delete(item)
 
-    /** Fills in the attributes a Quick-Add ToDo was created without. */
+    /**
+     * Fills in the attributes a Quick-Add ToDo was created without.
+     *
+     * [travelBefore] and [breakAfter] are defaults for the blocks this will
+     * produce rather than part of the task itself; [endSound] says whether the
+     * end of its planned time announces itself.
+     */
     suspend fun concretize(
         item: Item,
         category: Category,
         priority: Priority,
         targetDate: LocalDate,
         estimatedDuration: Duration,
+        travelBefore: Duration? = null,
+        breakAfter: Duration? = null,
+        endSound: Boolean = item.endSound,
     ) {
         update(
-            item.copy(
+            item.concretized(
                 category = category,
                 priority = priority,
                 targetDate = targetDate,
                 estimatedDuration = estimatedDuration,
+                travelBefore = travelBefore,
+                breakAfter = breakAfter,
+                endSound = endSound,
             ),
+        )
+    }
+
+    /**
+     * Fills in what a bare recurring note was missing, and lays it down.
+     *
+     * Several weekdays become several definitions — see [rulesForWeekdays] — so
+     * the note that was one row can leave as two or three. The one that already
+     * exists is updated rather than replaced, which keeps any blocks that somehow
+     * point at it, and the rest are copies with fresh ids.
+     *
+     * It leaves the Sammelliste for `Stage.DAY`, where recurring definitions
+     * live, and `enteredCollectionAt` is cleared with it: the one-month clock
+     * measures hoarding, and this is no longer being hoarded.
+     */
+    suspend fun concretizeRecurring(
+        item: Item,
+        category: Category?,
+        weekdays: Set<DayOfWeek>,
+        startTime: LocalTime,
+        duration: Duration,
+        travelBefore: Duration? = null,
+        breakAfter: Duration? = null,
+        endSound: Boolean = item.endSound,
+    ) {
+        val rules = rulesForWeekdays(weekdays)
+        if (rules.isEmpty()) return
+
+        val now = clock.now()
+        val base = item.copy(
+            stage = Stage.DAY,
+            category = category,
+            startTime = startTime,
+            estimatedDuration = duration,
+            travelBefore = travelBefore,
+            breakAfter = breakAfter,
+            endSound = endSound,
+            enteredCollectionAt = null,
+            updatedAt = now,
+        )
+        itemDao.upsertAll(
+            listOf(base.copy(recurrenceRule = rules.first())) +
+                rules.drop(1).map { rule ->
+                    base.copy(
+                        id = UUID.randomUUID().toString(),
+                        recurrenceRule = rule,
+                        createdAt = now,
+                    )
+                },
         )
     }
 

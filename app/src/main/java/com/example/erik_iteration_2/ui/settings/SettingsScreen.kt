@@ -14,12 +14,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.erik_iteration_2.alarm.AlarmSettingsIntents
+import com.example.erik_iteration_2.alarm.alarmReadiness
 import com.example.erik_iteration_2.data.backup.BACKUP_FILE_NAME
 import com.example.erik_iteration_2.domain.setup.UserSetup
 import com.example.erik_iteration_2.domain.setup.WEEK
@@ -42,9 +46,13 @@ import com.example.erik_iteration_2.ui.setup.SportStep
 import com.example.erik_iteration_2.ui.setup.WorkStep
 import com.example.erik_iteration_2.ui.components.ErikField
 import com.example.erik_iteration_2.ui.components.ErikTextField
+import com.example.erik_iteration_2.ui.format.formatClock
 import com.example.erik_iteration_2.ui.format.formatLong
 import com.example.erik_iteration_2.ui.theme.ErikTheme
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * The Einstellungen tab: the standing configuration, away from planning a day.
@@ -65,6 +73,7 @@ fun SettingsScreen(
     val openDays by viewModel.openDays.collectAsStateWithLifecycle()
     val phrase by viewModel.phrase.collectAsStateWithLifecycle()
     val phraseAccepted by viewModel.phraseAccepted.collectAsStateWithLifecycle()
+    val alarms by viewModel.alarms.collectAsStateWithLifecycle()
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip"),
@@ -92,6 +101,8 @@ fun SettingsScreen(
             }
 
             message?.let { MessageBox(it, viewModel::dismissMessage) }
+
+            AlarmBox(alarms)
 
             DataBox(
                 onExport = { exportLauncher.launch(BACKUP_FILE_NAME) },
@@ -143,6 +154,7 @@ fun SettingsScreen(
                 )
 
                 SleepStep(setup, viewModel::update)
+                WakeAlarmBox(setup, viewModel::update)
                 MealsStep(setup, viewModel::update)
                 HousekeepingStep(setup, viewModel::update)
                 SportStep(setup, viewModel::update)
@@ -280,28 +292,39 @@ private fun CatchUpBox(
                 )
             }
 
-            openDays.forEach { date ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ErikText(
-                        text = date.formatLong(),
-                        style = ErikTheme.typography.body,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ErikButton(
-                        text = "Nachtragen",
-                        style = ErikButtonStyle.Secondary,
-                        enabled = unlocked,
-                        onClick = { onCatchUp(date) },
-                    )
+            // The list stays folded until the phrase is typed. It can run to
+            // thirty rows, none of which can be acted on before then — unfolded,
+            // it simply pushed the rest of the settings tab off the screen. The
+            // count above still says the days are there; only the rows wait.
+            if (unlocked) {
+                openDays.forEach { date ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ErikText(
+                            text = date.formatLong(),
+                            style = ErikTheme.typography.body,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ErikButton(
+                            text = "Nachtragen",
+                            style = ErikButtonStyle.Secondary,
+                            onClick = { onCatchUp(date) },
+                        )
+                    }
                 }
-            }
 
-            ErikText(
-                text = "Nachgetragen wird die Ernte des Tages — Verträge nicht: die werden " +
-                    "am Tag selbst bezeugt, nicht eine Woche später.",
-                style = ErikTheme.typography.caption,
-                color = ErikTheme.colors.textMuted,
-            )
+                ErikText(
+                    text = "Nachgetragen wird die Ernte des Tages — Verträge nicht: die " +
+                        "werden am Tag selbst bezeugt, nicht eine Woche später.",
+                    style = ErikTheme.typography.caption,
+                    color = ErikTheme.colors.textMuted,
+                )
+            } else {
+                ErikText(
+                    text = "Die Liste erscheint, sobald der Satz vollständig dasteht.",
+                    style = ErikTheme.typography.caption,
+                    color = ErikTheme.colors.textMuted,
+                )
+            }
         }
     }
 }
@@ -394,5 +417,157 @@ private fun DebugBox(onReset: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/**
+ * ERIK's own wake alarm.
+ *
+ * It rings at the setup's `wakeTime` rather than at a time of its own, so the
+ * hour the planner shades as the end of the night and the hour the phone rings
+ * at can never drift apart. Off by default — an app that starts waking someone
+ * because they answered a questionnaire has overstepped.
+ */
+@Composable
+private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
+    ErikSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.md)) {
+            ErikText(text = "Weckruf", style = ErikTheme.typography.heading)
+            ErikText(
+                text = "ERIK weckt dich um ${setup.wakeTime.formatClock()} Uhr — dieselbe " +
+                    "Aufstehzeit, die oben im Schlaf steht. Der Weckruf klingelt über den " +
+                    "Sperrbildschirm und läutet, bis du ihn beendest oder neun Minuten " +
+                    "schlummerst.",
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+            )
+            ErikChoice(
+                options = listOf(
+                    false to "Kein Weckruf",
+                    true to "Jeden Tag um ${setup.wakeTime.formatClock()} wecken",
+                ),
+                selected = setup.wakeAlarm,
+                onSelect = { on -> onChange { it.copy(wakeAlarm = on) } },
+            )
+        }
+    }
+}
+
+/**
+ * Whether the alarms can actually get through, and when they are next due.
+ *
+ * This card exists because every way an alarm can be suppressed on Android is
+ * **silent**: a refused notification permission makes the planning alarm fire,
+ * reschedule and show nothing; a denied exact-alarm permission turns every alarm
+ * into a window doze may push past its hour; a battery manager can stop the app
+ * outright. From the outside all three look identical — no alarm and no reason —
+ * so the app has to be able to name which one it is.
+ *
+ * The due times sit next to them for the same reason: without them, an alarm
+ * that is armed for tomorrow cannot be told apart from one that was never set.
+ */
+@Composable
+private fun AlarmBox(alarms: AlarmSchedule) {
+    val context = LocalContext.current
+    // Read again on demand rather than watched: these change in the system
+    // settings, which means leaving the app, and coming back is the moment to
+    // look. A tap is a smaller price than a poll that runs all day.
+    var probe by remember { mutableIntStateOf(0) }
+    val readiness = remember(probe) { alarmReadiness(context) }
+
+    ErikSurface(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = if (readiness.allGood) ErikTheme.colors.border else ErikTheme.colors.warning,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.md)) {
+            ErikText(text = "Alarme", style = ErikTheme.typography.heading)
+
+            ReadinessRow(
+                label = "Benachrichtigungen",
+                ok = readiness.notificationsAllowed,
+                whenMissing = "Ohne sie klingelt der Alarm, zeigt aber nichts.",
+                onFix = { context.startActivity(AlarmSettingsIntents.notifications(context)) },
+            )
+            ReadinessRow(
+                label = "Exakte Alarme",
+                ok = readiness.exactAlarmsAllowed,
+                whenMissing = "Ohne sie kommen Alarme irgendwann im Zeitfenster — " +
+                    "im Doze-Modus auch deutlich später.",
+                onFix = { context.startActivity(AlarmSettingsIntents.exactAlarms(context)) },
+            )
+            ReadinessRow(
+                label = "Akku-Optimierung",
+                ok = readiness.ignoringBatteryOptimisation,
+                whenMissing = "Manche Hersteller stoppen die App im Hintergrund ganz. " +
+                    "ERIK von der Optimierung ausnehmen.",
+                onFix = { context.startActivity(AlarmSettingsIntents.batteryOptimisation(context)) },
+            )
+
+            ErikText(
+                text = "Als Nächstes",
+                style = ErikTheme.typography.label,
+                color = ErikTheme.colors.textSecondary,
+            )
+            DueRow("Tagesplanung", alarms.daily)
+            DueRow("Wochenplanung", alarms.weekly)
+            DueRow("Weckruf", alarms.wake, offHint = "aus")
+
+            ErikButton(
+                text = "Neu prüfen",
+                style = ErikButtonStyle.Secondary,
+                onClick = { probe++ },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReadinessRow(
+    label: String,
+    ok: Boolean,
+    whenMissing: String,
+    onFix: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.xs)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ErikText(
+                text = label,
+                style = ErikTheme.typography.body,
+                modifier = Modifier.weight(1f),
+            )
+            ErikText(
+                text = if (ok) "erlaubt" else "fehlt",
+                style = ErikTheme.typography.label,
+                color = if (ok) ErikTheme.colors.success else ErikTheme.colors.warning,
+            )
+        }
+        if (!ok) {
+            ErikText(
+                text = whenMissing,
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+            )
+            ErikButton(text = "Einstellen", style = ErikButtonStyle.Secondary, onClick = onFix)
+        }
+    }
+}
+
+@Composable
+private fun DueRow(label: String, at: Instant?, offHint: String = "nicht gesetzt") {
+    val zone = TimeZone.currentSystemDefault()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ErikText(
+            text = label,
+            style = ErikTheme.typography.caption,
+            color = ErikTheme.colors.textMuted,
+            modifier = Modifier.weight(1f),
+        )
+        ErikText(
+            text = at?.toLocalDateTime(zone)?.let {
+                "${it.date.formatLong()}, ${it.time.formatClock()}"
+            } ?: offHint,
+            style = ErikTheme.typography.caption,
+            color = if (at == null) ErikTheme.colors.textMuted else ErikTheme.colors.textSecondary,
+        )
     }
 }

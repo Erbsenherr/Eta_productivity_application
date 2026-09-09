@@ -54,6 +54,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 app.container.planningAlarmCoordinator.rescheduleAll()
+                app.container.taskStartCoordinator.reschedule()
+                app.container.wakeAlarmCoordinator.reschedule()
             } finally {
                 pending.finish()
             }

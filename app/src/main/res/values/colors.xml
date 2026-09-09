@@ -2,4 +2,16 @@
 <resources>
     <!-- Mirrors LightErikColors.background; painted before the first Compose frame. -->
     <color name="erik_window_background">#FAFAF8</color>
+
+    <!--
+        The widget cannot read ErikTheme: RemoteViews are inflated by the
+        launcher, in the launcher's process, long before any Compose tree
+        exists. These five mirror LightErikColors by hand, with the night
+        variants alongside, and are the only place the palette is duplicated.
+    -->
+    <color name="erik_widget_surface">#FFFFFF</color>
+    <color name="erik_widget_border">#E4E2DD</color>
+    <color name="erik_widget_text">#1A1A17</color>
+    <color name="erik_widget_muted">#8E8B83</color>
+    <color name="erik_widget_accent">#4F46E5</color>
 </resources>

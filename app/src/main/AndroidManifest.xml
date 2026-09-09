@@ -2,11 +2,32 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- The planning alarm. Exact alarms are asked for but not relied on: the
-         scheduler falls back to an inexact window when the user declines. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
+        Exact alarms, in the two shapes Android wants them.
+
+        SCHEDULE_EXACT_ALARM is granted at install up to API 32 and, from 33 on,
+        is DENIED by default and has to be granted by hand in the system settings
+        — which is the likeliest reason a planning alarm ever went unnoticed:
+        without it the scheduler falls back to an inexact window, and doze can
+        push an inexact alarm past the hour it was meant for.
+
+        USE_EXACT_ALARM is granted at install and needs nothing from the user. It
+        is reserved for apps whose core function is an alarm clock or a calendar,
+        which is a Play Store policy rather than a technical limit; ERIK sets a
+        wake alarm and two phase alarms, so it qualifies on the merits, but the
+        claim would have to be made in a Play listing if this were ever published.
+    -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Lets the wake alarm come up over the lock screen instead of as a banner. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".ErikApplication"
@@ -32,9 +53,58 @@
             </intent-filter>
         </activity>
 
+        <!--
+            The quick-add the home-screen widget opens. Translucent, `singleTop`
+            so a second tap on the widget brings the open one forward instead of
+            stacking another, and excluded from recents: it is a note taken on
+            the way past, not a place to come back to.
+        -->
+        <activity
+            android:name=".widget.QuickAddActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ERIK_QuickAdd"
+            android:windowSoftInputMode="adjustResize" />
+
+        <receiver
+            android:name=".widget.QuickAddWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_add_widget_info" />
+        </receiver>
+
         <receiver
             android:name=".alarm.PlanningAlarmReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".alarm.TaskStartAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".alarm.WakeAlarmReceiver"
+            android:exported="false" />
+
+        <!--
+            The ringing screen. `singleInstance` so the full-screen intent and a
+            tap on the notification cannot end up with two of them, and excluded
+            from recents: it is not somewhere to go back to.
+        -->
+        <activity
+            android:name=".alarm.WakeAlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ERIK_Iteration_2" />
 
         <receiver
             android:name=".alarm.BootCompletedReceiver"

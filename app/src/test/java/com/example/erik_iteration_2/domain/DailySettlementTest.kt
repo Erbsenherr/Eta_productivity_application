@@ -13,6 +13,7 @@ import com.example.erik_iteration_2.domain.model.RecurrenceRule
 import com.example.erik_iteration_2.domain.reevaluation.ContractVerdict
 import com.example.erik_iteration_2.domain.reevaluation.LEGACY_DAILY_CAP
 import com.example.erik_iteration_2.domain.reevaluation.plannedMinutes
+import com.example.erik_iteration_2.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
 import com.example.erik_iteration_2.domain.reevaluation.settleDay
 import com.example.erik_iteration_2.domain.reward.weeklyInflationOn
 import kotlin.time.Duration
@@ -90,10 +91,14 @@ class DailySettlementTest {
         updatedAt = now,
     )
 
-    /** A day with exactly fourteen planned hours, so nothing is charged for. */
+    /**
+     * A day with exactly fourteen hours planned *and done*, so nothing is charged
+     * for. The blocks have to be completed: a slot that was dropped counts as
+     * unplanned time, so a day of untouched blocks is the opposite of a full one.
+     */
     private fun fullDay() = listOf(
-        entry("a", LocalTime(7, 0), 7.hours),
-        entry("b", LocalTime(14, 0), 7.hours),
+        entry("a", LocalTime(7, 0), 7.hours, completed = true),
+        entry("b", LocalTime(14, 0), 7.hours, completed = true),
     )
 
     @Test
@@ -214,10 +219,10 @@ class DailySettlementTest {
 
     @Test
     fun `two unplanned hours are free, the rest costs one and a half each`() {
-        // Sixteen waking hours, twelve of them planned: four unplanned.
+        // Sixteen waking hours, twelve of them planned and done: four unplanned.
         val blocks = listOf(
-            entry("a", LocalTime(7, 0), 6.hours),
-            entry("b", LocalTime(14, 0), 6.hours),
+            entry("a", LocalTime(7, 0), 6.hours, completed = true),
+            entry("b", LocalTime(14, 0), 6.hours, completed = true),
         )
         val settlement = settleDay(blocks, emptyList(), sleep, ALLOWANCE)
         assertEquals(4.0, settlement.unplannedHours, 0.0001)
@@ -250,6 +255,71 @@ class DailySettlementTest {
         )
         // 6 harvested + 1 contract − (10 − 2) × 1.5 unplanned.
         assertEquals(6.0 + 1.0 - 12.0, settlement.total, 0.0001)
+    }
+
+    @Test
+    fun `an abandoned block costs its hours as unplanned time`() {
+        // Fourteen hours planned, the second seven dropped: those hours went by
+        // exactly as empty ones would have.
+        val blocks = listOf(
+            entry("a", LocalTime(7, 0), 7.hours, completed = true),
+            entry("b", LocalTime(14, 0), 7.hours, discarded = true),
+        )
+        val settlement = settleDay(blocks, emptyList(), sleep, ALLOWANCE)
+        assertEquals(9.0, settlement.unplannedHours, 0.0001)
+        assertEquals(7.0, settlement.droppedHours, 0.0001)
+        assertEquals(7.0 * UNPLANNED_PENALTY_PER_HOUR, settlement.unplannedPenalty, 0.0001)
+    }
+
+    @Test
+    fun `a block left unanswered costs the same as a dropped one`() {
+        val dropped = listOf(
+            entry("a", LocalTime(7, 0), 7.hours, completed = true),
+            entry("b", LocalTime(14, 0), 7.hours, discarded = true),
+        )
+        val open = listOf(
+            entry("a", LocalTime(7, 0), 7.hours, completed = true),
+            entry("b", LocalTime(14, 0), 7.hours),
+        )
+        assertEquals(
+            settleDay(dropped, emptyList(), sleep, ALLOWANCE).unplannedPenalty,
+            settleDay(open, emptyList(), sleep, ALLOWANCE).unplannedPenalty,
+            0.0001,
+        )
+    }
+
+    @Test
+    fun `refilling the freed slot makes the charge go away`() {
+        // The 14:00 block was dropped, but something else ran in the same hours
+        // and did happen. Planned time is a union of what stood, so nothing is
+        // owed for that stretch.
+        val blocks = listOf(
+            entry("a", LocalTime(7, 0), 7.hours, completed = true),
+            entry("b", LocalTime(14, 0), 7.hours, discarded = true, itemId = "b"),
+            entry("ersatz", LocalTime(14, 0), 7.hours, completed = true, itemId = "ersatz"),
+        )
+        val settlement = settleDay(blocks, emptyList(), sleep, ALLOWANCE)
+        assertEquals(0.0, settlement.droppedHours, 0.0001)
+        assertEquals(2.0, settlement.unplannedHours, 0.0001)
+        assertEquals(0.0, settlement.unplannedPenalty, 0.0001)
+    }
+
+    @Test
+    fun `dropped free time is priced by the forfeit and not charged again`() {
+        // Fourteen hours done plus two hours of free time given up: the forfeit
+        // pays for those two, and they are not also billed as unplanned.
+        val blocks = fullDay() + entry(
+            id = "freizeit",
+            from = LocalTime(21, 0),
+            duration = 2.hours,
+            category = null,
+            discarded = true,
+            role = ItemRole.FREE_TIME,
+        )
+        val settlement = settleDay(blocks, emptyList(), sleep, ALLOWANCE)
+        assertEquals(8.0, settlement.freeTimeForgone, 0.0001)
+        assertEquals(0.0, settlement.droppedHours, 0.0001)
+        assertEquals(0.0, settlement.unplannedHours, 0.0001)
     }
 
     @Test

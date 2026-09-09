@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.erik_iteration_2.ui.theme.ErikTheme
 
@@ -24,11 +25,18 @@ fun ErikText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     textAlign: TextAlign? = null,
+    textDecoration: TextDecoration? = null,
 ) {
     BasicText(
         text = text,
         modifier = modifier,
-        style = style.merge(TextStyle(color = color, textAlign = textAlign ?: TextAlign.Unspecified)),
+        style = style.merge(
+            TextStyle(
+                color = color,
+                textAlign = textAlign ?: TextAlign.Unspecified,
+                textDecoration = textDecoration,
+            ),
+        ),
         maxLines = maxLines,
         overflow = overflow,
     )

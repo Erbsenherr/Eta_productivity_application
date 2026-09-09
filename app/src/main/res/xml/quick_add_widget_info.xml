@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Two cells wide, one tall: it is a button-shaped thing, not a list. No
+    updatePeriodMillis — the widget shows no data of its own, so waking it on a
+    timer would cost battery for a picture that never changes.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_quick_add"
+    android:minWidth="180dp"
+    android:minHeight="70dp"
+    android:previewLayout="@layout/widget_quick_add"
+    android:resizeMode="horizontal|vertical"
+    android:description="@string/widget_quick_add_description"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:widgetCategory="home_screen" />

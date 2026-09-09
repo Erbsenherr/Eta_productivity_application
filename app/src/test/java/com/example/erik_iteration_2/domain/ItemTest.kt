@@ -3,10 +3,12 @@ package com.example.erik_iteration_2.domain
 import com.example.erik_iteration_2.domain.model.Category
 import com.example.erik_iteration_2.domain.model.Item
 import com.example.erik_iteration_2.domain.model.Priority
+import com.example.erik_iteration_2.domain.model.RecurrenceRule
 import com.example.erik_iteration_2.domain.model.Stage
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -28,6 +30,37 @@ class ItemTest {
             now = now,
         )
         assertEquals(LocalDate(2026, 8, 14), item.availableFrom)
+    }
+
+    @Test
+    fun `a quick added recurring note is not concretized until it can be expanded`() {
+        val quick = Item.newQuickRecurring("Wäsche waschen", now)
+        assertFalse(quick.isConcretized)
+
+        // The three `expandRecurring` refuses to guess at, and no others: a
+        // recurring task has no priority and no target date to be waiting for.
+        assertFalse(quick.copy(recurrenceRule = RecurrenceRule.Daily).isConcretized)
+        assertFalse(
+            quick.copy(
+                recurrenceRule = RecurrenceRule.Daily,
+                startTime = LocalTime(18, 0),
+            ).isConcretized,
+        )
+        assertTrue(
+            quick.copy(
+                recurrenceRule = RecurrenceRule.Daily,
+                startTime = LocalTime(18, 0),
+                estimatedDuration = 1.hours,
+            ).isConcretized,
+        )
+    }
+
+    @Test
+    fun `a quick added recurring note waits in the Sammelliste like any other`() {
+        val quick = Item.newQuickRecurring("Wäsche waschen", now)
+        assertEquals(Stage.COLLECTION, quick.stage)
+        // The one-month clock runs on it too — an unanswered note is hoarding.
+        assertNotNull(quick.enteredCollectionAt)
     }
 
     @Test

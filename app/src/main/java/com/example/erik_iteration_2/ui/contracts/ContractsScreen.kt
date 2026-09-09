@@ -1,5 +1,6 @@
 package com.example.erik_iteration_2.ui.contracts
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.erik_iteration_2.domain.contract.SlotStatus
@@ -41,6 +46,17 @@ fun ContractsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val refusal by viewModel.refusal.collectAsStateWithLifecycle()
     var signingSlot by remember { mutableStateOf<Int?>(null) }
+
+    // Long-pressing a contract opens the one change it is allowed. When it is not
+    // allowed, the same press says which rule stands in the way — a gesture that
+    // silently does nothing is indistinguishable from one that is not there.
+    var editingContract by remember { mutableStateOf<Contract?>(null) }
+    var editRefused by remember { mutableStateOf<String?>(null) }
+
+    fun openEdit(contract: Contract) {
+        val refusal = editRefusal(contract)
+        if (refusal == null) editingContract = contract else editRefused = refusal
+    }
 
     ErikScreen(modifier = modifier, bottomInset = false) {
         Column(
@@ -74,6 +90,7 @@ fun ContractsScreen(
                     upgradable = state.upgradable.any { (status as? SlotStatus.Taken)?.contract?.id == it.id },
                     onSign = { signingSlot = slot },
                     onUpgrade = { contract -> viewModel.upgradeToLegacy(contract) },
+                    onLongPress = ::openEdit,
                 )
             }
 
@@ -87,7 +104,7 @@ fun ContractsScreen(
                             style = ErikTheme.typography.caption,
                             color = ErikTheme.colors.textMuted,
                         )
-                        state.legacy.forEach { ContractRow(it) }
+                        state.legacy.forEach { c -> ContractRow(c, onLongPress = { openEdit(c) }) }
                     }
                 }
             }
@@ -96,13 +113,29 @@ fun ContractsScreen(
                 ErikSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.md)) {
                         ErikText(text = "Abgeschlossen", style = ErikTheme.typography.heading)
-                        state.closed.forEach { ContractRow(it) }
+                        state.closed.forEach { c -> ContractRow(c, onLongPress = { openEdit(c) }) }
                     }
                 }
             }
 
             Spacer(Modifier.size(ErikTheme.spacing.xl))
         }
+    }
+
+    editingContract?.let { contract ->
+        EditContractDialog(
+            contract = contract,
+            today = state.today,
+            onDismiss = { editingContract = null },
+            onSave = { title, conditions, breach ->
+                viewModel.editWording(contract, title, conditions, breach)
+                editingContract = null
+            },
+        )
+    }
+
+    editRefused?.let { reason ->
+        RefusalDialog(reason = reason, onDismiss = { editRefused = null })
     }
 
     signingSlot?.let { slot ->
@@ -137,6 +170,7 @@ private fun SlotBox(
     upgradable: Boolean,
     onSign: () -> Unit,
     onUpgrade: (Contract) -> Unit,
+    onLongPress: (Contract) -> Unit,
 ) {
     ErikSurface(
         modifier = Modifier.fillMaxWidth(),
@@ -164,7 +198,7 @@ private fun SlotBox(
                 }
 
                 is SlotStatus.Taken -> {
-                    ContractRow(status.contract)
+                    ContractRow(status.contract, onLongPress = { onLongPress(status.contract) })
                     if (upgradable) {
                         ErikText(
                             text = "Läuft seit einem Monat — kann Legacy werden und den " +
@@ -224,9 +258,21 @@ private fun ExpiringBox(contract: Contract, onExtend: () -> Unit, onEnd: () -> U
     }
 }
 
+/**
+ * One contract, as it reads in a slot box or in a list.
+ *
+ * Long-pressing it is the way to the single wording change it may have. Nothing
+ * else on the row moves, which is deliberate: everything a contract does happens
+ * in the evening, and this screen is where it is read.
+ */
 @Composable
-private fun ContractRow(contract: Contract) {
-    Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.xs)) {
+private fun ContractRow(contract: Contract, onLongPress: () -> Unit = {}) {
+    Column(
+        modifier = Modifier.fillMaxWidth().pointerInput(contract.id) {
+            detectTapGestures(onLongPress = { onLongPress() })
+        },
+        verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.xs),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ErikText(
                 text = contract.title,
@@ -259,5 +305,42 @@ private fun ContractRow(contract: Contract) {
             style = ErikTheme.typography.caption,
             color = ErikTheme.colors.textMuted,
         )
+        if (contract.editedAt != null) {
+            ErikText(
+                text = "Bereits einmal geändert — die Laufzeit lief ab dann neu.",
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+            )
+        } else if (contract.isEditable) {
+            ErikText(
+                text = "Lange drücken, um den Wortlaut einmalig zu ändern.",
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+            )
+        }
+    }
+}
+
+/** The one-sentence reason a long press led nowhere. */
+@Composable
+private fun RefusalDialog(reason: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        ErikSurface(
+            modifier = Modifier.widthIn(max = 380.dp),
+            color = ErikTheme.colors.surfaceRaised,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.lg)) {
+                ErikText(text = "Nicht änderbar", style = ErikTheme.typography.title)
+                ErikText(
+                    text = reason,
+                    style = ErikTheme.typography.body,
+                    color = ErikTheme.colors.textSecondary,
+                )
+                Row {
+                    Spacer(Modifier.weight(1f))
+                    ErikButton(text = "Verstanden", onClick = onDismiss)
+                }
+            }
+        }
     }
 }

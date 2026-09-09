@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -34,6 +36,8 @@ import com.example.erik_iteration_2.data.local.BlockWithItem
 import com.example.erik_iteration_2.domain.model.Item
 import com.example.erik_iteration_2.domain.model.Priority
 import com.example.erik_iteration_2.domain.planning.MINUTES_PER_DAY
+import com.example.erik_iteration_2.domain.planning.autoScrollStep
+import com.example.erik_iteration_2.domain.planning.minuteOfDay
 import com.example.erik_iteration_2.domain.planning.snapToGrid
 import com.example.erik_iteration_2.ui.components.ErikButton
 import com.example.erik_iteration_2.ui.components.ErikButtonStyle
@@ -44,6 +48,9 @@ import com.example.erik_iteration_2.ui.format.formatClock
 import com.example.erik_iteration_2.ui.format.formatLong
 import com.example.erik_iteration_2.ui.theme.ErikTheme
 import kotlin.math.roundToInt
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** What is being dragged out of a revolver, and where the finger has it. */
 private sealed interface DragPayload {
@@ -64,8 +71,12 @@ private enum class RevolverKind { TASKS, SPEND }
 private const val NEW_TODO_ID = "NEW_TODO"
 
 /**
- * Planning the next day: the revolver on top, the day below, and the one gesture
- * that connects them.
+ * A day: the revolver on top, the day below, and the one gesture that connects
+ * them.
+ *
+ * Which day it is comes from the view model. Tomorrow is the planning phase and
+ * ends by being confirmed; today is the same screen turned on the day already
+ * running, so a plan can still be corrected once it turns out to be wrong.
  *
  * A drop has to become a time, which means turning a position on screen into a
  * minute of the day. The timeline reports where it sits and how tall a minute is;
@@ -81,6 +92,7 @@ fun DayPlannerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
+    val breakPrompt by viewModel.breakPrompt.collectAsStateWithLifecycle()
 
     val scrollState = rememberScrollState()
     var revolverKind by remember { mutableStateOf(RevolverKind.TASKS) }
@@ -94,6 +106,32 @@ fun DayPlannerScreen(
     var editing by remember { mutableStateOf<BlockWithItem?>(null) }
     var spendPrompt by remember { mutableStateOf<Pair<SpendKind, Int>?>(null) }
     var newTodoMinute by remember { mutableStateOf<Int?>(null) }
+
+    // Dragging past the edge of the screen scrolls the day under the finger, so
+    // the hours off-screen can be reached at all.
+    //
+    // A revolver drag needs nothing else: it is absolute, a position turned into a
+    // minute through the timeline's reported geometry, so it follows a scroll for
+    // free. A block drag is relative — it accumulates the finger's own travel,
+    // which is what preserves the grab point on a tall block — so it is told how
+    // far the day has moved and adds that to its own reckoning.
+    val autoScrolled = remember { mutableFloatStateOf(0f) }
+    var dragPointerY by remember { mutableStateOf<Float?>(null) }
+    var viewportTop by remember { mutableFloatStateOf(0f) }
+    var viewportHeight by remember { mutableFloatStateOf(0f) }
+
+    val edgeDragging = dragPointerY != null
+    LaunchedEffect(edgeDragging) {
+        if (!edgeDragging) return@LaunchedEffect
+        while (true) {
+            // One step per frame, and the pointer is read fresh each time: an
+            // auto-scroll with a perfectly still finger has to keep going.
+            withFrameNanos { }
+            val y = dragPointerY ?: break
+            val step = autoScrollStep(y, viewportTop, viewportHeight)
+            if (step != 0f) autoScrolled.floatValue += scrollState.scrollBy(step)
+        }
+    }
 
     val taskEntries = state.revolver.map { it.toColouredRevolverEntry() }
     // The spontaneous ToDo leads the second revolver: it is the one a stray
@@ -112,9 +150,19 @@ fun DayPlannerScreen(
         return snapToGrid(minute).takeIf { it in 0 until MINUTES_PER_DAY }
     }
 
-    // Open on the morning rather than at midnight; most of a day's plan is there.
-    LaunchedEffect(minutePx) {
-        if (minutePx > 1f) scrollState.scrollTo((7 * 60 * minutePx).roundToInt())
+    // Open where the day is being looked at from: the morning when planning
+    // tomorrow, because most of a plan is there, and the hour before now when
+    // correcting today, because that is what is being corrected.
+    LaunchedEffect(minutePx, state.isToday) {
+        if (minutePx <= 1f) return@LaunchedEffect
+        val minute = if (state.isToday) {
+            (Clock.System.now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .time.minuteOfDay() - 60).coerceAtLeast(0)
+        } else {
+            7 * 60
+        }
+        scrollState.scrollTo((minute * minutePx).roundToInt())
     }
 
     ErikScreen(modifier = modifier) {
@@ -180,14 +228,17 @@ fun DayPlannerScreen(
                             }
                             if (payload != null) {
                                 drag = RevolverDrag(entry, payload, position)
+                                dragPointerY = position.y
                             }
                         },
                         onDrag = { delta ->
                             drag = drag?.let { it.copy(position = it.position + delta) }
+                            dragPointerY = drag?.position?.y
                         },
                         onDragEnd = {
                             val dropped = drag
                             drag = null
+                            dragPointerY = null
                             val minute = dropped?.let { minuteUnder(it.position) }
                             if (dropped != null && minute != null) {
                                 when (val payload = dropped.payload) {
@@ -204,6 +255,10 @@ fun DayPlannerScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .onGloballyPositioned {
+                            viewportTop = it.positionInRoot().y
+                            viewportHeight = it.size.height.toFloat()
+                        }
                         .verticalScroll(scrollState)
                         // A long press anywhere on the confirmed list brings the
                         // revolver back out, as the concept asks.
@@ -217,10 +272,12 @@ fun DayPlannerScreen(
                         sleep = state.sleep,
                         editable = !state.isConfirmed,
                         dropIndicatorMinute = drag?.let { minuteUnder(it.position) },
+                        autoScrollPx = { autoScrolled.floatValue },
                         onGeometry = { top, perMinute ->
                             timelineTop = top
                             minutePx = perMinute
                         },
+                        onDragPointer = { dragPointerY = it },
                         onBlockLongPress = { editing = it },
                         onBlockMoved = viewModel::move,
                     )
@@ -237,7 +294,11 @@ fun DayPlannerScreen(
                         contentPadding = ErikTheme.spacing.md,
                     ) {
                         ErikText(
-                            text = "Für morgen ist keine Freizeit eingeplant.",
+                            text = if (state.isToday) {
+                                "Für heute ist keine Freizeit eingeplant."
+                            } else {
+                                "Für morgen ist keine Freizeit eingeplant."
+                            },
                             style = ErikTheme.typography.caption,
                             color = ErikTheme.colors.warning,
                         )
@@ -246,6 +307,7 @@ fun DayPlannerScreen(
 
                 PlannerFooter(
                     confirmed = state.isConfirmed,
+                    isToday = state.isToday,
                     revolverKind = revolverKind,
                     onSwitchRevolver = {
                         revolverKind = if (revolverKind == RevolverKind.TASKS) {
@@ -282,12 +344,27 @@ fun DayPlannerScreen(
         BlockEditDialog(
             entry = entry,
             onDismiss = { editing = null },
-            onSave = { name, category, start, duration, blockNote, itemNote ->
-                viewModel.edit(entry, name, category, start, duration, blockNote, itemNote)
+            onSave = { name, category, start, duration, blockNote, itemNote, travel, pause, sound ->
+                viewModel.edit(
+                    entry, name, category, start, duration, blockNote, itemNote,
+                    travel, pause, sound,
+                )
                 editing = null
             },
             onRemove = {
                 viewModel.remove(entry)
+                editing = null
+            },
+            onCancelBlock = {
+                viewModel.cancel(entry)
+                editing = null
+            },
+            onUncancelBlock = {
+                viewModel.uncancel(entry)
+                editing = null
+            },
+            onCopyToWeek = {
+                viewModel.copyToWeek(entry)
                 editing = null
             },
         )
@@ -295,11 +372,20 @@ fun DayPlannerScreen(
 
     newTodoMinute?.let { minute ->
         NewTodoDialog(
+            today = state.date,
             onDismiss = { newTodoMinute = null },
-            onCreate = { name, category, duration ->
-                viewModel.createTodo(name, category, duration, minute)
+            onCreate = { name, attributes ->
+                viewModel.createTodo(name, attributes, minute)
                 newTodoMinute = null
             },
+        )
+    }
+
+    breakPrompt?.let { prompt ->
+        BreakDroppedDialog(
+            name = prompt.name,
+            onDismiss = viewModel::dismissBreakPrompt,
+            onPlaceAnyway = viewModel::placeWithoutBreak,
         )
     }
 
@@ -381,7 +467,11 @@ private fun PlannerHeader(
     Row(modifier = modifier.fillMaxWidth()) {
         Column(Modifier.weight(1f)) {
             ErikText(
-                text = if (state.isConfirmed) "Liste für Morgen" else "Morgen planen",
+                text = when {
+                    state.isToday -> "Heute umplanen"
+                    state.isConfirmed -> "Liste für Morgen"
+                    else -> "Morgen planen"
+                },
                 style = ErikTheme.typography.title,
             )
             ErikText(
@@ -397,6 +487,7 @@ private fun PlannerHeader(
 @Composable
 private fun PlannerFooter(
     confirmed: Boolean,
+    isToday: Boolean,
     revolverKind: RevolverKind,
     onSwitchRevolver: () -> Unit,
     onConfirm: () -> Unit,
@@ -409,7 +500,23 @@ private fun PlannerFooter(
             .padding(ErikTheme.spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(ErikTheme.spacing.sm),
     ) {
-        if (confirmed) {
+        // A day being lived is never confirmed again. It was planned last night,
+        // and writing `confirmedAt` a second time would misdate that. Changes are
+        // saved as they are made, so leaving is all this needs to offer.
+        if (isToday) {
+            ErikText(
+                text = "Änderungen gelten sofort.",
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textMuted,
+                modifier = Modifier.weight(1f),
+            )
+            ErikButton(
+                text = if (revolverKind == RevolverKind.TASKS) "Punkte" else "ToDos",
+                style = ErikButtonStyle.Secondary,
+                onClick = onSwitchRevolver,
+            )
+            ErikButton(text = "Fertig", onClick = onClose)
+        } else if (confirmed) {
             ErikText(
                 text = "Steht.",
                 style = ErikTheme.typography.caption,
@@ -442,7 +549,13 @@ private fun BoxScope.PlacementBanner(
             .align(Alignment.BottomCenter)
             .padding(ErikTheme.spacing.lg)
             .fillMaxWidth(),
-        borderColor = ErikTheme.colors.warning,
+        // Only one of these is bad news; a copy into the week is a thing that
+        // worked, and a warning border would read as though it had not.
+        borderColor = if (feedback is PlacementFeedback.CopiedToWeek) {
+            ErikTheme.colors.success
+        } else {
+            ErikTheme.colors.warning
+        },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ErikText(
@@ -455,6 +568,9 @@ private fun BoxScope.PlacementBanner(
 
                     is PlacementFeedback.Blocked ->
                         "»${feedback.name}« steht auf der Sperrliste."
+
+                    is PlacementFeedback.CopiedToWeek ->
+                        "»${feedback.name}« liegt jetzt auch in der Wochenliste."
                 },
                 style = ErikTheme.typography.body,
                 color = ErikTheme.colors.textSecondary,

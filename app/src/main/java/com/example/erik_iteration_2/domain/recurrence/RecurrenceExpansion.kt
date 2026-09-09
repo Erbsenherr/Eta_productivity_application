@@ -11,6 +11,7 @@ import com.example.erik_iteration_2.domain.vacation.suspends
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.plus
@@ -26,6 +27,40 @@ fun LocalDate.isoWeekNumber(): Int {
 
 /** Which occurrence of its weekday this date is within its month, 1-based. */
 fun LocalDate.weekdayOccurrenceInMonth(): Int = (day - 1) / 7 + 1
+
+/**
+ * The definitions a set of chosen weekdays asks for.
+ *
+ * All seven collapse into [RecurrenceRule.Daily], which is the rule that exists
+ * for exactly that. Anything less becomes **one rule per weekday**, following the
+ * setup questionnaire's precedent: a task on Tuesday and Thursday is two
+ * definitions, so that later moving one of them does not drag the other along.
+ *
+ * Returned in weekday order, and empty for an empty set — no day is not an answer.
+ */
+fun rulesForWeekdays(weekdays: Set<DayOfWeek>): List<RecurrenceRule> = when {
+    weekdays.isEmpty() -> emptyList()
+    weekdays.size == DayOfWeek.entries.size -> listOf(RecurrenceRule.Daily)
+    else -> DayOfWeek.entries
+        .filter { it in weekdays }
+        .map { RecurrenceRule.Weekly(it) }
+}
+
+/**
+ * The weekdays a rule falls on — the rough inverse of [rulesForWeekdays].
+ *
+ * **Lossy on purpose, and only safe where it is used.** A fortnightly or monthly
+ * rule reduces to its weekday, so round-tripping one through a weekday picker
+ * would turn it into an ordinary weekly rule. Nothing does: the only editor that
+ * reads this is the Sammelliste's, and a card there has no rule at all yet. It
+ * exists so that editor has something to show rather than an empty picker.
+ */
+fun RecurrenceRule.weekdaysOf(): Set<DayOfWeek> = when (this) {
+    is RecurrenceRule.Daily -> DayOfWeek.entries.toSet()
+    is RecurrenceRule.Weekly -> setOf(weekday)
+    is RecurrenceRule.Biweekly -> setOf(weekday)
+    is RecurrenceRule.Monthly -> setOf(weekday)
+}
 
 /** Whether a recurring item is due on [date]. */
 fun RecurrenceRule.matches(date: LocalDate): Boolean = when (this) {
@@ -85,6 +120,10 @@ fun expandRecurring(
                 date = date,
                 start = vacations.startOverrideFor(item.id, date) ?: start,
                 plannedDuration = duration,
+                // The definition's journey and break travel to every occurrence
+                // it lays down; a standing task with a commute has one each time.
+                travelBefore = item.travelBefore,
+                breakAfter = item.breakAfter,
                 origin = BlockOrigin.RECURRING,
                 createdAt = now,
                 updatedAt = now,

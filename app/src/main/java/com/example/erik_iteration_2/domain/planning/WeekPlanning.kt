@@ -70,7 +70,9 @@ fun occupiedMinutesOfWeek(blocks: List<BlockWithItem>): Int =
 
 private fun mergedMinutes(blocks: List<BlockWithItem>): Int {
     val spans = blocks
-        .map { it.block.startMinute() to it.block.endMinute() }
+        // Container spans, so a task that brings a journey and a break with it
+        // costs the week what it actually costs.
+        .map { it.block.containerStartMinute() to it.block.containerEndMinute() }
         .filter { it.second > it.first }
         .sortedBy { it.first }
     if (spans.isEmpty()) return 0

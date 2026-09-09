@@ -33,8 +33,10 @@ import com.example.erik_iteration_2.ui.components.ErikButtonStyle
 import com.example.erik_iteration_2.ui.components.ErikScreen
 import com.example.erik_iteration_2.ui.components.ErikSurface
 import com.example.erik_iteration_2.ui.components.ErikText
-import com.example.erik_iteration_2.ui.components.ErikTextField
+import com.example.erik_iteration_2.ui.format.formatClock
 import com.example.erik_iteration_2.ui.format.formatLong
+import com.example.erik_iteration_2.ui.quickadd.QuickAddPanel
+import com.example.erik_iteration_2.ui.quickadd.QuickAddViewModel
 import com.example.erik_iteration_2.ui.theme.ErikTheme
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -53,13 +55,15 @@ private const val PAGE_COUNT = 2
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
+    quickAddViewModel: QuickAddViewModel,
     modifier: Modifier = Modifier,
     onPlanTomorrow: () -> Unit = {},
+    onReplanToday: () -> Unit = {},
     onPlanWeek: () -> Unit = {},
     onCloseDay: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val feedback by viewModel.quickAddFeedback.collectAsStateWithLifecycle()
+    val editFeedback by viewModel.blockEditFeedback.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(initialPage = PAGE_TODAY) { PAGE_COUNT }
     val now = rememberTickingNow()
 
@@ -83,11 +87,13 @@ fun DashboardScreen(
                 when (page) {
                     PAGE_TODAY -> TodayPage(
                         state = state,
-                        feedback = feedback,
+                        editFeedback = editFeedback,
                         now = now,
                         viewModel = viewModel,
+                        quickAddViewModel = quickAddViewModel,
                         onCloseDay = onCloseDay,
                         onPlanTomorrow = onPlanTomorrow,
+                        onReplanToday = onReplanToday,
                     )
 
                     else -> TomorrowPage(state, onPlanTomorrow, onPlanWeek)
@@ -100,11 +106,13 @@ fun DashboardScreen(
 @Composable
 private fun TodayPage(
     state: DashboardUiState,
-    feedback: QuickAddFeedback?,
+    editFeedback: BlockEditFeedback?,
     now: Instant,
     viewModel: DashboardViewModel,
+    quickAddViewModel: QuickAddViewModel,
     onCloseDay: () -> Unit,
     onPlanTomorrow: () -> Unit,
+    onReplanToday: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -123,11 +131,26 @@ private fun TodayPage(
         }
         NowBox(current = nowAndNext.current, next = nowAndNext.next)
 
+        // Long press on the account: booking a correction by hand.
+        var bookingPoints by remember { mutableStateOf(false) }
+
         PointsBox(
             balance = state.balance,
             pendingHarvest = state.pendingHarvest,
             crowned = state.crowned,
+            onLongPress = { bookingPoints = true },
         )
+
+        if (bookingPoints) {
+            ManualPointsDialog(
+                balance = state.balance,
+                onDismiss = { bookingPoints = false },
+                onBook = { amount, note ->
+                    viewModel.adjustPoints(amount, note)
+                    bookingPoints = false
+                },
+            )
+        }
 
         state.phase?.let { phase ->
             PhaseBox(
@@ -138,11 +161,7 @@ private fun TodayPage(
             )
         }
 
-        QuickAddBox(
-            feedback = feedback,
-            onAdd = viewModel::quickAdd,
-            onDismissFeedback = viewModel::dismissQuickAddFeedback,
-        )
+        QuickAddPanel(viewModel = quickAddViewModel)
 
         TasksBox(
             title = "Heute anstehend",
@@ -151,7 +170,19 @@ private fun TodayPage(
             onDurationChange = { entry, duration ->
                 viewModel.setActualDuration(entry.block, duration)
             },
+            onStartChange = viewModel::setStart,
         )
+
+        // Small corrections happen in the list above. This is the way to the
+        // planner itself, for the day already under way — cancelling something,
+        // moving it by more than a nudge, or adding what was not foreseen.
+        ErikButton(
+            text = "Heute umplanen",
+            style = ErikButtonStyle.Secondary,
+            onClick = onReplanToday,
+        )
+
+        BlockEditFeedbackLine(editFeedback, viewModel::dismissBlockEditFeedback)
 
         DeadlinesBox(deadlines = state.deadlines, now = now)
 
@@ -206,55 +237,33 @@ private fun PageHeader(title: String, subtitle: String) {
     }
 }
 
+/** What a start-time correction did, when it could not do exactly as asked. */
 @Composable
-private fun QuickAddBox(
-    feedback: QuickAddFeedback?,
-    onAdd: (String) -> Unit,
-    onDismissFeedback: () -> Unit,
+private fun BlockEditFeedbackLine(
+    feedback: BlockEditFeedback?,
+    onDismiss: () -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
+    if (feedback == null) return
 
-    fun submit() {
-        if (text.isBlank()) return
-        onAdd(text)
-        text = ""
-    }
-
-    ErikSurface(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(ErikTheme.spacing.md)) {
-            BoxHeading("Quick-Add")
+    ErikSurface(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = ErikTheme.colors.warning,
+        contentPadding = ErikTheme.spacing.md,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             ErikText(
-                text = "Nur notieren — Attribute kommen in der Tagesplanung dazu.",
-                style = ErikTheme.typography.caption,
-                color = ErikTheme.colors.textMuted,
-            )
-            ErikTextField(
-                value = text,
-                onValueChange = {
-                    text = it
-                    if (feedback != null) onDismissFeedback()
+                text = when (feedback) {
+                    is BlockEditFeedback.Moved ->
+                        "»${feedback.name}« lag dort nicht frei — jetzt um ${feedback.to.formatClock()}."
+
+                    is BlockEditFeedback.NoRoom ->
+                        "»${feedback.name}« passt heute nirgends mehr hin."
                 },
-                placeholder = "Was liegt an?",
-                onImeAction = ::submit,
+                style = ErikTheme.typography.caption,
+                color = ErikTheme.colors.textSecondary,
+                modifier = Modifier.weight(1f),
             )
-            ErikButton(text = "In die Sammelliste", onClick = ::submit)
-
-            when (feedback) {
-                is QuickAddFeedback.Added -> ErikText(
-                    text = "»${feedback.name}« liegt in der Sammelliste.",
-                    style = ErikTheme.typography.caption,
-                    color = ErikTheme.colors.success,
-                )
-
-                is QuickAddFeedback.Blocked -> ErikText(
-                    text = "»${feedback.name}« steht auf der Sperrliste — " +
-                        "wieder möglich ab ${feedback.until.formatLong()}.",
-                    style = ErikTheme.typography.caption,
-                    color = ErikTheme.colors.danger,
-                )
-
-                null -> Unit
-            }
+            ErikButton(text = "OK", style = ErikButtonStyle.Secondary, onClick = onDismiss)
         }
     }
 }

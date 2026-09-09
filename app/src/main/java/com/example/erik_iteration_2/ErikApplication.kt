@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import com.example.erik_iteration_2.alarm.PlanningNotifications
+import com.example.erik_iteration_2.alarm.TaskStartNotifications
+import com.example.erik_iteration_2.alarm.WakeAlarmNotifications
 import com.example.erik_iteration_2.di.AppContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,12 +34,16 @@ class ErikApplication : Application() {
         container = AppContainer(this, { isInForeground })
 
         PlanningNotifications.ensureChannel(this)
+        TaskStartNotifications.ensureChannel(this)
+        WakeAlarmNotifications.ensureChannel(this)
         registerActivityLifecycleCallbacks(ForegroundCounter())
 
         // Alarms do not survive an uninstall-reinstall or a cleared app, and a
         // setup answered on another install would otherwise never ring again.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.planningAlarmCoordinator.rescheduleAll()
+            container.taskStartCoordinator.reschedule()
+            container.wakeAlarmCoordinator.reschedule()
         }
     }
 

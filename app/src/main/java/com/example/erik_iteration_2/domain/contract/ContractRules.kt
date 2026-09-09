@@ -4,7 +4,10 @@ import com.example.erik_iteration_2.domain.model.CONTRACT_SLOTS
 import com.example.erik_iteration_2.domain.model.Contract
 import com.example.erik_iteration_2.domain.model.ContractState
 import com.example.erik_iteration_2.domain.model.MIN_CONTRACT_TERM
+import kotlin.time.Instant
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.plus
 
 /** Why a slot cannot be used right now. */
@@ -74,3 +77,37 @@ fun expiringContracts(contracts: List<Contract>, today: LocalDate): List<Contrac
 /** Contracts that have run a month and may be upgraded. */
 fun upgradableContracts(contracts: List<Contract>, today: LocalDate): List<Contract> =
     contracts.filter { it.canUpgradeToLegacy(today) }
+
+/**
+ * The one wording change a contract is allowed, applied.
+ *
+ * Returns null where it is not allowed — a legacy contract, a closed one, or one
+ * that has already had its change. See [Contract.isEditable].
+ *
+ * Only the **text** moves. The effort, and with it the daily payout, stays: an
+ * edit that could raise the rate would make this a way of paying yourself more
+ * for a promise already half-served. What it costs is the run-up — the term keeps
+ * its length and restarts from [today], so a contract two weeks in is back at
+ * zero and needs a full month again before it can become legacy. That is the
+ * rule, not a side effect: changing what you promised is making a new promise.
+ */
+fun editedContract(
+    contract: Contract,
+    title: String,
+    conditions: String,
+    breachDefinition: String,
+    today: LocalDate,
+    now: Instant,
+): Contract? {
+    if (!contract.isEditable) return null
+    val termDays = contract.signedOn.daysUntil(contract.endsOn)
+    return contract.copy(
+        title = title.ifBlank { conditions.take(40) },
+        conditions = conditions,
+        breachDefinition = breachDefinition,
+        signedOn = today,
+        endsOn = today.plus(DatePeriod(days = termDays)),
+        editedAt = now,
+        updatedAt = now,
+    )
+}

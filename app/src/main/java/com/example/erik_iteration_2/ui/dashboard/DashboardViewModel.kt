@@ -2,8 +2,8 @@ package com.example.erik_iteration_2.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.erik_iteration_2.alarm.TaskStartCoordinator
 import com.example.erik_iteration_2.data.local.BlockWithItem
-import com.example.erik_iteration_2.data.repository.AddItemResult
 import com.example.erik_iteration_2.data.repository.ContractRepository
 import com.example.erik_iteration_2.data.repository.ItemRepository
 import com.example.erik_iteration_2.data.repository.PlanRepository
@@ -13,9 +13,16 @@ import com.example.erik_iteration_2.domain.model.BlockOrigin
 import com.example.erik_iteration_2.domain.model.ContractState
 import com.example.erik_iteration_2.domain.model.Item
 import com.example.erik_iteration_2.domain.model.PlannedBlock
+import com.example.erik_iteration_2.domain.model.PointsReason
 import com.example.erik_iteration_2.domain.planning.DailyPhaseStatus
 import com.example.erik_iteration_2.domain.planning.PlanningPhase
+import com.example.erik_iteration_2.domain.planning.MINUTES_PER_DAY
+import com.example.erik_iteration_2.domain.planning.canPlace
+import com.example.erik_iteration_2.domain.planning.firstFreeStart
+import com.example.erik_iteration_2.domain.planning.minuteOfDay
+import com.example.erik_iteration_2.domain.planning.minuteToLocalTime
 import com.example.erik_iteration_2.domain.planning.nextPlanning
+import com.example.erik_iteration_2.domain.planning.snapToGrid
 import com.example.erik_iteration_2.domain.reevaluation.LEGACY_DAILY_CAP
 import com.example.erik_iteration_2.domain.reward.yieldOf
 import com.example.erik_iteration_2.domain.streak.Streak
@@ -33,6 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -68,18 +76,24 @@ data class DashboardUiState(
     val crowned: Boolean get() = legacyGrossPerDay > LEGACY_DAILY_CAP
 }
 
-/** Transient feedback for the quick-add field. */
-sealed interface QuickAddFeedback {
-    data class Added(val name: String) : QuickAddFeedback
-    data class Blocked(val name: String, val until: LocalDate) : QuickAddFeedback
+/**
+ * What the list did with a correction it could not carry out as asked.
+ *
+ * The dashboard's list edits the same blocks the planner does, so it obeys the
+ * same rule: nothing overlaps, and a change that would has to slide.
+ */
+sealed interface BlockEditFeedback {
+    data class Moved(val name: String, val to: LocalTime) : BlockEditFeedback
+    data class NoRoom(val name: String) : BlockEditFeedback
 }
 
 class DashboardViewModel(
     private val itemRepository: ItemRepository,
     private val planRepository: PlanRepository,
-    pointsRepository: PointsRepository,
+    private val pointsRepository: PointsRepository,
     contractRepository: ContractRepository,
     private val setupRepository: SetupRepository,
+    private val taskStartCoordinator: TaskStartCoordinator,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -87,8 +101,8 @@ class DashboardViewModel(
     private val today: LocalDate = clock.now().toLocalDateTime(timeZone).date
     private val tomorrow: LocalDate = today.plus(DatePeriod(days = 1))
 
-    private val _quickAddFeedback = MutableStateFlow<QuickAddFeedback?>(null)
-    val quickAddFeedback: StateFlow<QuickAddFeedback?> = _quickAddFeedback.asStateFlow()
+    private val _blockEditFeedback = MutableStateFlow<BlockEditFeedback?>(null)
+    val blockEditFeedback: StateFlow<BlockEditFeedback?> = _blockEditFeedback.asStateFlow()
 
     val uiState: StateFlow<DashboardUiState> = combine(
         pointsRepository.observeBalance(),
@@ -161,6 +175,9 @@ class DashboardViewModel(
             } else {
                 planRepository.complete(entry.block)
             }
+            // Something ticked off ahead of its hour should not still announce
+            // itself, and reopening one puts it back in the queue.
+            taskStartCoordinator.reschedule()
         }
     }
 
@@ -176,21 +193,72 @@ class DashboardViewModel(
         }
     }
 
-    fun quickAdd(name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+    /**
+     * Moving something the day already holds, without opening the planner.
+     *
+     * The list only offered the duration before, which meant the one correction
+     * a running day most often needs — this starts later than planned — had to go
+     * through the planner. It runs the planner's own `canPlace` / `firstFreeStart`
+     * pair rather than writing the time blindly: the list must not become a way
+     * around the one rule the planner enforces.
+     */
+    fun setStart(entry: BlockWithItem, start: LocalTime) {
         viewModelScope.launch {
-            _quickAddFeedback.value = when (val result = itemRepository.addQuickTodo(trimmed)) {
-                is AddItemResult.Added -> QuickAddFeedback.Added(trimmed)
-                is AddItemResult.BlockedByLock -> QuickAddFeedback.Blocked(
-                    name = trimmed,
-                    until = result.lockedUntil.toLocalDateTime(timeZone).date,
-                )
+            val onTheDay = uiState.value.todayBlocks.map { it.block }
+            val wanted = snapToGrid(start.minuteOfDay()).coerceIn(0, MINUTES_PER_DAY - 1)
+            val moved = entry.block.copy(
+                start = minuteToLocalTime(wanted),
+                updatedAt = clock.now(),
+            )
+
+            if (canPlace(onTheDay, moved)) {
+                planRepository.addBlock(moved)
+                // The dashboard is the one place a block moves outside a flow, so
+                // the alarm cannot wait for `rescheduleAlarms` to come round.
+                taskStartCoordinator.reschedule()
+                return@launch
             }
+            val free = firstFreeStart(
+                existing = onTheDay,
+                duration = entry.block.effectiveDuration,
+                preferredStart = wanted,
+                ignoreId = entry.block.id,
+                // The whole container has to fit, journey and break included —
+                // the same rule the planner enforces, so this stays a correction
+                // rather than a back door around it.
+                leadIn = entry.block.travelBefore,
+                tailOut = entry.block.breakAfter,
+            )
+            if (free == null) {
+                _blockEditFeedback.value = BlockEditFeedback.NoRoom(entry.item.name)
+                return@launch
+            }
+            planRepository.addBlock(moved.copy(start = minuteToLocalTime(free)))
+            _blockEditFeedback.value =
+                BlockEditFeedback.Moved(entry.item.name, minuteToLocalTime(free))
+            taskStartCoordinator.reschedule()
         }
     }
 
-    fun dismissQuickAddFeedback() {
-        _quickAddFeedback.value = null
+    fun dismissBlockEditFeedback() {
+        _blockEditFeedback.value = null
+    }
+
+    /**
+     * A correction to the account, by hand.
+     *
+     * A row like any other, because the balance *is* the ledger: booking a
+     * manual amount leaves the history readable instead of overwriting a number
+     * whose provenance is then gone. Positive credits, negative takes away.
+     */
+    fun adjustPoints(amount: Double, note: String?) {
+        if (amount == 0.0) return
+        viewModelScope.launch {
+            pointsRepository.record(
+                amount = amount,
+                reason = PointsReason.MANUAL,
+                note = note?.takeIf { it.isNotBlank() },
+            )
+        }
     }
 }
