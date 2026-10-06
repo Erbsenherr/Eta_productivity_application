@@ -59,6 +59,11 @@ above everything when it has something to say.
   worth seeing before the day is planned around it, and an empty box is a permanent
   reminder that there is nothing to remind anyone of. Name, then date and hour, since
   a countdown alone does not say *when*.
+- **"Heute anstehend" folds** (step 31): `TasksBox(foldKey = "today.tasks")` makes
+  the heading a toggle, open until the user closes it and remembered like the
+  lists on the Listen tab. Folded, the header still says how many blocks are open
+  — a folded list must not read as an empty one. "Morgen anstehend" passes no key
+  and stays as it was.
 - **Small corrections happen in "Heute anstehend" without leaving the screen** — a
   duration, or a start time whose "07:00 · 1 h" caption opens
   `EtaTimePickerDialog`. `setStart` runs the same `canPlace` / `firstFreeStart` pair

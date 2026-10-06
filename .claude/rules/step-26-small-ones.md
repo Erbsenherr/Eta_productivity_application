@@ -19,11 +19,13 @@ No schema change. The first round written after `CLAUDE.md` was split up.
   of its own above the other two, in "Tasks gruppieren?" and "Zur Gruppe
   hinzufügen?" alike — the shape "Gruppen zusammenlegen?" always had. **A row of
   three buttons is the trap**: two with a spacer is the most a dialog holds.
-- **A tap unfolds a name.** In the "Gerade" / "Als Nächstes" box and on a row of
-  "Heute anstehend" a tap lifts the line limit on the name and a second tap puts it
-  back — in place, no bubble: both already have room to grow downwards, unlike a
-  quarter-hour block in the planner. The long press keeps its meaning in both
-  (pomodoro; "Doch einplanen"). In `TaskRow` the detector is keyed by
+- **A tap unfolds a name** — on a row of "Heute anstehend" only, since step 31. A
+  tap lifts the line limit on the name and a second tap puts it back — in place, no
+  bubble: the row has room to grow downwards, unlike a quarter-hour block in the
+  planner. **The "Gerade" / "Als Nächstes" box no longer needs it**: its name and
+  its steps have no line limit at all and the box is as tall as what it says, so
+  the tap was removed there and only the long press (pomodoro) is left. In the list
+  the long press keeps its meaning too ("Doch einplanen"). In `TaskRow` the detector is keyed by
   `(block.id, canUncancel)`, so the long-press lambda cannot go stale.
 - **Pomodoro phases are freely chosen.** Both pickers — `PomodoroDialog` and the
   Extras default — are `precise`: stepped in fives, typed by tapping the value.

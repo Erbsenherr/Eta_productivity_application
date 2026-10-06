@@ -124,10 +124,12 @@ finished contracts are folded away. What the screen says: **a locked slot is dra
 red through**, not merely outlined —
 `colors.dangerSoft` is a token of its own so the dark theme can pick its own wash
 rather than getting a washed-out red over near-black. A locked slot is not a slot
-with a warning on it, it is a slot that is out of action. **"Gebrochene Verträge"
-is its own list**, split out of an "Abgeschlossen" section that held breaches and
-expiries together — two things that mean opposite things about the same promise. A
-contract being served out is **not** in it: it is still in its slot, in red.
+with a warning on it, it is a slot that is out of action. **Broken contracts are
+not listed at all** since step 31, at the user's request: the "Gebrochene Verträge"
+box is gone and `ContractsUiState` no longer carries them. The rows stay in the
+database, and what a breach costs is still shown where it bites — the locked slot
+names the contract that locked it, and one being served out is in its slot, in red.
+"Abgeschlossen" holds expiries only, which is what it was split down to in step 17.
 
 #### Contracts can be changed once (step 11)
 

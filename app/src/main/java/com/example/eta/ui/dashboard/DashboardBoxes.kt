@@ -52,6 +52,7 @@ import com.example.eta.ui.components.EtaCheckbox
 import com.example.eta.ui.components.EtaStepperButton
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
+import com.example.eta.ui.components.rememberFold
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.components.EtaTimePickerDialog
 import com.example.eta.ui.components.ConfirmDialog
@@ -209,15 +210,11 @@ fun NowBox(
                     // it launched with, and the entry it closed over goes stale.
                     val latestEntry by rememberUpdatedState(entry.entry)
                     val latestOnLongPress by rememberUpdatedState(onLongPress)
-                    // A tap unfolds a name too long for its two lines, and folds
-                    // it again; the long press already meant the pomodoro.
-                    var showFullName by remember(entry.entry.block.id) { mutableStateOf(false) }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .pointerInput(entry.entry.block.id, running) {
                                 detectTapGestures(
-                                    onTap = { showFullName = !showFullName },
                                     onLongPress = { latestOnLongPress(latestEntry, running) },
                                 )
                             },
@@ -226,7 +223,6 @@ fun NowBox(
                             now = entry,
                             minuteOfDay = minuteOfDay,
                             running = running,
-                            showFullName = showFullName,
                             steps = subtasks[entry.entry.item.id].orEmpty(),
                             checkedIds = checked[entry.entry.block.id].orEmpty(),
                             onCheckSubtask = { subtaskId, on ->
@@ -261,7 +257,6 @@ private fun NowLine(
     now: NowEntry,
     minuteOfDay: Int,
     running: Boolean,
-    showFullName: Boolean = false,
     steps: List<Subtask> = emptyList(),
     checkedIds: Set<String> = emptySet(),
     onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit = { _, _ -> },
@@ -278,11 +273,12 @@ private fun NowLine(
                     .background(colorOf(entry.item.category), CircleShape),
             )
             Spacer(Modifier.width(EtaTheme.spacing.sm))
+            // Never cut off: the box grows with what it has to say. It is the
+            // one place that names what is happening now, so a name that needs
+            // four lines gets four.
             EtaText(
                 text = entry.item.name + (phaseLabel(now.phase)?.let { " · $it" } ?: ""),
                 style = EtaTheme.typography.title,
-                maxLines = if (showFullName) Int.MAX_VALUE else 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
         EtaText(
@@ -331,8 +327,6 @@ private fun NowLine(
                             EtaTheme.colors.textPrimary
                         },
                         textDecoration = if (done) TextDecoration.LineThrough else null,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             } else {
@@ -629,11 +623,49 @@ fun TasksBox(
     onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
     onUncancel: ((BlockWithItem) -> Unit)? = null,
     emptyHint: String = "Nichts geplant.",
+    /**
+     * Set to make the box foldable, under this name — see [rememberFold]. Open
+     * until the user closes it; the header then says how many are still open,
+     * so a folded list is not a hidden one.
+     */
+    foldKey: String? = null,
 ) {
+    val fold = foldKey?.let { rememberFold(it, initiallyOpen = true) }
+    val open = fold?.open ?: true
+
     EtaSurface(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
-            BoxHeading(title)
-            if (blocks.isEmpty()) {
+            if (fold == null) {
+                BoxHeading(title)
+            } else {
+                val remaining = blocks.count { it.block.isOpen }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = fold::toggle,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BoxHeading(title, Modifier.weight(1f))
+                    EtaText(
+                        text = if (remaining == 0) "nichts offen" else "$remaining offen",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                    Spacer(Modifier.width(EtaTheme.spacing.sm))
+                    EtaText(
+                        text = if (open) "▴" else "▾",
+                        style = EtaTheme.typography.label,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
+            }
+            if (!open) {
+                // Folded: the header is the whole box.
+            } else if (blocks.isEmpty()) {
                 EtaText(
                     text = emptyHint,
                     style = EtaTheme.typography.body,

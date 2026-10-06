@@ -39,7 +39,6 @@ data class ContractsUiState(
      * its slot, drawn in red and asked about every evening, and listing it twice
      * would say two things about one promise.
      */
-    val broken: List<Contract> = emptyList(),
     /** Ran their term and were ended deliberately. */
     val fulfilled: List<Contract> = emptyList(),
     /** Probations whose month is up: the slot is owed a decision. */
@@ -65,7 +64,6 @@ class ContractsViewModel(
                 legacy = contracts.filter { it.state == ContractState.LEGACY },
                 expiring = contracts.filter { it.isExpiring(today) },
                 upgradable = contracts.filter { it.canUpgradeToLegacy(today) },
-                broken = contracts.filter { it.state == ContractState.BROKEN },
                 fulfilled = contracts.filter { it.state == ContractState.FULFILLED },
                 awaitingDecision = probationsAwaitingDecision(contracts, today),
             )

@@ -13,8 +13,12 @@ around the rules those phases enforce. The way to move a card is to run the phas
 that moves it. Keep it that way when adding to this screen.
 
 It needed no new data at first: `observeStage`, `observeDay`, `observeDayPlan` and
-`observeErfolgsliste` already carried everything. Sections collapse; the Sperrliste
-and the Erfolgsliste start closed, being backlog and history rather than today. The
+`observeErfolgsliste` already carried everything. Sections collapse, and since
+step 31 **every one starts closed and then stays the way it was left**, across
+restarts: each is a `Fold` (`ui/components/Fold.kt`, `rememberFold("lists.<SECTION>")`),
+which writes the answer to `SharedPreferences` the moment it changes.
+`rememberSaveable` would only have survived a rotation. Use `rememberFold` for any
+new section that should be remembered, with the screen as the key's prefix. The
 one gesture from the concept: **long-pressing "Liste für Morgen" opens the
 planner**, which is how that list is reopened for editing.
 

@@ -38,6 +38,7 @@ import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
+import com.example.eta.ui.components.rememberFold
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
@@ -65,10 +66,10 @@ fun SmartListsScreen(
     val setup by viewModel.setup.collectAsStateWithLifecycle()
     val booked = remember(state.definitions, setup) { weekOccupancy(state.definitions, setup) }
 
-    // The long lists start closed: history, backlog and the standing week, not today.
-    var collapsed by remember {
-        mutableStateOf(setOf(ListSection.SPERRLISTE, ListSection.WIEDERKEHREND, ListSection.ERFOLG))
-    }
+    // Every list starts closed, and after that stays the way it was left —
+    // across restarts too, which is why this is a `Fold` and not plain state.
+    val folds = ListSection.entries.associateWith { rememberFold("lists.${it.name}") }
+    val collapsed = folds.filterValues { !it.open }.keys
 
     // A tapped row. The card it holds says what to show; the flag says whether the
     // popup may offer more than reading, which is a property of the *list* it came
@@ -84,9 +85,7 @@ fun SmartListsScreen(
     var openedGroup by remember { mutableStateOf<RecurringGroup?>(null) }
     var editingGroup by remember { mutableStateOf<RecurringGroup?>(null) }
 
-    fun toggle(section: ListSection) {
-        collapsed = if (section in collapsed) collapsed - section else collapsed + section
-    }
+    fun toggle(section: ListSection) = folds.getValue(section).toggle()
 
     EtaScreen(modifier = modifier, bottomInset = false) {
         Column(

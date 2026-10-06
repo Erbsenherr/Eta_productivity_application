@@ -282,6 +282,7 @@ private fun TodayPage(
         TasksBox(
             title = "Heute anstehend",
             blocks = state.todayBlocks,
+            foldKey = "today.tasks",
             onToggle = viewModel::toggleCompleted,
             onDurationChange = { entry, duration ->
                 viewModel.setActualDuration(entry.block, duration)

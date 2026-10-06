@@ -390,7 +390,7 @@ read-only (parked last at the user's request) · 16. Calendar's own first round 
 condition, Mengen-Inkrement · 25. The Wochenschema · 26. Five conveniences and a
 hidden button · 27. Billing a task finished early · 28. Task names read aloud ·
 29. A Pause revolver in the day planner · 30. Designs to choose from, and a launch
-screen.
+screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

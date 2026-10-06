@@ -121,32 +121,9 @@ fun ContractsScreen(
                 }
             }
 
-            if (state.broken.isNotEmpty()) {
-                // Folded away, at the user's request: both of these are history —
-                // what is over, one way or the other — and the three slots plus the
-                // legacy collection are what the tab is opened for. Each keeps its
-                // own box, because a breach and an expiry say opposite things about
-                // the same promise and putting them under one heading was the
-                // confusion step 17 split apart.
-                EtaSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = EtaTheme.colors.danger,
-                ) {
-                    EtaExpander(
-                        label = "Gebrochene Verträge",
-                        hint = "Was nicht gehalten wurde, bleibt stehen. Ein Vertrag, der nach " +
-                            "dem Bruch weitergeführt wird, steht dagegen weiter in seinem Slot.",
-                        summary = if (state.broken.size == 1) {
-                            "1 Vertrag"
-                        } else {
-                            "${state.broken.size} Verträge"
-                        },
-                    ) {
-                        state.broken.forEach { c -> ContractRow(c, onLongPress = { openEdit(c) }) }
-                    }
-                }
-            }
-
+            // Broken contracts are not listed, at the user's request. What a breach
+            // costs is still on the screen where it bites — the slot it locks says
+            // so — and one that was carried on after the breach is in its slot.
             if (state.fulfilled.isNotEmpty()) {
                 EtaSurface(modifier = Modifier.fillMaxWidth()) {
                     EtaExpander(
