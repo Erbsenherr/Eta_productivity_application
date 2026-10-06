@@ -1,0 +1,31 @@
+# Build output
+build/
+.gradle/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Machine-specific: the SDK path, written by Android Studio on first open
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+
+# Signed APKs. They go to the phone, not into the repository.
+dist/
+
+# Signing keys must never be committed
+*.jks
+*.keystore
+
+# Claude Code's per-machine settings; the rules in .claude/rules are documentation and stay
+.claude/settings.local.json
+
+# Obsidian's per-machine window state
+Eta_doc/.obsidian/workspace.json
+
+# OS
+.DS_Store
+Thumbs.db

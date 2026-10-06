@@ -5,8 +5,18 @@
         everything after that. The window background is themed so a cold start
         does not flash white on a dark device.
     -->
-    <style name="Theme.ERIK_Iteration_2" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/erik_window_background</item>
+    <style name="Theme.Eta" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/eta_window_background</item>
+    </style>
+
+    <!--
+        What MainActivity starts in. White whatever the device's mode, because the
+        launch screen that follows is: the glyph and its line of text on white,
+        the way the icon shows them. `applyDesignToWindow` puts the design's own
+        background behind everything after that.
+    -->
+    <style name="Theme.Eta.Launch">
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 
     <!--
@@ -14,7 +24,7 @@
         it: this is a note taken in passing, not a visit to the app, and a full
         opaque screen would read as one.
     -->
-    <style name="Theme.ERIK_QuickAdd" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Eta_QuickAdd" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowNoTitle">true</item>

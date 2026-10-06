@@ -8,14 +8,16 @@
     android:padding="12dp">
 
     <TextView
+        android:id="@+id/widget_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/widget_quick_add_title"
-        android:textColor="@color/erik_widget_muted"
+        android:textColor="@color/eta_widget_muted"
         android:textSize="12sp"
         android:maxLines="1" />
 
     <TextView
+        android:id="@+id/widget_field"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
@@ -25,17 +27,18 @@
         android:paddingTop="10dp"
         android:paddingBottom="10dp"
         android:text="@string/widget_quick_add_placeholder"
-        android:textColor="@color/erik_widget_muted"
+        android:textColor="@color/eta_widget_muted"
         android:textSize="14sp"
         android:maxLines="1"
         android:ellipsize="end" />
 
     <TextView
+        android:id="@+id/widget_hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="@string/widget_quick_add_hint"
-        android:textColor="@color/erik_widget_muted"
+        android:textColor="@color/eta_widget_muted"
         android:textSize="11sp"
         android:maxLines="1"
         android:ellipsize="end" />

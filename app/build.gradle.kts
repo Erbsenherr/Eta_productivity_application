@@ -5,12 +5,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.erik_iteration_2"
+    namespace = "com.example.eta"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
+        // The app was called ERIK until the rename to Eta. The id keeps the old
+        // name on purpose: a new one would install as a second, empty app.
         applicationId = "com.example.erik_iteration_2"
         minSdk = 24
         targetSdk = 37
@@ -62,6 +64,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.datetime)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.play.services.auth)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.androidx.room.testing)

@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Reading the connected Google account's calendars, read-only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -17,7 +20,7 @@
 
         USE_EXACT_ALARM is granted at install and needs nothing from the user. It
         is reserved for apps whose core function is an alarm clock or a calendar,
-        which is a Play Store policy rather than a technical limit; ERIK sets a
+        which is a Play Store policy rather than a technical limit; Eta sets a
         wake alarm and two phase alarms, so it qualifies on the merits, but the
         claim would have to be made in a Play listing if this were ever published.
     -->
@@ -29,8 +32,20 @@
     <!-- Lets the wake alarm come up over the lock screen instead of as a banner. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+    <!--
+        Reading task names aloud. From Android 11 an app cannot see another
+        app's services unless it says which kind it is looking for; without
+        this the speech engine reads as "not installed" and every
+        announcement falls back to its sound.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
-        android:name=".ErikApplication"
+        android:name=".EtaApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -38,13 +53,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ERIK_Iteration_2">
+        android:theme="@style/Theme.Eta">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.ERIK_Iteration_2"
+            android:theme="@style/Theme.Eta.Launch"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -64,7 +79,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.ERIK_QuickAdd"
+            android:theme="@style/Theme.Eta_QuickAdd"
             android:windowSoftInputMode="adjustResize" />
 
         <receiver
@@ -90,6 +105,10 @@
             android:name=".alarm.WakeAlarmReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".alarm.ReminderAlarmReceiver"
+            android:exported="false" />
+
         <!--
             The ringing screen. `singleInstance` so the full-screen intent and a
             tap on the notification cannot end up with two of them, and excluded
@@ -104,7 +123,7 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.ERIK_Iteration_2" />
+            android:theme="@style/Theme.Eta" />
 
         <receiver
             android:name=".alarm.BootCompletedReceiver"

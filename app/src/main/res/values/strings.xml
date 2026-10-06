@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">ERIK_Iteration_2</string>
-    <string name="widget_quick_add_title">ERIK · Quick-Add</string>
+    <string name="app_name">Eta</string>
+    <string name="widget_quick_add_title">Eta · Quick-Add</string>
     <string name="widget_quick_add_placeholder">Was liegt an?</string>
     <string name="widget_quick_add_hint">Tippen — wischen für Wiederkehrendes</string>
     <string name="widget_quick_add_description">Notiz oder wiederkehrende Aufgabe, ohne die App zu öffnen.</string>

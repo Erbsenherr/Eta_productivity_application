@@ -1,0 +1,148 @@
+package com.example.eta.ui.contracts
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.eta.data.repository.ContractRepository
+import com.example.eta.data.repository.SignResult
+import com.example.eta.domain.contract.SlotStatus
+import com.example.eta.domain.contract.probationsAwaitingDecision
+import com.example.eta.domain.contract.slotStatuses
+import com.example.eta.domain.model.Contract
+import com.example.eta.domain.model.ContractEffort
+import com.example.eta.domain.model.ContractState
+import kotlin.time.Clock
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.todayIn
+
+data class ContractsUiState(
+    val today: LocalDate,
+    val slots: List<SlotStatus> = emptyList(),
+    val legacy: List<Contract> = emptyList(),
+    /** Ran their term and are waiting to be extended, changed or ended. */
+    val expiring: List<Contract> = emptyList(),
+    /** Have run a month and may be upgraded, freeing their slot. */
+    val upgradable: List<Contract> = emptyList(),
+    /**
+     * Broken and let go — the "gebrochene Verträge" list.
+     *
+     * A contract being **served out** after its breach is not here: it is still in
+     * its slot, drawn in red and asked about every evening, and listing it twice
+     * would say two things about one promise.
+     */
+    val broken: List<Contract> = emptyList(),
+    /** Ran their term and were ended deliberately. */
+    val fulfilled: List<Contract> = emptyList(),
+    /** Probations whose month is up: the slot is owed a decision. */
+    val awaitingDecision: List<Contract> = emptyList(),
+)
+
+class ContractsViewModel(
+    private val contractRepository: ContractRepository,
+    clock: Clock = Clock.System,
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
+) : ViewModel() {
+
+    private val today: LocalDate = clock.todayIn(timeZone)
+
+    private val _refusal = MutableStateFlow<String?>(null)
+    val refusal: StateFlow<String?> = _refusal.asStateFlow()
+
+    val uiState: StateFlow<ContractsUiState> = contractRepository.observeAll()
+        .map { contracts ->
+            ContractsUiState(
+                today = today,
+                slots = slotStatuses(contracts, today),
+                legacy = contracts.filter { it.state == ContractState.LEGACY },
+                expiring = contracts.filter { it.isExpiring(today) },
+                upgradable = contracts.filter { it.canUpgradeToLegacy(today) },
+                broken = contracts.filter { it.state == ContractState.BROKEN },
+                fulfilled = contracts.filter { it.state == ContractState.FULFILLED },
+                awaitingDecision = probationsAwaitingDecision(contracts, today),
+            )
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = ContractsUiState(today = today),
+        )
+
+    /** Signs, or surfaces the reason it cannot be signed. */
+    fun sign(
+        slot: Int,
+        title: String,
+        conditions: String,
+        breachDefinition: String,
+        effort: ContractEffort,
+        signature: String,
+        weeks: Int,
+        onSigned: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = contractRepository.sign(
+                slot = slot,
+                title = title,
+                conditions = conditions,
+                breachDefinition = breachDefinition,
+                effort = effort,
+                signature = signature,
+                endsOn = today.plus(DatePeriod(days = weeks * 7)),
+            )
+            when (result) {
+                is SignResult.Signed -> onSigned()
+                is SignResult.Refused -> _refusal.value = result.reason
+            }
+        }
+    }
+
+    /** Changing a contract's wording; the dialog has already stated what it costs. */
+    fun editWording(contract: Contract, title: String, conditions: String, breach: String) {
+        viewModelScope.launch {
+            contractRepository.editWording(contract, title, conditions, breach)
+        }
+    }
+
+    fun upgradeToLegacy(contract: Contract) {
+        viewModelScope.launch { contractRepository.upgradeToLegacy(contract) }
+    }
+
+    /** Extending a contract that ran its term, by the same length again. */
+    fun extend(contract: Contract, weeks: Int) {
+        viewModelScope.launch {
+            contractRepository.extend(contract, today.plus(DatePeriod(days = weeks * 7)))
+        }
+    }
+
+    fun fulfil(contract: Contract) {
+        viewModelScope.launch { contractRepository.fulfil(contract) }
+    }
+
+    /**
+     * The month is served: the promise is taken up again, term back to zero.
+     *
+     * Same words, same effort, same signature — only the run-up is gone, so it
+     * needs a full month again before it can become legacy. Making a promise
+     * again is making a new promise.
+     */
+    fun restartProbation(contract: Contract) {
+        viewModelScope.launch { contractRepository.restartProbation(contract) }
+    }
+
+    /** The other answer: let it go, and the slot is free for something new. */
+    fun abandonProbation(contract: Contract) {
+        viewModelScope.launch { contractRepository.abandonProbation(contract) }
+    }
+
+    fun dismissRefusal() {
+        _refusal.value = null
+    }
+}

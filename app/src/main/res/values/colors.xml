@@ -1,17 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Mirrors LightErikColors.background; painted before the first Compose frame. -->
-    <color name="erik_window_background">#FAFAF8</color>
+    <!-- Mirrors LegacyLightColors.background; painted before the first Compose frame. -->
+    <color name="eta_window_background">#FAFAF8</color>
 
     <!--
-        The widget cannot read ErikTheme: RemoteViews are inflated by the
+        The widget cannot read EtaTheme: RemoteViews are inflated by the
         launcher, in the launcher's process, long before any Compose tree
-        exists. These five mirror LightErikColors by hand, with the night
+        exists. These five mirror LegacyLightColors by hand, with the night
         variants alongside, and are the only place the palette is duplicated.
     -->
-    <color name="erik_widget_surface">#FFFFFF</color>
-    <color name="erik_widget_border">#E4E2DD</color>
-    <color name="erik_widget_text">#1A1A17</color>
-    <color name="erik_widget_muted">#8E8B83</color>
-    <color name="erik_widget_accent">#4F46E5</color>
+    <color name="eta_widget_surface">#FFFFFF</color>
+    <color name="eta_widget_border">#E4E2DD</color>
+    <color name="eta_widget_text">#1A1A17</color>
+    <color name="eta_widget_muted">#8E8B83</color>
+    <color name="eta_widget_accent">#4F46E5</color>
+
+    <!--
+        The same five for the Eta design, mirroring EtaRedColors. No night
+        variants: that design is light whatever the device says.
+    -->
+    <color name="eta_red_widget_surface">#FFFFFF</color>
+    <color name="eta_red_widget_border">#ECE6E4</color>
+    <color name="eta_red_widget_text">#1B1717</color>
+    <color name="eta_red_widget_muted">#978D8A</color>
+    <color name="eta_red_widget_accent">#E5322D</color>
+
+    <!-- And for Eta Dunkel, mirroring EtaRedDarkColors. -->
+    <color name="eta_red_dark_widget_surface">#1E1A1B</color>
+    <color name="eta_red_dark_widget_border">#372E2F</color>
+    <color name="eta_red_dark_widget_text">#F5F0EF</color>
+    <color name="eta_red_dark_widget_muted">#857A78</color>
+    <color name="eta_red_dark_widget_accent">#EB4640</color>
 </resources>

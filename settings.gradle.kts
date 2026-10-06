@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ERIK_Iteration_2"
+rootProject.name = "Eta"
 include(":app")

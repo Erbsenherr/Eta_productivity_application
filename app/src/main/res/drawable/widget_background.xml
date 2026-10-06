@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget's own panel, standing in for ErikSurface. -->
+<!-- The widget's own panel, standing in for EtaSurface. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/erik_widget_surface" />
+    <solid android:color="@color/eta_widget_surface" />
     <stroke
         android:width="1dp"
-        android:color="@color/erik_widget_border" />
+        android:color="@color/eta_widget_border" />
     <corners android:radius="16dp" />
 </shape>

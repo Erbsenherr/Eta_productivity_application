@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Android 12 and later draw a splash screen of their own, with the launcher
+        icon in the middle. It cannot carry text, so it is left blank and white:
+        the icon would otherwise appear twice, once here and once on the launch
+        screen that has the line beneath it.
+    -->
+    <style name="Theme.Eta.Launch">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenBackground">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_no_icon</item>
+    </style>
+</resources>
