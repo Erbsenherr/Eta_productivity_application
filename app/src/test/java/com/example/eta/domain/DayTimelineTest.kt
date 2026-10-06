@@ -16,6 +16,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -128,7 +129,7 @@ class DayTimelineTest {
             sleepTime = LocalTime(23, 0),
             wakeTime = LocalTime(7, 0),
         )
-        assertEquals(listOf(0 until 420, 1380 until 1440), setup.sleepStretches())
+        assertEquals(listOf(0 until 420, 1380 until 1440), setup.sleepStretches(DayOfWeek.WEDNESDAY))
     }
 
     @Test
@@ -137,7 +138,7 @@ class DayTimelineTest {
             sleepTime = LocalTime(1, 0),
             wakeTime = LocalTime(9, 0),
         )
-        assertEquals(listOf(60 until 540), setup.sleepStretches())
+        assertEquals(listOf(60 until 540), setup.sleepStretches(DayOfWeek.WEDNESDAY))
     }
 
     @Test

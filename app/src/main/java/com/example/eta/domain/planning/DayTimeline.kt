@@ -4,7 +4,10 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.setup.nightEndingOn
+import com.example.eta.domain.setup.shifted
 import kotlin.time.Duration
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -282,24 +285,29 @@ fun firstFreeStart(
 }
 
 /**
- * The night as it falls on one calendar day, in minutes from midnight.
+ * The night as it falls on one [weekday], in minutes from midnight.
  *
  * A night that crosses midnight shows up as two stretches — the tail of the
  * previous one in the morning, the start of this one in the evening. Going to bed
  * after midnight is the other case and needs only one. The planner shades these
  * rather than drawing them as blocks: sleep is configuration, not something to
  * check off.
+ *
+ * Per weekday because the weekend may have a night of its own: the two stretches
+ * of a Friday then belong to two different nights — the ordinary one it wakes
+ * from and the weekend one it goes into.
  */
-fun UserSetup.sleepStretches(): List<IntRange> {
-    val sleepStart = sleepTime.minuteOfDay()
-    val wake = wakeTime.minuteOfDay()
+fun UserSetup.sleepStretches(weekday: DayOfWeek): List<IntRange> {
+    val endingToday = nightEndingOn(weekday)
+    val endingTomorrow = nightEndingOn(weekday.shifted(1))
 
-    return if (sleepStart > wake) {
-        buildList {
-            if (wake > 0) add(0 until wake)
-            if (sleepStart < MINUTES_PER_DAY) add(sleepStart until MINUTES_PER_DAY)
-        }
-    } else {
-        listOfNotNull((sleepStart until wake).takeIf { !it.isEmpty() })
+    return listOf(
+        endingToday.sleepOffset() until endingToday.wake.minuteOfDay(),
+        (MINUTES_PER_DAY + endingTomorrow.sleepOffset()) until
+            (MINUTES_PER_DAY + endingTomorrow.wake.minuteOfDay()),
+    ).mapNotNull { night ->
+        val from = night.first.coerceAtLeast(0)
+        val until = (night.last + 1).coerceAtMost(MINUTES_PER_DAY)
+        (from until until).takeIf { !it.isEmpty() }
     }
 }

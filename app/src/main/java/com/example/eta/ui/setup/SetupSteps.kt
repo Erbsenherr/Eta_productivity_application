@@ -14,6 +14,7 @@ import com.example.eta.domain.setup.DailySlot
 import com.example.eta.domain.setup.HousekeepingPlan
 import com.example.eta.domain.setup.MealPlan
 import com.example.eta.domain.setup.MindfulnessPlan
+import com.example.eta.domain.setup.NightTimes
 import com.example.eta.domain.setup.TimeSpan
 import com.example.eta.domain.setup.WorkBlock
 import com.example.eta.domain.setup.UserSetup
@@ -22,6 +23,7 @@ import com.example.eta.domain.setup.WeeklySlot
 import com.example.eta.domain.setup.WorkSchedule
 import com.example.eta.domain.setup.bedPrepDuration
 import com.example.eta.domain.setup.sleepDuration
+import com.example.eta.domain.setup.suggestedWeekendNight
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
@@ -175,6 +177,56 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                 "Nacht: ${draft.sleepDuration().formatShort()} · " +
                     "Bettfertig: ${draft.bedPrepDuration().formatShort()}",
             )
+
+            val weekend = draft.weekendNight
+            EtaField(
+                label = "Am Wochenende",
+                hint = "Gilt für die Nächte auf Samstag und auf Sonntag: Freitag- und " +
+                    "Samstagabend, Samstag- und Sonntagmorgen.",
+            ) {
+                EtaChoice(
+                    options = listOf(false to "Wie unter der Woche", true to "Andere Zeiten"),
+                    selected = weekend != null,
+                    onSelect = { differs ->
+                        onChange {
+                            it.copy(
+                                weekendNight = if (differs) {
+                                    it.weekendNight ?: it.suggestedWeekendNight()
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    },
+                )
+            }
+            if (weekend != null) {
+                fun change(transform: (NightTimes) -> NightTimes) =
+                    onChange { it.copy(weekendNight = it.weekendNight?.let(transform)) }
+
+                EtaField(label = "Bettfertig machen ab (Fr, Sa)") {
+                    EtaTimePicker(
+                        value = weekend.bedPrep,
+                        onValueChange = { time -> change { it.copy(bedPrep = time) } },
+                    )
+                }
+                EtaField(label = "Schlafen gehen (Fr, Sa)") {
+                    EtaTimePicker(
+                        value = weekend.sleep,
+                        onValueChange = { time -> change { it.copy(sleep = time) } },
+                    )
+                }
+                EtaField(label = "Aufstehen (Sa, So)") {
+                    EtaTimePicker(
+                        value = weekend.wake,
+                        onValueChange = { time -> change { it.copy(wake = time) } },
+                    )
+                }
+                DerivedHint(
+                    "Nacht am Wochenende: ${weekend.sleepDuration().formatShort()} · " +
+                        "Bettfertig: ${weekend.bedPrepDuration().formatShort()}",
+                )
+            }
         }
     }
 }
@@ -354,7 +406,7 @@ fun SportStep(draft: UserSetup, onChange: OnSetupChange) {
                     onChange {
                         it.copy(
                             sport = if (wants) {
-                                slot ?: WeeklySlot(DayOfWeek.TUESDAY, LocalTime(18, 0), 1.hours)
+                                slot ?: WeeklySlot(DayOfWeek.TUESDAY, LocalTime(17, 15), 1.hours)
                             } else {
                                 null
                             },

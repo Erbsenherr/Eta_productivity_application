@@ -217,8 +217,9 @@ Samsung, Xiaomi and others exempt their own clock unconditionally, so the
 the app. If the wake alarm proves unreliable on this phone, that row is the first
 thing to check, and the honest fallback is the system clock.
 
-**Open:** one time for every day. Someone who gets up later at the weekend needs
-either a per-weekday `wakeTime` — which would touch the sleep answer and the
-free-hour maths with it — or a wake time of the alarm's own, which reintroduces the
-drift this design avoids. Neither is obviously right; ask before choosing.
+**The weekend can ring later** since step 32: `nextWake` asks `wakeTimeOn(weekday)`
+day by day, so a `weekendNight` in the setup moves Saturday's and Sunday's alarm with
+the hour the planner shades. Still no time of the alarm's own — the drift that
+design avoids stays avoided. One weekend time for both days; a time per weekday
+would be the next step and nobody asked.
 

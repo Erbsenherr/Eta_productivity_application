@@ -31,7 +31,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.weekOccupancy
-import com.example.eta.domain.setup.SETTINGS_OWNED_ITEM_IDS
+import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
@@ -322,7 +322,7 @@ fun SmartListsScreen(
     openedGroup?.let { group ->
         RecurringGroupDialog(
             group = group,
-            ownedBySettings = group.ids.any { it in SETTINGS_OWNED_ITEM_IDS },
+            ownedBySettings = group.ids.any(::isOwnedBySettings),
             onDismiss = { openedGroup = null },
             onEdit = {
                 editingGroup = group

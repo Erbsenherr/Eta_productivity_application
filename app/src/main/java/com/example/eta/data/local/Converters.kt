@@ -6,6 +6,7 @@ import com.example.eta.domain.setup.DailySlot
 import com.example.eta.domain.setup.HousekeepingPlan
 import com.example.eta.domain.setup.MealPlan
 import com.example.eta.domain.setup.MindfulnessPlan
+import com.example.eta.domain.setup.NightTimes
 import com.example.eta.domain.setup.WeeklySlot
 import com.example.eta.domain.setup.WorkSchedule
 import kotlin.time.Duration
@@ -95,6 +96,12 @@ class Converters {
     @ColumnTypeConverter
     fun stringToMindfulness(value: String?): MindfulnessPlan? =
         value?.let { MindfulnessPlan.decode(it) }
+
+    @ColumnTypeConverter
+    fun nightTimesToString(value: NightTimes?): String? = value?.encode()
+
+    @ColumnTypeConverter
+    fun stringToNightTimes(value: String?): NightTimes? = value?.let { NightTimes.decode(it) }
 
     @ColumnTypeConverter
     fun workScheduleToString(value: WorkSchedule?): String? = value?.encode()

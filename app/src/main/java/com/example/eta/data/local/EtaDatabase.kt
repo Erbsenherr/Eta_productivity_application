@@ -40,7 +40,7 @@ import com.example.eta.domain.setup.UserSetup
         Subtask::class,
         SubtaskCheck::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -666,5 +666,16 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         connection.execSQL(
             "ALTER TABLE `user_setup` ADD COLUMN `speakNotes` INTEGER NOT NULL DEFAULT 0",
         )
+    }
+}
+
+/**
+ * The weekend's own night: one nullable column holding the three times, encoded
+ * the way the other nested answers are. Null for everyone who upgrades — their
+ * nights were all the same, and stay so until they say otherwise.
+ */
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `weekendNight` TEXT")
     }
 }

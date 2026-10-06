@@ -32,8 +32,7 @@ fun weekOccupancy(
     setup: UserSetup?,
     ignoreIds: Set<String> = emptySet(),
 ): Map<DayOfWeek, List<IntRange>> {
-    val night = setup?.sleepStretches().orEmpty()
-    val byDay = WEEK.associateWith { night.toMutableList() }
+    val byDay = WEEK.associateWith { setup?.sleepStretches(it).orEmpty().toMutableList() }
     definitions
         .filter { it.id !in ignoreIds && it.completedAt == null && it.isConcretized }
         .filter { it.stage != Stage.COLLECTION && it.stage != Stage.LOCKED }

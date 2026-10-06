@@ -50,8 +50,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (453 tests
-as of step 30), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (467 tests
+as of step 32), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -317,7 +317,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 
 | file in `.claude/rules/` | sections it holds |
 | --- | --- |
-| `setup.md` | *The setup questionnaire* |
+| `setup.md` | *The setup questionnaire* · *Step 32*: page order, "Überspringen", the weekend night (`NightTimes`), defaults that do not collide |
 | `database.md` | *The database and its migrations* — the version and the migration table |
 | `contracts.md` | *Contracts and the evening settlement*, *Breaking a contract without giving it up (step 17)*, *Contracts can be changed once (step 11)* |
 | `lists.md` | *The "Smart toDos" (Listen) tab* |
@@ -390,7 +390,8 @@ read-only (parked last at the user's request) · 16. Calendar's own first round 
 condition, Mengen-Inkrement · 25. The Wochenschema · 26. Five conveniences and a
 hidden button · 27. Billing a task finished early · 28. Task names read aloud ·
 29. A Pause revolver in the day planner · 30. Designs to choose from, and a launch
-screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text.
+screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text ·
+32. The questionnaire reordered, skippable pages and a weekend night.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and
@@ -406,7 +407,6 @@ lands.
 - **`MIGRATION_1_2` is verified only by diffing against the exported schema.** A real
   migration test needs `MigrationTestHelper` with a JVM SQLite driver; `room3-testing` is
   already on the test classpath for it.
-- **One wake time for every day** — see *The wake alarm*.
 - **Nothing lets the user set an `ItemRole`** — see *`ItemRole`*.
 - **Notes at creation time**, and a deadline on a card already planned into a day, have
   nowhere to be asked for yet.

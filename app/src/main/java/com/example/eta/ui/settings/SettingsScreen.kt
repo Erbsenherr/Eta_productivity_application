@@ -75,7 +75,7 @@ import kotlinx.datetime.toLocalDateTime
  * questionnaire laid them down, and they are edited as tasks on the Listen tab;
  * asking them again here would overwrite whatever was changed there. Sleep and
  * the morning stay, because they hang off the night — see
- * `SETTINGS_OWNED_ITEM_IDS`.
+ * `isOwnedBySettings`.
  */
 @Composable
 fun SettingsScreen(
@@ -698,8 +698,11 @@ private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Weckruf", style = EtaTheme.typography.heading)
+            val weekendWake = setup.weekendNight?.wake
+            val hours = setup.wakeTime.formatClock() +
+                (weekendWake?.let { ", am Wochenende um ${it.formatClock()}" } ?: "")
             EtaText(
-                text = "Eta weckt dich um ${setup.wakeTime.formatClock()} Uhr — dieselbe " +
+                text = "Eta weckt dich um $hours Uhr — dieselbe " +
                     "Aufstehzeit, die oben im Schlaf steht. Der Weckruf klingelt über den " +
                     "Sperrbildschirm und läutet, bis du ihn beendest oder neun Minuten " +
                     "schlummerst.",
@@ -709,7 +712,11 @@ private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
             EtaChoice(
                 options = listOf(
                     false to "Kein Weckruf",
-                    true to "Jeden Tag um ${setup.wakeTime.formatClock()} wecken",
+                    true to if (weekendWake == null) {
+                        "Jeden Tag um ${setup.wakeTime.formatClock()} wecken"
+                    } else {
+                        "Jeden Tag zur Aufstehzeit wecken"
+                    },
                 ),
                 selected = setup.wakeAlarm,
                 onSelect = { on -> onChange { it.copy(wakeAlarm = on) } },

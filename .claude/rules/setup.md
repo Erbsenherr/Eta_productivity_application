@@ -54,3 +54,53 @@ Hausputz, Sport, Kochen and Achtsamkeit carry theirs. Sleep produces no item at
 all; it is configuration the planner shades (`colors.sleep`) and the free-hour
 maths subtracts.
 
+### Step 32: the order of the pages, skipping, and a weekend night
+
+**The two pages the app cannot run without come first**: "Schlaf und Morgen", then
+"Planungsphasen" — the planner shades the night and both alarms need an hour.
+The welcome text is the top of the first page rather than a page of its own, so
+the first thing shown is a question. Everything after those two — Essen, Hausputz,
+Sport, Freie Zeit, Selbstachtsamkeit, Arbeit und Uni — carries an **"Überspringen"
+button**, on a line of its own above Zurück / Weiter (three buttons in one row do
+not fit a phone).
+
+- **Skipping is kept beside the draft, not written into it.** `SetupViewModel.skipped`
+  is a set of `SetupPart`; `UserSetup.skipping(parts)` in `domain/setup/Nights.kt`
+  takes those answers out, and is applied to what the outlook counts and to what
+  `finish` stores. What was typed on a skipped page is therefore still there behind
+  "Doch beantworten".
+- What "taken out" means per page: Hausputz, Sport and Achtsamkeit become null, work
+  becomes `WorkSchedule.None`, the meals an **empty** `DailyCooking`, and free time a
+  slot of **zero duration** — `recurringItems` and `weeklySpans` already drop both,
+  which is why neither needed to become nullable. **Skipped free time takes the
+  social budget with it**: they are one page.
+- **`UserSetup.draft` must not collide with itself.** Someone who accepts every page
+  gets no "Doppeltbelegung" — sport moved from 18:00 to 17:15 because it ran into
+  the cooking at 18:30 — and `WeekendNightTest` pins it, with and without the
+  suggested weekend. A new default has to pass that test.
+
+**The weekend may have a night of its own.** `UserSetup.weekendNight` is a nullable
+`NightTimes(bedPrep, sleep, wake)`, one encoded column; null means every night is
+alike, which is every setup from before. "Am Wochenende → Andere Zeiten" on the
+sleep page switches it on, seeded by `suggestedWeekendNight()` (an hour later to
+bed, two hours longer in it). The page is shared with the settings tab, so it can
+be changed there too. The morning's *length* stays one answer.
+
+- **A night belongs to the day it ends on.** Weekend nights are the ones ending on
+  Saturday and Sunday: Friday and Saturday evening, Saturday and Sunday morning.
+  Sunday evening already belongs to Monday. `nightEndingOn(weekday)` is the one
+  place that decides, and everything goes through it: `weeklySpans`,
+  `sleepStretches(weekday)` (which gained its parameter — a Friday wakes from one
+  night and goes into another), `nextWake` and `recurringItems`.
+- **`NightTimes` speaks in offsets from the wake day's midnight**, negative for the
+  evening before, so "before or after midnight" is settled once. Going to bed at
+  00:30 puts the whole night, winding down included or not, on the right weekday.
+- **Bettfertig machen and Morgenzeit become one definition per night** when there
+  is a weekend night: `setup:bedprep-saturday` is the winding down of the night that
+  *ends* on Saturday, a `Weekly(FRIDAY)` rule. The id carries the wake day, not the
+  day the task falls on, because two nights can wind down on the same weekday (one
+  after midnight, one before). With every night alike they stay the two `Daily`
+  definitions `setup:bedprep` / `setup:morning`. Switching the option retires one
+  set and lays down the other through the ordinary `saveSettings` path.
+- **`isOwnedBySettings(id)` replaced the `SETTINGS_OWNED_ITEM_IDS` set**, since the
+  owned ids are no longer two fixed strings.

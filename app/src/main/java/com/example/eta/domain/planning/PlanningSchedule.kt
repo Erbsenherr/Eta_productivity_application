@@ -1,6 +1,7 @@
 package com.example.eta.domain.planning
 
 import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.setup.wakeTimeOn
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -62,12 +63,19 @@ val WAKE_SNOOZE: Duration = 9.minutes
 /**
  * When the wake alarm is next due, or null when the user has not asked for one.
  *
- * Shares [nextDaily] with the planning alarm, and is strict about "after" for the
- * same reason: ringing at the appointed minute must not be able to schedule that
+ * Strict about "after", like the planning alarm and for the same reason: ringing at the appointed minute must not be able to schedule that
  * same minute again and loop.
  */
-fun nextWake(setup: UserSetup, after: LocalDateTime): LocalDateTime? =
-    if (setup.wakeAlarm) nextDaily(setup.wakeTime, after) else null
+fun nextWake(setup: UserSetup, after: LocalDateTime): LocalDateTime? {
+    if (!setup.wakeAlarm) return null
+    // Day by day, since the weekend may get up at an hour of its own.
+    for (offset in 0..7) {
+        val date: LocalDate = after.date.plus(DatePeriod(days = offset))
+        val candidate = LocalDateTime(date, setup.wakeTimeOn(date.dayOfWeek))
+        if (candidate > after) return candidate
+    }
+    return null
+}
 
 /**
  * Whether the alarm should sound.

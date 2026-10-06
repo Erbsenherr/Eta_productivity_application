@@ -4,15 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.domain.setup.SetupConflict
+import com.example.eta.domain.setup.SetupPart
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.conflicts
 import com.example.eta.domain.setup.freeMinutesPerWeek
 import com.example.eta.domain.setup.recurringItems
+import com.example.eta.domain.setup.skipping
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -33,6 +36,16 @@ class SetupViewModel(
     private val _draft = MutableStateFlow(UserSetup.draft(clock.now()))
     val draft: StateFlow<UserSetup> = _draft.asStateFlow()
 
+    /**
+     * The pages the user chose to leave out. Kept beside the draft rather than
+     * written into it, so the answers on a skipped page are still there when it
+     * is taken back; [effective] is the draft with them removed.
+     */
+    private val _skipped = MutableStateFlow(emptySet<SetupPart>())
+    val skipped: StateFlow<Set<SetupPart>> = _skipped.asStateFlow()
+
+    private val effective = combine(_draft, _skipped) { draft, skipped -> draft.skipping(skipped) }
+
     private val _saving = MutableStateFlow(false)
     val saving: StateFlow<Boolean> = _saving.asStateFlow()
 
@@ -40,7 +53,7 @@ class SetupViewModel(
      * Recomputed on every answer, because the concept asks for double bookings to
      * be pointed out *while* the questionnaire is being filled in, not at the end.
      */
-    val outlook: StateFlow<SetupOutlook> = _draft
+    val outlook: StateFlow<SetupOutlook> = effective
         .map { setup ->
             SetupOutlook(
                 conflicts = setup.conflicts(),
@@ -58,6 +71,10 @@ class SetupViewModel(
         _draft.update(transform)
     }
 
+    fun skip(part: SetupPart) = _skipped.update { it + part }
+
+    fun unskip(part: SetupPart) = _skipped.update { it - part }
+
     /**
      * Writes the answers and lays down the schedule. No callback is needed: the
      * root screen watches the stored setup and swaps itself for the dashboard.
@@ -73,7 +90,7 @@ class SetupViewModel(
         if (_saving.value) return
         _saving.value = true
         viewModelScope.launch {
-            setupRepository.complete(_draft.value)
+            setupRepository.complete(_draft.value.skipping(_skipped.value))
             _saving.value = false
         }
     }

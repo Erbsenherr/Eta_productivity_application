@@ -4,6 +4,7 @@ import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.model.RecurrenceRule
+import com.example.eta.domain.planning.MINUTES_PER_DAY
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.datetime.DayOfWeek
@@ -19,15 +20,25 @@ const val SETUP_ITEM_ID_PREFIX = "setup:"
 private fun setupId(key: String) = SETUP_ITEM_ID_PREFIX + key
 
 /**
- * The two definitions the settings tab still owns: winding down and the morning.
+ * The two tasks the settings tab still owns: winding down and the morning.
  *
  * Everything else the questionnaire lays down is created once and from then on is
  * an ordinary standing task, edited on the Listen tab. These two stay with the
  * settings because they hang off the night — bed preparation ends at the sleep
  * time and the morning starts at the wake time — and the night is configuration,
- * not a task. Saving the settings regenerates exactly these, and nothing else.
+ * not a task. Saving the settings regenerates exactly these, and nothing else —
+ * see [isOwnedBySettings].
  */
-val SETTINGS_OWNED_ITEM_IDS: Set<String> = setOf(setupId("bedprep"), setupId("morning"))
+private val SETTINGS_OWNED_KEYS = listOf("bedprep", "morning")
+
+/**
+ * Whether [id] is one of them. With every night alike each is one daily
+ * definition (`setup:bedprep`); with a weekend of its own there is one per night,
+ * named after the day that night ends on (`setup:bedprep-saturday`).
+ */
+fun isOwnedBySettings(id: String): Boolean = SETTINGS_OWNED_KEYS.any { key ->
+    id == setupId(key) || id.startsWith(setupId("$key-"))
+}
 
 /**
  * The recurring definitions that follow from the answers.
@@ -92,8 +103,40 @@ fun UserSetup.recurringItems(now: Instant): List<Item> {
         }
     }
 
-    daily("bedprep", SetupLabels.BED_PREP, null, bedPrepTime, bedPrepDuration(), ItemRole.BED_PREP)
-    daily("morning", SetupLabels.MORNING, null, wakeTime, morningDuration, ItemRole.MORNING)
+    if (weekendNight == null) {
+        daily("bedprep", SetupLabels.BED_PREP, null, bedPrepTime, bedPrepDuration(), ItemRole.BED_PREP)
+        daily("morning", SetupLabels.MORNING, null, wakeTime, morningDuration, ItemRole.MORNING)
+    } else {
+        // One pair per night. The id carries the day the night *ends* on, not the
+        // day the task falls on: winding down after midnight lands on the wake
+        // day itself, and two nights could otherwise claim the same weekday's id.
+        fun nightly(key: String, name: String, wakeDay: DayOfWeek, onDay: DayOfWeek, start: LocalTime, duration: Duration, role: ItemRole) {
+            if (duration.inWholeMinutes <= 0) return
+            items += Item.newRecurring(
+                id = setupId("$key-${wakeDay.name.lowercase()}"),
+                name = name,
+                category = null,
+                recurrenceRule = RecurrenceRule.Weekly(onDay),
+                startTime = start,
+                estimatedDuration = duration,
+                now = now,
+                role = role,
+            )
+        }
+        WEEK.forEach { wakeDay ->
+            val night = nightEndingOn(wakeDay)
+            nightly(
+                key = "bedprep",
+                name = SetupLabels.BED_PREP,
+                wakeDay = wakeDay,
+                onDay = wakeDay.shifted(Math.floorDiv(night.bedPrepOffset(), MINUTES_PER_DAY)),
+                start = night.bedPrep,
+                duration = night.bedPrepDuration(),
+                role = ItemRole.BED_PREP,
+            )
+            nightly("morning", SetupLabels.MORNING, wakeDay, wakeDay, night.wake, morningDuration, ItemRole.MORNING)
+        }
+    }
     daily("freetime", SetupLabels.FREE_TIME, null, freeTime.start, freeTime.duration, ItemRole.FREE_TIME)
 
     when (val plan = meals) {

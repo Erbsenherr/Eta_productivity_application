@@ -293,7 +293,7 @@ class DayPlannerViewModel(
             revolver = tier.items,
             revolverPriority = tier.priority,
             lockedPriorities = tier.lockedBelow,
-            sleep = setup?.sleepStretches().orEmpty(),
+            sleep = setup?.sleepStretches(date.dayOfWeek).orEmpty(),
             // Today is never locked by its confirmation: that confirmation was
             // last night's planning, and this screen exists to correct it.
             isConfirmed = day == PlannerDay.TOMORROW && dayPlan?.isConfirmed == true,

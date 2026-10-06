@@ -329,6 +329,12 @@ data class UserSetup(
      * planner shades as the end of the night is the hour it rings at.
      */
     val wakeAlarm: Boolean = false,
+    /**
+     * The night at the weekend, where it differs — see [NightTimes] for which
+     * nights those are. Null means every night is the same, which is what every
+     * setup answered before this existed says.
+     */
+    val weekendNight: NightTimes? = null,
     /** How much of the morning belongs to getting going, starting at [wakeTime]. */
     val morningDuration: Duration,
     val meals: MealPlan,
@@ -393,7 +399,9 @@ data class UserSetup(
             housekeeping = HousekeepingPlan.Weekly(
                 WeeklySlot(DayOfWeek.SATURDAY, LocalTime(10, 0), 1.hours),
             ),
-            sport = WeeklySlot(DayOfWeek.TUESDAY, LocalTime(18, 0), 1.hours),
+            // After work and done before the cooking at half past six: answers
+            // that are simply accepted must not collide with each other.
+            sport = WeeklySlot(DayOfWeek.TUESDAY, LocalTime(17, 15), 1.hours),
             freeTime = DailySlot(LocalTime(20, 0), 1.hours + 30.minutes),
             socialTimePerWeek = 4.hours,
             mindfulness = MindfulnessPlan.EveryDay(DailySlot(LocalTime(21, 30), 15.minutes)),

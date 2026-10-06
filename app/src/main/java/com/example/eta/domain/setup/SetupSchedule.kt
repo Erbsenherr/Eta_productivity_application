@@ -88,21 +88,27 @@ object SetupLabels {
     const val WEEKLY_PLANNING = "Wochenplanung"
 }
 
-/** How long the night lasts, from falling asleep to getting up. */
-fun UserSetup.sleepDuration(): Duration {
-    val from = sleepTime.minuteOfDay()
-    val to = wakeTime.minuteOfDay()
-    val length = if (to > from) to - from else to + MINUTES_PER_DAY - from
-    return length.minutes
-}
+/** How long an ordinary night lasts, from falling asleep to getting up. */
+fun UserSetup.sleepDuration(): Duration = weekdayNight.sleepDuration()
 
-/** How long winding down lasts, from putting things away to lights out. */
-fun UserSetup.bedPrepDuration(): Duration {
-    val from = bedPrepTime.minuteOfDay()
-    val to = sleepTime.minuteOfDay()
-    val length = if (to >= from) to - from else to + MINUTES_PER_DAY - from
-    return length.minutes
-}
+/** How long winding down lasts on an ordinary evening. */
+fun UserSetup.bedPrepDuration(): Duration = weekdayNight.bedPrepDuration()
+
+/**
+ * Adds a stretch given as an offset from [wakeDay]'s midnight — how a night
+ * describes itself, see [NightTimes] — on whichever weekday that lands.
+ */
+private fun MutableList<SetupSpan>.addFromOffset(
+    label: String,
+    wakeDay: DayOfWeek,
+    offsetMinutes: Int,
+    duration: Duration,
+) = addSpan(
+    label = label,
+    weekday = wakeDay.shifted(Math.floorDiv(offsetMinutes, MINUTES_PER_DAY)),
+    start = LocalTime.fromSecondOfDay(Math.floorMod(offsetMinutes, MINUTES_PER_DAY) * 60),
+    duration = duration,
+)
 
 /**
  * Everything the answers occupy in a representative week.
@@ -113,9 +119,13 @@ fun UserSetup.bedPrepDuration(): Duration {
 fun UserSetup.weeklySpans(): List<SetupSpan> {
     val spans = mutableListOf<SetupSpan>()
 
-    spans.addEveryDay(SetupLabels.SLEEP, sleepTime, sleepDuration())
-    spans.addEveryDay(SetupLabels.BED_PREP, bedPrepTime, bedPrepDuration())
-    spans.addEveryDay(SetupLabels.MORNING, wakeTime, morningDuration)
+    // Night by night rather than "every day at": the weekend may have its own.
+    WEEK.forEach { wakeDay ->
+        val night = nightEndingOn(wakeDay)
+        spans.addFromOffset(SetupLabels.SLEEP, wakeDay, night.sleepOffset(), night.sleepDuration())
+        spans.addFromOffset(SetupLabels.BED_PREP, wakeDay, night.bedPrepOffset(), night.bedPrepDuration())
+        spans.addSpan(SetupLabels.MORNING, wakeDay, night.wake, morningDuration)
+    }
     spans.addEveryDay(SetupLabels.FREE_TIME, freeTime.start, freeTime.duration)
 
     when (val plan = meals) {

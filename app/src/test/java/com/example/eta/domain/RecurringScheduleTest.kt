@@ -11,7 +11,7 @@ import com.example.eta.domain.recurrence.groupRecurring
 import com.example.eta.domain.recurrence.reassignRows
 import com.example.eta.domain.recurrence.recurringOverlaps
 import com.example.eta.domain.recurrence.sharedWeekdays
-import com.example.eta.domain.setup.SETTINGS_OWNED_ITEM_IDS
+import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.recurringItems
 import kotlin.time.Duration
@@ -188,7 +188,7 @@ class RecurringScheduleTest {
 
     @Test
     fun `the settings own exactly bed preparation and the morning`() {
-        val owned = UserSetup.draft(now).recurringItems(now).filter { it.id in SETTINGS_OWNED_ITEM_IDS }
+        val owned = UserSetup.draft(now).recurringItems(now).filter { isOwnedBySettings(it.id) }
         assertEquals(setOf(ItemRole.BED_PREP, ItemRole.MORNING), owned.map { it.role }.toSet())
     }
 }

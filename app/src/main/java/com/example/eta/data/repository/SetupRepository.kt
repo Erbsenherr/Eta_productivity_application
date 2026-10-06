@@ -3,7 +3,7 @@ package com.example.eta.data.repository
 import com.example.eta.data.local.ItemDao
 import com.example.eta.data.local.ResetDao
 import com.example.eta.data.local.SetupDao
-import com.example.eta.domain.setup.SETTINGS_OWNED_ITEM_IDS
+import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.domain.setup.SETUP_ID
 import com.example.eta.domain.setup.SETUP_ITEM_ID_PREFIX
 import com.example.eta.domain.setup.UserSetup
@@ -82,7 +82,7 @@ class SetupRepository(
      * Stores the standing configuration from the settings tab.
      *
      * Of the recurring definitions, only the two the settings still own are
-     * regenerated — bed preparation and the morning, see [SETTINGS_OWNED_ITEM_IDS].
+     * regenerated — bed preparation and the morning, see [isOwnedBySettings].
      * Everything else lives on the Listen tab now; regenerating it here would undo
      * whatever was changed there.
      *
@@ -95,10 +95,10 @@ class SetupRepository(
         setupDao.upsert(setup.copy(id = SETUP_ID, updatedAt = now))
 
         val existing = itemDao.findByIdPrefix(SETUP_ITEM_ID_PREFIX)
-            .filter { it.id in SETTINGS_OWNED_ITEM_IDS }
+            .filter { isOwnedBySettings(it.id) }
             .associateBy { it.id }
         val generated = setup.recurringItems(now)
-            .filter { it.id in SETTINGS_OWNED_ITEM_IDS }
+            .filter { isOwnedBySettings(it.id) }
             .map { item -> existing[item.id]?.let { item.copy(createdAt = it.createdAt) } ?: item }
         val obsolete = existing.values
             .filter { old -> generated.none { it.id == old.id } && old.completedAt == null }
