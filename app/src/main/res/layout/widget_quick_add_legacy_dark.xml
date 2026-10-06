@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    widget_quick_add.xml in another set of colours, and otherwise the same
+    view for view: the provider picks the layout that matches the design.
+    Change the structure in all six or in none.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background_legacy_dark"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_quick_add_title"
+        android:textColor="@color/eta_legacy_dark_widget_muted"
+        android:textSize="12sp"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_field"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_field_legacy_dark"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:text="@string/widget_quick_add_placeholder"
+        android:textColor="@color/eta_legacy_dark_widget_muted"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/widget_quick_add_hint"
+        android:textColor="@color/eta_legacy_dark_widget_muted"
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>

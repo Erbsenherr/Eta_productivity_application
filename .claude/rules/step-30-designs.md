@@ -56,14 +56,20 @@ background that shows until the first frame. `MainActivity` calls it again when 
 design changes. `QuickAddActivity` keeps the plain call: it is translucent over the
 home screen, whose bars are not the app's to colour.
 
-**The widget follows by hand.** Its layout carries the legacy colours following the
-phone through `values-night`, which is right for Legacy on `SYSTEM` and for nothing
-else. `lookOf(choice)` in the provider picks drawables and colours for the other
-five combinations: `…_red_auto` has a night twin and follows the phone, the rest
-(`…_red`, `…_red_dark`, `…_legacy_light`, `…_legacy_dark`) are pinned and have none
-on purpose. Text colours go by resource from Android 12 (`RemoteViews.setColor`), so
-a following widget keeps following; before that they are resolved when drawn.
-`QuickAddWidgetProvider.refresh` redraws placed widgets when either answer changes.
+**The widget has one layout per look.** `layoutOf(choice)` in the provider picks
+among six: `widget_quick_add` (Legacy following the phone, and the `initialLayout`),
+`…_legacy_light`, `…_legacy_dark`, `…_red_auto`, `…_red`, `…_red_dark`. They are the
+same view for view and differ only in the drawables and colours they name — change
+the structure in all six or in none. `…_red_auto` and the plain one have night
+twins and follow the phone; the pinned four have none on purpose.
+
+It began as one layout recoloured from the provider (`setBackgroundResource`, text
+colours), and **on the user's phone the panel kept the layout's own background
+while the field took the new one** — a dark field in a light box. Why the launcher
+honoured one call and not the other was never found; nothing could be reproduced
+here. Do not go back to recolouring: a layout that names its own resources leaves
+nothing to apply half of. `QuickAddWidgetProvider.refresh` redraws placed widgets
+when either answer changes.
 
 ### The launch screen
 

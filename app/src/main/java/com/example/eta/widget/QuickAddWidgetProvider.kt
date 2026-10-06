@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.widget.RemoteViews
 import com.example.eta.EtaApplication
 import com.example.eta.R
@@ -51,79 +50,38 @@ class QuickAddWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        return RemoteViews(context.packageName, R.layout.widget_quick_add).apply {
+        val choice = (context.applicationContext as EtaApplication)
+            .container.designStore.choice.value
+
+        return RemoteViews(context.packageName, layoutOf(choice)).apply {
             // The whole panel is the target. A widget this small has no room for
             // a hit area smaller than itself.
             setOnClickPendingIntent(R.id.widget_root, pending)
-
-            // The layout carries the legacy colours following the phone's dark
-            // mode. Every other combination is put on by hand.
-            val choice = (context.applicationContext as EtaApplication)
-                .container.designStore.choice.value
-            lookOf(choice)?.let { look ->
-                setInt(R.id.widget_root, "setBackgroundResource", look.panel)
-                setInt(R.id.widget_field, "setBackgroundResource", look.field)
-                textColor(context, R.id.widget_title, look.title)
-                textColor(context, R.id.widget_field, look.muted)
-                textColor(context, R.id.widget_hint, look.muted)
-            }
         }
     }
 
     /**
-     * A colour by resource where the launcher can resolve it (Android 12+), so a
-     * set with a night twin keeps following the phone after this was drawn.
-     * Before that it is resolved here and now, and a widget that follows the
-     * phone catches up the next time it is redrawn.
+     * One layout per look, rather than one layout recoloured after the fact.
+     *
+     * Recolouring — `setBackgroundResource` and text colours set from here — is
+     * what this did at first, and on the user's phone the panel kept the layout's
+     * own background while the field took the new one: a dark field in a light
+     * box. A layout names its drawables and colours itself, so there is nothing
+     * for a launcher to apply half of, and the sets with a night twin follow the
+     * phone on every Android version without being redrawn.
      */
-    private fun RemoteViews.textColor(context: Context, viewId: Int, colorRes: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            setColor(viewId, "setTextColor", colorRes)
-        } else {
-            setTextColor(viewId, context.getColor(colorRes))
-        }
-    }
-
-    /** Drawables and colours for [choice]; null where the layout's own are right. */
-    private fun lookOf(choice: DesignChoice): WidgetLook? = when (choice.design) {
+    private fun layoutOf(choice: DesignChoice): Int = when (choice.design) {
         AppDesign.ETA -> when (choice.brightness) {
-            Brightness.SYSTEM -> WidgetLook(
-                panel = R.drawable.widget_background_red_auto,
-                field = R.drawable.widget_field_red_auto,
-                title = R.color.eta_red_auto_widget_accent,
-                muted = R.color.eta_red_auto_widget_muted,
-            )
-            Brightness.LIGHT -> WidgetLook(
-                panel = R.drawable.widget_background_red,
-                field = R.drawable.widget_field_red,
-                title = R.color.eta_red_widget_accent,
-                muted = R.color.eta_red_widget_muted,
-            )
-            Brightness.DARK -> WidgetLook(
-                panel = R.drawable.widget_background_red_dark,
-                field = R.drawable.widget_field_red_dark,
-                title = R.color.eta_red_dark_widget_accent,
-                muted = R.color.eta_red_dark_widget_muted,
-            )
+            Brightness.SYSTEM -> R.layout.widget_quick_add_red_auto
+            Brightness.LIGHT -> R.layout.widget_quick_add_red
+            Brightness.DARK -> R.layout.widget_quick_add_red_dark
         }
         AppDesign.LEGACY -> when (choice.brightness) {
-            Brightness.SYSTEM -> null
-            Brightness.LIGHT -> WidgetLook(
-                panel = R.drawable.widget_background_legacy_light,
-                field = R.drawable.widget_field_legacy_light,
-                title = R.color.eta_legacy_light_widget_muted,
-                muted = R.color.eta_legacy_light_widget_muted,
-            )
-            Brightness.DARK -> WidgetLook(
-                panel = R.drawable.widget_background_legacy_dark,
-                field = R.drawable.widget_field_legacy_dark,
-                title = R.color.eta_legacy_dark_widget_muted,
-                muted = R.color.eta_legacy_dark_widget_muted,
-            )
+            Brightness.SYSTEM -> R.layout.widget_quick_add
+            Brightness.LIGHT -> R.layout.widget_quick_add_legacy_light
+            Brightness.DARK -> R.layout.widget_quick_add_legacy_dark
         }
     }
-
-    private class WidgetLook(val panel: Int, val field: Int, val title: Int, val muted: Int)
 
     companion object {
         /** Redraws every placed widget — the design is the one thing it shows that changes. */
