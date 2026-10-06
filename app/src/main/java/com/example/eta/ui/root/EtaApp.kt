@@ -135,7 +135,7 @@ private fun MainScaffold(
     // back onto the dashboard. Saved by name, so what goes into the bundle is a
     // plain String rather than anything that needs a parcelling story.
     val context = LocalContext.current
-    val design by container.designStore.design.collectAsStateWithLifecycle()
+    val design by container.designStore.choice.collectAsStateWithLifecycle()
 
     var tab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(EtaTab.Today) }
     var flow by rememberSaveable(stateSaver = FLOW_SAVER) { mutableStateOf<AppFlow?>(null) }
@@ -312,6 +312,10 @@ private fun MainScaffold(
                     ),
                     design = design,
                     onDesignChange = { chosen ->
+                        container.designStore.select(chosen)
+                        QuickAddWidgetProvider.refresh(context)
+                    },
+                    onBrightnessChange = { chosen ->
                         container.designStore.select(chosen)
                         QuickAddWidgetProvider.refresh(context)
                     },

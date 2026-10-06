@@ -22,18 +22,17 @@ private val LocalEtaSpacing = staticCompositionLocalOf { EtaSpacing() }
  * timeline and the card shapes that encode where a block came from all need full
  * control over gesture and paint, which Material components would fight.
  *
- * [design] picks the tokens; every activity passes the one in `DesignStore`.
+ * [choice] picks the tokens; every activity passes the one in `DesignStore`.
  */
 @Composable
 fun EtaTheme(
-    design: AppDesign,
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    choice: DesignChoice,
     content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(
-        LocalEtaColors provides colorsOf(design, darkTheme),
+        LocalEtaColors provides choice.colors(systemDark = isSystemInDarkTheme()),
         LocalEtaTypography provides DefaultEtaTypography,
-        LocalEtaShapes provides shapesOf(design),
+        LocalEtaShapes provides shapesOf(choice.design),
         LocalEtaSpacing provides EtaSpacing(),
         content = content,
     )

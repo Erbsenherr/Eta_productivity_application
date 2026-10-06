@@ -117,7 +117,7 @@ val LegacyDarkColors = EtaColors(
 val EtaBrandRed = Color(0xFFE5322D)
 
 /**
- * The palette of the [AppDesign.ETA] design: the app icon turned into a screen —
+ * The palette of the [AppDesign.ETA] design by day: the app icon turned into a screen —
  * white, with its red wherever the app answers a touch.
  *
  * Two things had to move out of the red's way. **[danger] is a dark wine**, not a
@@ -151,7 +151,7 @@ val EtaRedColors = EtaColors(
 )
 
 /**
- * The palette of the [AppDesign.ETA_DARK] design: [EtaRedColors] with the lights
+ * The palette of the [AppDesign.ETA] design by night: [EtaRedColors] with the lights
  * out. The ground is a near-black leaning warm, so the red sits on it rather than
  * vibrating against a blue-black, and the red itself is a shade lighter — the
  * icon's own is too dark to read as text on this ground.

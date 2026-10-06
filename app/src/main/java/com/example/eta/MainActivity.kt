@@ -39,14 +39,14 @@ class MainActivity : ComponentActivity() {
 
         readDeferPhase(intent)
         val container = (application as EtaApplication).container
-        applyDesignToWindow(container.designStore.design.value)
+        applyDesignToWindow(container.designStore.choice.value)
 
         // Only on a cold start, and not when an alarm was answered: someone who
         // tapped "jetzt planen" is on their way somewhere.
         val showLaunch = savedInstanceState == null && deferPhase == null && openPhase == null
 
         setContent {
-            val design by container.designStore.design.collectAsStateWithLifecycle()
+            val design by container.designStore.choice.collectAsStateWithLifecycle()
             LaunchedEffect(design) { applyDesignToWindow(design) }
 
             var launching by remember { mutableStateOf(showLaunch) }

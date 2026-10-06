@@ -13,21 +13,21 @@ import androidx.compose.ui.graphics.toArgb
  * Compose does not paint.
  *
  * - **The system bar icons.** Plain `enableEdgeToEdge()` picks them from the
- *   device's dark mode, which is right for a design that follows it and wrong for
- *   one that is light or dark by choice — white icons over a white screen.
+ *   device's dark mode, which is right while the design follows it and wrong
+ *   once the user fixed it light or dark — white icons over a white screen.
  * - **The window background**, which shows until the first frame. The theme in the
  *   manifest can only know the device's mode, not the user's choice.
  *
  * Call it in `onCreate`, and again whenever the design changes.
  */
-fun ComponentActivity.applyDesignToWindow(design: AppDesign) {
+fun ComponentActivity.applyDesignToWindow(choice: DesignChoice) {
     val systemDark = resources.configuration.uiMode and
         Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
-    val colors = colorsOf(design, systemDark)
+    val colors = choice.colors(systemDark)
 
     when {
-        design.followsSystemDark -> enableEdgeToEdge()
+        choice.brightness == Brightness.SYSTEM -> enableEdgeToEdge()
         colors.isDark -> enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(DARK_SCRIM),

@@ -32,7 +32,7 @@ data class EtaSpacing(
 )
 
 /**
- * The [AppDesign.ETA] design's radii: rounder throughout. `fixedBlock` stays
+ * The [AppDesign.ETA] design's radii, by day and by night: rounder throughout. `fixedBlock` stays
  * square — that corner is how the planner says a block is not the user's to move.
  */
 val EtaRedShapes = EtaShapes(

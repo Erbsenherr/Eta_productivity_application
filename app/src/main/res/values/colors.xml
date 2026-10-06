@@ -31,4 +31,22 @@
     <color name="eta_red_dark_widget_text">#F5F0EF</color>
     <color name="eta_red_dark_widget_muted">#857A78</color>
     <color name="eta_red_dark_widget_accent">#EB4640</color>
+
+    <!--
+        Three more sets, for a brightness the user fixed or a design that follows
+        the phone: the red one that switches (its night twin is in values-night),
+        and legacy pinned light and pinned dark.
+    -->
+    <color name="eta_red_auto_widget_surface">#FFFFFF</color>
+    <color name="eta_red_auto_widget_border">#ECE6E4</color>
+    <color name="eta_red_auto_widget_muted">#978D8A</color>
+    <color name="eta_red_auto_widget_accent">#E5322D</color>
+    <color name="eta_legacy_light_widget_surface">#FFFFFF</color>
+    <color name="eta_legacy_light_widget_border">#E4E2DD</color>
+    <color name="eta_legacy_light_widget_muted">#8E8B83</color>
+    <color name="eta_legacy_light_widget_accent">#4F46E5</color>
+    <color name="eta_legacy_dark_widget_surface">#1B1B1F</color>
+    <color name="eta_legacy_dark_widget_border">#2E2E36</color>
+    <color name="eta_legacy_dark_widget_muted">#77756F</color>
+    <color name="eta_legacy_dark_widget_accent">#818CF8</color>
 </resources>

@@ -54,6 +54,8 @@ import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.theme.AppDesign
+import com.example.eta.ui.theme.Brightness
+import com.example.eta.ui.theme.DesignChoice
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -84,8 +86,9 @@ fun SettingsScreen(
      * meanings. Passed in the way the dashboard is passed its Quick-Add.
      */
     calendarViewModel: CalendarSettingsViewModel,
-    design: AppDesign,
+    design: DesignChoice,
     onDesignChange: (AppDesign) -> Unit,
+    onBrightnessChange: (Brightness) -> Unit,
     modifier: Modifier = Modifier,
     onDebugReset: (() -> Unit)? = null,
     onOpenVacation: () -> Unit = {},
@@ -124,7 +127,7 @@ fun SettingsScreen(
 
             message?.let { MessageBox(it, viewModel::dismissMessage) }
 
-            DesignBox(design, onDesignChange)
+            DesignBox(design, onDesignChange, onBrightnessChange)
 
             AlarmBox(alarms)
 
@@ -208,20 +211,37 @@ fun SettingsScreen(
  * is judged by looking at it, so choosing one puts it on at once.
  */
 @Composable
-private fun DesignBox(design: AppDesign, onChange: (AppDesign) -> Unit) {
+private fun DesignBox(
+    choice: DesignChoice,
+    onDesignChange: (AppDesign) -> Unit,
+    onBrightnessChange: (Brightness) -> Unit,
+) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Design", style = EtaTheme.typography.heading)
             EtaChoice(
                 options = AppDesign.entries.map { it to it.label },
-                selected = design,
-                onSelect = onChange,
+                selected = choice.design,
+                onSelect = onDesignChange,
             )
             EtaText(
-                text = design.hint,
+                text = choice.design.hint,
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
+
+            // One button that steps through the three, as asked for: the answer
+            // is on the button, and a tap gives the next one.
+            EtaField(
+                label = "Hell oder dunkel",
+                hint = "Tippen wechselt weiter: dem Handy anpassen, hell, dunkel.",
+            ) {
+                EtaButton(
+                    text = choice.brightness.label,
+                    style = EtaButtonStyle.Secondary,
+                    onClick = { onBrightnessChange(choice.brightness.next()) },
+                )
+            }
         }
     }
 }

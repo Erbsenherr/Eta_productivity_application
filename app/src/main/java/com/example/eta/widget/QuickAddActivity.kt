@@ -52,7 +52,7 @@ class QuickAddActivity : ComponentActivity() {
 
         val container = (application as EtaApplication).container
 
-        val design = container.designStore.design.value
+        val design = container.designStore.choice.value
 
         setContent {
             EtaTheme(design) {

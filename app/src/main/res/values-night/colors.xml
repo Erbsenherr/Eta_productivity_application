@@ -9,4 +9,10 @@
     <color name="eta_widget_text">#F2F2F0</color>
     <color name="eta_widget_muted">#77756F</color>
     <color name="eta_widget_accent">#818CF8</color>
+
+    <!-- Mirrors EtaRedDarkColors, for the Eta design while it follows the phone. -->
+    <color name="eta_red_auto_widget_surface">#1E1A1B</color>
+    <color name="eta_red_auto_widget_border">#372E2F</color>
+    <color name="eta_red_auto_widget_muted">#857A78</color>
+    <color name="eta_red_auto_widget_accent">#EB4640</color>
 </resources>

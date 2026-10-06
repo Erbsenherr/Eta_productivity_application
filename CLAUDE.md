@@ -50,7 +50,7 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (452 tests
+this machine, so everything is verified by compilation, the unit suite (453 tests
 as of step 30), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
@@ -80,6 +80,21 @@ $out = "dist\eta-release-$(Get-Date -Format 'yyyy-MM-dd-HHmm').apk"
   apksigner's and can be ignored. Old APKs stay — `dist/` is the history.
 - Say in the closing message which file it is. A session that only touched
   documentation builds none.
+
+### …and a push
+
+**Every session that changed something ends with a commit pushed to `main`**, without
+being asked, unless the user says otherwise for that session — after the APK, as
+the very last step. One commit for the session, with a message that says what
+changed; documentation-only sessions push too.
+
+- **Commit on `main` directly.** This is a one-person repository with no branches,
+  and switching branches is not harmless here: `git switch` to a commit that still
+  tracked `local.properties` and `dist/` overwrote the ignored copies on disk, and
+  the merge back then deleted them — the build broke with "SDK location not found"
+  and eight APKs were gone until restored from history.
+- `dist/`, `build/` and `local.properties` are ignored, so the APK itself is never
+  pushed. Look at `git status` before committing all the same.
 
 ## Toolchain notes that will bite you
 
@@ -323,7 +338,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-23-subtasks.md` | *Step 23*: subtasks, the builder, merging in the planner, the follow-up question, the drawn signature |
 | `step-25-wochenschema.md` | *Step 25*: the Wochenschema |
 | `step-26-small-ones.md` | *Step 26*: the hidden "Gruppieren" button, tap to unfold a name, free pomodoro phases, the red mark in the Wochenschema, "Nächster freier Slot" |
-| `step-30-designs.md` | *Step 30*: designs (`AppDesign`: Eta, Eta Dunkel, Legacy), `applyDesignToWindow`, the widget's colours · *The launch screen* |
+| `step-30-designs.md` | *Step 30*: designs (`AppDesign`: Eta, Legacy) and `Brightness`, `applyDesignToWindow`, the widget's colours · *The launch screen* |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -334,9 +349,9 @@ Only something every task needs goes in this file.
 
 These came out of discussion with the user and are not all derivable from `Eta_doc`:
 
-- **The Eta design is the default.** Eta and Eta Dunkel are two designs chosen by
-  hand and do not follow the device; Legacy is one tap away in the settings and
-  still does. See *Step 30*.
+- **The Eta design is the default, and both designs follow the phone's dark mode**
+  unless the user fixes them light or dark — one button in the Design card that
+  steps through the three. Legacy is the same thing in indigo. See *Step 30*.
 - **Eta may play through "Nicht stören"**, off by default — see *Sounds, and the
   alarms that announce a task*.
 - **UI: Compose Foundation only, no Material3.** The revolver, drag-and-drop timeline
