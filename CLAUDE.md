@@ -20,8 +20,9 @@ Eta. Three things keep the old name on purpose, and must not be "finished":
   and the Google Calendar OAuth client is registered for that package name.
 - **`EtaDatabase.NAME = "erik.db"`** — the file on the phone, and the entry name
   inside every backup zip made so far.
-- The repository folder `Erik_2`, the GitHub repository `ERIK_It2`, and the old
-  `erik-debug-…` APKs in `dist/`.
+- The repository folder `Erik_2` and the old `erik-debug-…` APKs in `dist/`. The
+  GitHub repository was `ERIK_It2` until it was renamed to
+  `Eta_productivity_application`; the old address only redirects.
 
 ## Build
 
