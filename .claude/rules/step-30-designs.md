@@ -88,6 +88,14 @@ spelling "Assistent" is the user's.
   glyph would appear twice in a row at two sizes. Only `MainActivity` wears that
   theme; the wake alarm keeps `Theme.Eta`, so it does not flash white at night.
 
+**The glyph sits 11/512 of an icon right of where its legs would be centred**, in
+every launcher icon file and on the launch screen (where the PNG carries 34 px of
+nothing on its right for the same lean). With the two legs exactly centred — which
+is how Asset Studio left it — the hook at the top left makes the letter look pushed
+to the left; centring the whole bounding box overshoots the other way. Halfway was
+the user's pick from three rendered side by side. Re-importing the icon through
+Asset Studio undoes this, and puts the template's green background back as well.
+
 **Unverified, like every screen:** the handover from the system splash to the launch
 screen, the status bar icons in each combination of design, brightness and device mode, and
 whether the red reads well on real cards, by day and by night. White text on the red is about 4.2:1
