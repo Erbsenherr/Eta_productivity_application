@@ -1,10 +1,14 @@
 package com.example.eta.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -12,15 +16,22 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -91,6 +102,87 @@ fun EtaButton(
 }
 
 enum class EtaButtonStyle { Primary, Secondary }
+
+/** How long [EtaHoldButton] takes to fill, and how quickly it falls back. */
+private const val HOLD_MILLIS = 900
+private const val HOLD_RELEASE_MILLIS = 180
+
+/**
+ * How far the bar may have got for a release to still count as a tap. Past it
+ * the finger was clearly holding, and letting go early means "neither".
+ */
+private const val HOLD_TAP_FRACTION = 0.45f
+
+/**
+ * A secondary button with a second meaning behind a hold.
+ *
+ * A tap is [onClick]. Holding it down fills the button from left to right, and
+ * once the fill has covered it [onHold] fires instead. Letting go part-way does
+ * **nothing**: someone who started to hold and thought better of it has not
+ * asked for the tap either.
+ */
+@Composable
+fun EtaHoldButton(
+    text: String,
+    onClick: () -> Unit,
+    onHold: () -> Unit,
+    modifier: Modifier = Modifier,
+    fillColor: Color = EtaTheme.colors.warning,
+) {
+    var holding by remember { mutableStateOf(false) }
+    var fired by remember { mutableStateOf(false) }
+    val fill = remember { Animatable(0f) }
+    // The gesture block is launched once and keeps what it closed over, so the
+    // callbacks are read through these.
+    val latestClick by rememberUpdatedState(onClick)
+    val latestHold by rememberUpdatedState(onHold)
+
+    LaunchedEffect(holding) {
+        if (!holding) {
+            fill.animateTo(0f, tween(HOLD_RELEASE_MILLIS))
+            return@LaunchedEffect
+        }
+        fill.animateTo(1f, tween(HOLD_MILLIS, easing = LinearEasing))
+        fired = true
+        latestHold()
+    }
+
+    val shape = EtaTheme.shapes.medium
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(color = EtaTheme.colors.surface, shape = shape)
+            .drawBehind {
+                if (fill.value > 0f) {
+                    drawRect(
+                        color = fillColor.copy(alpha = 0.45f),
+                        size = size.copy(width = size.width * fill.value),
+                    )
+                }
+            }
+            .border(1.dp, EtaTheme.colors.border, shape)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        fired = false
+                        holding = true
+                        val released = tryAwaitRelease()
+                        val tapped = released && !fired && fill.value < HOLD_TAP_FRACTION
+                        holding = false
+                        if (tapped) latestClick()
+                    },
+                )
+            }
+            .padding(PaddingValues(horizontal = 20.dp, vertical = 12.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        EtaText(
+            text = text,
+            style = EtaTheme.typography.label,
+            color = EtaTheme.colors.textPrimary,
+        )
+    }
+}
 
 /**
  * A wastebasket in the corner of a dialog.

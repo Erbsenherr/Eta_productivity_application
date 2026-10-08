@@ -169,4 +169,53 @@ class RecurrenceExpansionTest {
 
         assertTrue(blocks.isEmpty())
     }
+
+    @Test
+    fun `nothing is laid down after the day a task repeats until`() {
+        // Mondays, ending on Monday the 14th — which itself still counts.
+        val ending = recurring(RecurrenceRule.Weekly(DayOfWeek.MONDAY))
+            .copy(repeatUntil = LocalDate(2026, 9, 14))
+
+        val blocks = expandRecurring(
+            definitions = listOf(ending),
+            from = LocalDate(2026, 9, 1),
+            to = LocalDate(2026, 9, 30),
+            existing = emptySet(),
+            now = now,
+        )
+
+        assertEquals(
+            listOf(LocalDate(2026, 9, 7), LocalDate(2026, 9, 14)),
+            blocks.map { it.date },
+        )
+    }
+
+    @Test
+    fun `an end date already past lays nothing down at all`() {
+        val over = recurring(RecurrenceRule.Daily).copy(repeatUntil = LocalDate(2026, 8, 31))
+
+        val blocks = expandRecurring(
+            definitions = listOf(over),
+            from = LocalDate(2026, 9, 1),
+            to = LocalDate(2026, 9, 30),
+            existing = emptySet(),
+            now = now,
+        )
+
+        assertTrue(blocks.isEmpty())
+    }
+
+    @Test
+    fun `an end date beyond the range changes nothing`() {
+        val daily = recurring(RecurrenceRule.Daily)
+        fun count(item: Item) = expandRecurring(
+            definitions = listOf(item),
+            from = LocalDate(2026, 9, 1),
+            to = LocalDate(2026, 9, 30),
+            existing = emptySet(),
+            now = now,
+        ).size
+
+        assertEquals(count(daily), count(daily.copy(repeatUntil = LocalDate(2026, 12, 24))))
+    }
 }

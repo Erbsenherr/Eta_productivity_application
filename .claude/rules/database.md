@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 21.** When changing an entity, diff the hand-written SQL against the
+**Version 22.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -33,6 +33,7 @@ Room stores enums by name in a TEXT column.
 | 17→18 | `subtasks` and `subtask_checks` — see *Step 23*. Nothing on `items`: a card with no steps is a group with an empty list |
 | 18→19 | `items.growthEvery` (1) / `growthProgress` (0), and the Mengen-Inkrement: `quantity`, `quantityStart`, `quantityIncrement`, `quantityTarget` nullable, `quantityEvery` (1) / `quantityProgress` (0) — see *Step 24* |
 | 20→21 | `user_setup.weekendNight` (`TEXT`, nullable): the weekend's own night as one encoded `NightTimes`, null for everyone who upgrades — see *Step 32* |
+| 21→22 | `user_setup.weekendDays` (`TEXT NOT NULL DEFAULT 'SATURDAY,SUNDAY'`, weekday names in week order), `items.repeatUntil` and `contracts.probationKeptSince` (both `TEXT`, nullable, ISO dates) — see *Step 33* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

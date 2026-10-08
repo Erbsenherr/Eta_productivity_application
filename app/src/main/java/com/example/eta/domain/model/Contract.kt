@@ -7,6 +7,7 @@ import androidx.room3.PrimaryKey
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.plus
 import java.util.UUID
 
@@ -60,6 +61,12 @@ val LEGACY_QUALIFYING_TERM = DatePeriod(months = 1)
 /** How long a breach blocks the slot, counted from the signing date. */
 val BREACH_LOCK = DatePeriod(months = 1)
 
+/**
+ * How many evenings in a row a contract on probation has to be kept before it
+ * may be put back into force — two weeks, the shortest term a contract can have.
+ */
+const val REINSTATEMENT_STREAK = 14
+
 /** A legacy contract pays a fifth of what it did as a full one. */
 const val LEGACY_SHARE = 0.2
 
@@ -102,6 +109,12 @@ data class Contract(
      * day of the change.
      */
     val editedAt: Instant? = null,
+    /**
+     * [ContractState.PROBATION] only: the first day of the unbroken run of
+     * evenings on which this was answered "gehalten". Null while there is no
+     * run — just broken, or broken again since. See [probationStreak].
+     */
+    val probationKeptSince: LocalDate? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
@@ -160,6 +173,30 @@ data class Contract(
      */
     fun probationDecisionDue(today: LocalDate): Boolean =
         state == ContractState.PROBATION && slotLockedUntil?.let { today >= it } == true
+
+    /**
+     * How many evenings in a row a contract on probation has been kept, as of
+     * [today].
+     *
+     * The run is [probationKeptSince] to [lastCheckedOn], and it only counts
+     * while it reaches up to yesterday: an evening that went unanswered is a gap,
+     * and "ununterbrochen" does not have gaps. Yesterday rather than today,
+     * because today's evening has not necessarily come yet.
+     */
+    fun probationStreak(today: LocalDate): Int {
+        if (state != ContractState.PROBATION) return 0
+        val since = probationKeptSince ?: return 0
+        val last = lastCheckedOn ?: return 0
+        if (last < since || last.daysUntil(today) > 1) return 0
+        return since.daysUntil(last) + 1
+    }
+
+    /**
+     * Whether a broken contract has earned its way back: [REINSTATEMENT_STREAK]
+     * kept evenings in a row while being served out.
+     */
+    fun canBeReinstated(today: LocalDate): Boolean =
+        probationStreak(today) >= REINSTATEMENT_STREAK
 
     /** Ran its full term and is waiting to be extended, changed or ended. */
     fun isExpiring(today: LocalDate): Boolean =

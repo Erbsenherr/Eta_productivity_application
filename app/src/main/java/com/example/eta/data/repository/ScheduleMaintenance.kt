@@ -40,6 +40,10 @@ class ScheduleMaintenance(
     suspend fun topUpUntil(until: LocalDate): Int {
         val today = clock.todayIn(timeZone)
         val horizon = maxOf(until, today.plus(DatePeriod(days = SCHEDULE_HORIZON_DAYS)))
+        // A standing task past its "Wiederholen bis" has nothing left to lay
+        // down. Retiring it here takes it off the lists that describe the week
+        // as it still is; expansion would pass over it either way.
+        itemDao.retireEndedRecurring(today, clock.now())
         val added = planRepository.materializeRecurring(
             definitions = itemDao.findRecurringDefinitions(),
             from = today,

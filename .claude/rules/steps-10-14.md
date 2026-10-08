@@ -130,6 +130,10 @@ the reevaluation is left and re-entered, and the reason survives as a record of 
 day reads the way it does. Nothing is refunded, because nothing was charged yet: the
 excuse happens before the booking, and the line simply is not there.
 
+Since step 33 the excuse can also be given **at the moment of calling off**, by
+holding "Absagen" down — see *Step 33*. The evening's hold stays for the
+cancellation that only turns out afterwards to have been nobody's doing.
+
 ### Step 14: four small ones
 
 No schema change. `PhaseBox`'s `owedFrom` is under *The Heute tab*, `key(item.id)`

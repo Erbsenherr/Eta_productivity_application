@@ -43,6 +43,25 @@ data class NightTimes(
 
     fun bedPrepOffset(): Int = sleepOffset() - bedPrepDuration().inWholeMinutes.toInt()
 
+    /**
+     * Whether the lights go out after midnight — on the wake day itself, with
+     * the whole evening before it left free.
+     */
+    val sleepsAfterMidnight: Boolean get() = sleepOffset() >= 0
+
+    /**
+     * The weekdays going to bed falls on, for nights that end on [wakeDays]:
+     * the day before each, or the wake day itself when it is after midnight.
+     * What a form has to say next to the hour, since "01:00" alone does not
+     * tell which day's one o'clock is meant.
+     */
+    fun sleepDays(wakeDays: Set<DayOfWeek>): Set<DayOfWeek> =
+        wakeDays.map { it.shifted(Math.floorDiv(sleepOffset(), MINUTES_PER_DAY)) }.toSet()
+
+    /** The same for winding down, which can start before midnight and end after. */
+    fun bedPrepDays(wakeDays: Set<DayOfWeek>): Set<DayOfWeek> =
+        wakeDays.map { it.shifted(Math.floorDiv(bedPrepOffset(), MINUTES_PER_DAY)) }.toSet()
+
     fun encode(): String =
         listOf(bedPrep, sleep, wake).joinToString(",") { it.toSecondOfDay().toString() }
 
@@ -54,8 +73,11 @@ data class NightTimes(
     }
 }
 
-/** The days a weekend night ends on. */
-val WEEKEND: Set<DayOfWeek> = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
+/**
+ * The days a weekend night ends on, unless the user says otherwise — see
+ * [UserSetup.weekendDays]. Saturday and Sunday: Friday and Saturday evening.
+ */
+val DEFAULT_WEEKEND: Set<DayOfWeek> = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
 
 /** [this] moved by [days], forwards or back, round the week. */
 fun DayOfWeek.shifted(days: Int): DayOfWeek = WEEK[Math.floorMod(WEEK.indexOf(this) + days, WEEK.size)]
@@ -65,9 +87,13 @@ val UserSetup.weekdayNight: NightTimes get() = NightTimes(bedPrepTime, sleepTime
 
 /** The night that ends on [weekday]: the weekend's own where one was given. */
 fun UserSetup.nightEndingOn(weekday: DayOfWeek): NightTimes =
-    weekendNight?.takeIf { weekday in WEEKEND } ?: weekdayNight
+    weekendNight?.takeIf { weekday in weekendDays } ?: weekdayNight
 
 fun UserSetup.wakeTimeOn(weekday: DayOfWeek): LocalTime = nightEndingOn(weekday).wake
+
+/** All seven nights of a week together, each at its own length. */
+fun UserSetup.sleepMinutesPerWeek(): Int =
+    WEEK.sumOf { nightEndingOn(it).sleepDuration().inWholeMinutes.toInt() }
 
 /**
  * What a weekend night is seeded with when the option is switched on: an hour

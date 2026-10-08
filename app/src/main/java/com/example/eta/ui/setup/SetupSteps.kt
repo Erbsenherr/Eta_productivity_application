@@ -24,6 +24,7 @@ import com.example.eta.domain.setup.WorkSchedule
 import com.example.eta.domain.setup.bedPrepDuration
 import com.example.eta.domain.setup.sleepDuration
 import com.example.eta.domain.setup.suggestedWeekendNight
+import com.example.eta.domain.setup.weekdayNight
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
@@ -36,6 +37,7 @@ import com.example.eta.ui.components.EtaWeekdayPicker
 import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatMinutes
 import com.example.eta.ui.format.formatShort
+import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -152,7 +154,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                     onValueChange = { time -> onChange { it.copy(bedPrepTime = time) } },
                 )
             }
-            EtaField(label = "Schlafen gehen") {
+            EtaField(
+                label = "Schlafen gehen",
+                hint = AFTER_MIDNIGHT_HINT.takeIf { draft.weekdayNight.sleepsAfterMidnight },
+            ) {
                 EtaTimePicker(
                     value = draft.sleepTime,
                     onValueChange = { time -> onChange { it.copy(sleepTime = time) } },
@@ -181,8 +186,7 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
             val weekend = draft.weekendNight
             EtaField(
                 label = "Am Wochenende",
-                hint = "Gilt für die Nächte auf Samstag und auf Sonntag: Freitag- und " +
-                    "Samstagabend, Samstag- und Sonntagmorgen.",
+                hint = "Eigene Schlafzeiten für die Tage, an denen du ausschlafen kannst.",
             ) {
                 EtaChoice(
                     options = listOf(false to "Wie unter der Woche", true to "Andere Zeiten"),
@@ -204,19 +208,53 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                 fun change(transform: (NightTimes) -> NightTimes) =
                     onChange { it.copy(weekendNight = it.weekendNight?.let(transform)) }
 
-                EtaField(label = "Bettfertig machen ab (Fr, Sa)") {
+                // Which days those are is the user's to say: a week that works
+                // Wednesday to Sunday has its weekend on Monday and Tuesday.
+                val days = draft.weekendDays
+                EtaField(
+                    label = "Welche Tage sind dein Wochenende?",
+                    hint = "Die Tage, an denen du nach diesen Zeiten aufstehst — der " +
+                        "Abend davor gehört jeweils dazu.",
+                ) {
+                    EtaWeekdayPicker(
+                        selected = days,
+                        onToggle = { day ->
+                            onChange {
+                                val next = if (day in it.weekendDays) {
+                                    it.weekendDays - day
+                                } else {
+                                    it.weekendDays + day
+                                }
+                                // A weekend of no days is "Wie unter der Woche",
+                                // and that is the switch above.
+                                if (next.isEmpty()) it else it.copy(weekendDays = next)
+                            }
+                        },
+                        days = WEEK,
+                    )
+                }
+
+                // The days are named beside each hour, because an hour alone
+                // does not say which day's it is — least of all one after
+                // midnight, which falls on the day of getting up.
+                EtaField(
+                    label = "Bettfertig machen ab (${formatWeekdays(weekend.bedPrepDays(days))})",
+                ) {
                     EtaTimePicker(
                         value = weekend.bedPrep,
                         onValueChange = { time -> change { it.copy(bedPrep = time) } },
                     )
                 }
-                EtaField(label = "Schlafen gehen (Fr, Sa)") {
+                EtaField(
+                    label = "Schlafen gehen (${formatWeekdays(weekend.sleepDays(days))})",
+                    hint = AFTER_MIDNIGHT_HINT.takeIf { weekend.sleepsAfterMidnight },
+                ) {
                     EtaTimePicker(
                         value = weekend.sleep,
                         onValueChange = { time -> change { it.copy(sleep = time) } },
                     )
                 }
-                EtaField(label = "Aufstehen (Sa, So)") {
+                EtaField(label = "Aufstehen (${formatWeekdays(days)})") {
                     EtaTimePicker(
                         value = weekend.wake,
                         onValueChange = { time -> change { it.copy(wake = time) } },
@@ -230,6 +268,15 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
         }
     }
 }
+
+/**
+ * Said under a bedtime that lies after midnight. Such an hour belongs to the
+ * night it starts, not to the evening of the day it is written on: 01:00 for
+ * the night into Sunday is Sunday at one, at the end of Saturday evening.
+ */
+private const val AFTER_MIDNIGHT_HINT =
+    "Nach Mitternacht — zählt als Ende des Abends davor und liegt im Kalender " +
+        "schon auf dem Tag des Aufstehens."
 
 private const val MEAL_PREP = "prep"
 private const val MEAL_DAILY = "daily"

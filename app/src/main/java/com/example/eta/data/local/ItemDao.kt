@@ -157,6 +157,21 @@ interface ItemDao {
     suspend fun findRecurringDefinitions(): List<Item>
 
     /**
+     * Retires the standing tasks whose "Wiederholen bis" lies before [today].
+     *
+     * Retired, not deleted, like one ended by hand: the cascade would take its
+     * past completions out of the Erfolgsliste. ISO dates compare as text.
+     */
+    @Query(
+        """
+        UPDATE items SET completedAt = :now, updatedAt = :now
+        WHERE type = 'RECURRING' AND completedAt IS NULL
+          AND repeatUntil IS NOT NULL AND repeatUntil < :today
+        """,
+    )
+    suspend fun retireEndedRecurring(today: LocalDate, now: Instant): Int
+
+    /**
      * The definitions the setup questionnaire owns, found by their id prefix.
      * Answering it again has to update or retire exactly these.
      */

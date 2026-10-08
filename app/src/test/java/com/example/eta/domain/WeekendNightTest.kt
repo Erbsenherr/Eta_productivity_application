@@ -3,6 +3,7 @@ package com.example.eta.domain
 import com.example.eta.domain.model.RecurrenceRule
 import com.example.eta.domain.planning.nextWake
 import com.example.eta.domain.planning.sleepStretches
+import com.example.eta.domain.setup.DEFAULT_WEEKEND
 import com.example.eta.domain.setup.MealPlan
 import com.example.eta.domain.setup.NightTimes
 import com.example.eta.domain.setup.SetupLabels
@@ -15,7 +16,9 @@ import com.example.eta.domain.setup.freeMinutesPerWeek
 import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.domain.setup.recurringItems
 import com.example.eta.domain.setup.skipping
+import com.example.eta.domain.setup.sleepMinutesPerWeek
 import com.example.eta.domain.setup.suggestedWeekendNight
+import com.example.eta.domain.setup.wakeTimeOn
 import com.example.eta.domain.setup.weeklySpans
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -163,6 +166,86 @@ class WeekendNightTest {
         assertNull(noSport.sport)
         assertEquals(draft.copy(sport = null), noSport)
         assertEquals(draft, draft.skipping(emptySet()))
+    }
+
+    /** The reported case: to bed at one on Saturday night, which is Sunday. */
+    private val oneOClock = draft.copy(
+        weekendNight = NightTimes(
+            bedPrep = LocalTime(0, 15),
+            sleep = LocalTime(1, 0),
+            wake = LocalTime(9, 0),
+        ),
+    )
+
+    @Test
+    fun `going to bed at one on saturday night lands on sunday`() {
+        val night = oneOClock.weekendNight!!
+        assertTrue(night.sleepsAfterMidnight)
+        assertEquals(60, night.sleepOffset())
+        assertEquals(15, night.bedPrepOffset())
+        // Named by the day it falls on, which is the wake day itself.
+        assertEquals(DEFAULT_WEEKEND, night.sleepDays(DEFAULT_WEEKEND))
+        assertEquals(DEFAULT_WEEKEND, night.bedPrepDays(DEFAULT_WEEKEND))
+
+        // Saturday evening stays free to the end; Sunday holds the whole night
+        // and then the start of the ordinary one into Monday.
+        assertEquals(listOf(60 until 540), oneOClock.sleepStretches(DayOfWeek.SATURDAY))
+        assertEquals(
+            listOf(60 until 540, 1380 until 1440),
+            oneOClock.sleepStretches(DayOfWeek.SUNDAY),
+        )
+        assertEquals(emptyList<Any>(), oneOClock.conflicts())
+
+        val intoSunday = oneOClock.recurringItems(now).single { it.id == "setup:bedprep-sunday" }
+        assertEquals(RecurrenceRule.Weekly(DayOfWeek.SUNDAY), intoSunday.recurrenceRule)
+        assertEquals(LocalTime(0, 15), intoSunday.startTime)
+    }
+
+    @Test
+    fun `winding down before midnight and sleeping after it spans two days`() {
+        val night = lateWeekend.weekendNight!!
+        assertEquals(setOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY), night.bedPrepDays(DEFAULT_WEEKEND))
+        assertEquals(DEFAULT_WEEKEND, night.sleepDays(DEFAULT_WEEKEND))
+    }
+
+    @Test
+    fun `the weekend is whichever days the user says`() {
+        // Working Wednesday to Sunday: the weekend is Monday and Tuesday.
+        val shifted = lateWeekend.copy(weekendDays = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY))
+
+        assertEquals(LocalTime(9, 0), shifted.wakeTimeOn(DayOfWeek.MONDAY))
+        assertEquals(LocalTime(9, 0), shifted.wakeTimeOn(DayOfWeek.TUESDAY))
+        assertEquals(LocalTime(7, 0), shifted.wakeTimeOn(DayOfWeek.SATURDAY))
+        assertEquals(LocalTime(7, 0), shifted.wakeTimeOn(DayOfWeek.SUNDAY))
+
+        // Saturday is an ordinary day again, Monday sleeps in.
+        assertEquals(
+            listOf(0 until 420, 1380 until 1440),
+            shifted.sleepStretches(DayOfWeek.SATURDAY),
+        )
+        assertEquals(listOf(30 until 540), shifted.sleepStretches(DayOfWeek.MONDAY))
+
+        val intoMonday = shifted.recurringItems(now).single { it.id == "setup:bedprep-monday" }
+        assertEquals(RecurrenceRule.Weekly(DayOfWeek.SUNDAY), intoMonday.recurrenceRule)
+        assertEquals(LocalTime(23, 30), intoMonday.startTime)
+
+        // Still two long nights a week.
+        assertEquals(lateWeekend.sleepMinutesPerWeek(), shifted.sleepMinutesPerWeek())
+    }
+
+    @Test
+    fun `a single day can be the whole weekend`() {
+        val onlySunday = lateWeekend.copy(weekendDays = setOf(DayOfWeek.SUNDAY))
+        assertEquals(LocalTime(7, 0), onlySunday.wakeTimeOn(DayOfWeek.SATURDAY))
+        assertEquals(LocalTime(9, 0), onlySunday.wakeTimeOn(DayOfWeek.SUNDAY))
+        assertEquals(6 * 480 + 510, onlySunday.sleepMinutesPerWeek())
+    }
+
+    @Test
+    fun `the chosen days mean nothing without a weekend night`() {
+        val plain = draft.copy(weekendDays = setOf(DayOfWeek.MONDAY))
+        assertEquals(draft.weeklySpans(), plain.weeklySpans())
+        assertEquals(7 * 480, plain.sleepMinutesPerWeek())
     }
 
     @Test

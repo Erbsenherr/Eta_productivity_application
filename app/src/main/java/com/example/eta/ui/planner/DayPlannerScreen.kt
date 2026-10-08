@@ -476,6 +476,10 @@ fun DayPlannerScreen(
                 viewModel.cancel(entry)
                 editing = null
             },
+            onCancelExcused = {
+                viewModel.cancel(entry, forceMajeure = true)
+                editing = null
+            },
             onCopyToWeek = {
                 viewModel.copyToWeek(entry)
                 editing = null

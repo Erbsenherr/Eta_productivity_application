@@ -67,6 +67,7 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.theme.EtaTheme
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -80,6 +81,7 @@ import kotlinx.datetime.daysUntil
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /** What a freshly ticked margin is worth until it is changed. */
 val DEFAULT_MARGIN: Duration = 15.minutes
@@ -483,6 +485,8 @@ fun RecurringAttributeFields(
         }
     }
 
+    RepeatUntilRow(extras = value.extras, onExtras = { onChange(value.copy(extras = it)) })
+
     // Right under the three answers that cause it, and above the margins, which
     // can cause it too but are read after.
     OverlapWarning(
@@ -537,6 +541,69 @@ fun RecurringAttributeFields(
         },
         foldCandidates = foldCandidates,
     )
+}
+
+/** How far out a freshly ticked end date sits until it is moved: four weeks. */
+private const val DEFAULT_REPEAT_DAYS = 28
+
+/**
+ * "Wiederholen bis": the last day a standing task still happens on.
+ *
+ * In the form itself rather than behind "Extras", because it answers the same
+ * question the weekdays do — when does this happen — only from the other end.
+ * A day stepper with week buttons, the shape every date in this app is asked
+ * in, there being no date picker. It stops at today: a task that ends in the
+ * past is ended, and "Beenden" is the button for that.
+ */
+@Composable
+private fun RepeatUntilRow(extras: ItemExtras, onExtras: (ItemExtras) -> Unit) {
+    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+    val until = extras.repeatUntil
+    val inDays = until?.let { today.daysUntil(it).coerceAtLeast(0) } ?: DEFAULT_REPEAT_DAYS
+
+    fun set(days: Int) {
+        onExtras(extras.copy(repeatUntil = today.plus(DatePeriod(days = days.coerceAtLeast(0)))))
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+        CheckRow(
+            checked = until != null,
+            onCheckedChange = { on ->
+                if (on) set(inDays) else onExtras(extras.copy(repeatUntil = null))
+            },
+            label = "Wiederholen bis",
+            hint = "Ein Enddatum. Der Tag selbst zählt noch mit; danach wird nichts " +
+                "mehr eingeplant und die Aufgabe verschwindet aus den Listen.",
+        )
+        if (until != null) {
+            EtaField(label = "Letzter Tag", hint = until.formatLong()) {
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaStepper(
+                        value = when (inDays) {
+                            0 -> "heute"
+                            1 -> "morgen"
+                            else -> "in $inDays Tagen"
+                        },
+                        valueWidth = 104.dp,
+                        onDecrement = { set(inDays - 1) },
+                        onIncrement = { set(inDays + 1) },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                        EtaButton(
+                            text = "− 1 Woche",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { set(inDays - 7) },
+                        )
+                        EtaButton(
+                            text = "+ 1 Woche",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { set(inDays + 7) },
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

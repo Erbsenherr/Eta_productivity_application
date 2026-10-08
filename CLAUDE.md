@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (467 tests
-as of step 32), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (482 tests
+as of step 33), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -318,9 +318,9 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 
 | file in `.claude/rules/` | sections it holds |
 | --- | --- |
-| `setup.md` | *The setup questionnaire* · *Step 32*: page order, "Überspringen", the weekend night (`NightTimes`), defaults that do not collide |
+| `setup.md` | *The setup questionnaire* · *Step 32*: page order, "Überspringen", the weekend night (`NightTimes`), which days the weekend is (`weekendDays`), a bedtime after midnight, defaults that do not collide |
 | `database.md` | *The database and its migrations* — the version and the migration table |
-| `contracts.md` | *Contracts and the evening settlement*, *Breaking a contract without giving it up (step 17)*, *Contracts can be changed once (step 11)* |
+| `contracts.md` | *Contracts and the evening settlement*, *Breaking a contract without giving it up (step 17)* — with the two kept weeks that put it back into force (step 33) —, *Contracts can be changed once (step 11)* |
 | `lists.md` | *The "Smart toDos" (Listen) tab* |
 | `streak-reevaluation.md` | *The streak, and what keeps a day honest*, *Reevaluation: every block answered before moving on* |
 | `alarms.md` | *The planning alarm, and why one can be silent*, *Sounds, and the alarms that announce a task*, *Reading a task's name aloud (step 28)*, *The wake alarm* |
@@ -340,6 +340,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-25-wochenschema.md` | *Step 25*: the Wochenschema |
 | `step-26-small-ones.md` | *Step 26*: the hidden "Gruppieren" button, tap to unfold a name, free pomodoro phases, the red mark in the Wochenschema, "Nächster freier Slot" |
 | `step-30-designs.md` | *Step 30*: designs (`AppDesign`: Eta, Legacy) and `Brightness`, `applyDesignToWindow`, the widget's colours · *The launch screen* |
+| `step-33-small-ones.md` | *Step 33*: the long press in "Heute anstehend", holding "Absagen" for höhere Gewalt (`EtaHoldButton`), "Wiederholen bis" (`Item.repeatUntil`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -392,7 +393,9 @@ condition, Mengen-Inkrement · 25. The Wochenschema · 26. Five conveniences and
 hidden button · 27. Billing a task finished early · 28. Task names read aloud ·
 29. A Pause revolver in the day planner · 30. Designs to choose from, and a launch
 screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text ·
-32. The questionnaire reordered, skippable pages and a weekend night.
+32. The questionnaire reordered, skippable pages and a weekend night ·
+33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
+and a broken contract's way back.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

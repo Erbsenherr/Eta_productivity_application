@@ -119,6 +119,27 @@ status rather than a flag on `Locked`, because the slot is doing something
 different: there is a contract in it, drawn as a contract, with `decisionDue`
 saying whether the screen has a question to put or a countdown to show.
 
+**Two kept weeks put it back into force** (step 33). A contract on probation
+that is answered "gehalten" on `REINSTATEMENT_STREAK` (14) evenings **in a row**
+may be reinstated before its lock runs out: "Wieder einsetzen" in its slot calls
+the same `restartedContract` the end-of-month "Neu starten" does, which now
+accepts either reason. It is `ACTIVE` again — paid, slot no longer red — and the
+term is back at zero, so it needs a full month again before it can become legacy.
+
+- **`Contract.probationKeptSince`** is the first day of the current run;
+  `lastCheckedOn` is its last. `probationAnswered` is the evening's write: kept on
+  the day after the last answer carries the run on, kept after a gap starts a new
+  one, not kept clears it. The contract stays on probation whatever the answer.
+- **An unanswered evening is a gap.** `probationStreak(today)` is zero once
+  `lastCheckedOn` is older than yesterday — yesterday rather than today, because
+  today's evening may not have come yet. The reevaluation dates its answers by the
+  day it is *done*, so an evening closed after midnight breaks the run; known, and
+  the same thing the streak already lives with.
+- The slot shows "n von 14 Abenden in Folge gehalten" while it counts, so the run
+  is something to watch grow rather than a button that appears from nowhere.
+- A contract already on probation at the upgrade starts counting with its next
+  kept evening; the migration leaves the column null.
+
 The **signature is drawn with a finger** since step 23, and the two lists of
 finished contracts are folded away. What the screen says: **a locked slot is drawn
 red through**, not merely outlined —

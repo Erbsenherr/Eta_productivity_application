@@ -19,7 +19,7 @@ import com.example.eta.domain.reevaluation.settleDay
 import com.example.eta.domain.reward.yieldOf
 import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
 import com.example.eta.domain.setup.UserSetup
-import com.example.eta.domain.setup.sleepDuration
+import com.example.eta.domain.planning.sleepStretches
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDate
 
@@ -48,8 +48,13 @@ class ReevaluationService(
         contractsToCheck(contractRepository.findRunning(), date)
 
     /** How much of [date] the night took, so unplanned time is only charged awake. */
-    private fun sleepMinutes(setup: UserSetup?): Int =
-        setup?.sleepDuration()?.inWholeMinutes?.toInt()?.coerceIn(0, MINUTES_PER_DAY) ?: 0
+    private fun sleepMinutes(setup: UserSetup?, date: LocalDate): Int =
+        // The night as it falls on this calendar day — the same stretches the
+        // planner shades — so a weekend night, or one that begins after
+        // midnight, is counted on the day it actually takes hours from.
+        setup?.sleepStretches(date.dayOfWeek)
+            ?.sumOf { it.last - it.first + 1 }
+            ?.coerceIn(0, MINUTES_PER_DAY) ?: 0
 
     /**
      * The daily free time the standing schedule provides for on [date] — the
@@ -78,7 +83,7 @@ class ReevaluationService(
         return settleDay(
             blocks = blockDao.findForDateWithItems(date),
             verdicts = verdicts,
-            sleepMinutes = sleepMinutes(setup),
+            sleepMinutes = sleepMinutes(setup, date),
             freeTimeAllowanceMinutes = freeTimeAllowanceMinutes(date),
             // What a called-off hour costs, from the standing configuration.
             cancellationPenaltyPerHour = setup?.cancellationPenaltyPerHour

@@ -117,17 +117,43 @@ fun probationsAwaitingDecision(contracts: List<Contract>, today: LocalDate): Lis
  * `editedAt` is deliberately **not** cleared. The one wording change is an
  * allowance per contract, and breaking it must not hand out a second.
  *
- * Null unless the month is actually up: the choice exists because the
- * consequence has been served, and offering it earlier would be a way out of it.
+ * Null unless it has been earned, and there are two ways to earn it. The month
+ * is up: the consequence has been served. Or the contract was kept for
+ * [com.example.eta.domain.model.REINSTATEMENT_STREAK] evenings in a row while
+ * being served out — then it may come back into force **before** the lock runs
+ * out, which is the whole reward: it pays again and its slot is no longer a
+ * punished one. Offering it any earlier would be a way out of the consequence.
  */
 fun restartedContract(contract: Contract, today: LocalDate, now: Instant): Contract? {
-    if (!contract.probationDecisionDue(today)) return null
+    if (!contract.probationDecisionDue(today) && !contract.canBeReinstated(today)) return null
     val termDays = contract.signedOn.daysUntil(contract.endsOn)
     return contract.copy(
         state = ContractState.ACTIVE,
         signedOn = today,
         endsOn = today.plus(DatePeriod(days = termDays)),
         closedAt = null,
+        probationKeptSince = null,
+        updatedAt = now,
+    )
+}
+
+/**
+ * An evening's answer for a contract that is being served out.
+ *
+ * It stays on probation either way — the breach already happened — but the
+ * answer is counted: kept on the evening after the last kept one carries the run
+ * on, kept after a gap starts a new one, and not kept ends it.
+ */
+fun probationAnswered(contract: Contract, kept: Boolean, date: LocalDate, now: Instant): Contract {
+    val carriesOn = contract.probationKeptSince != null &&
+        contract.lastCheckedOn?.let { it.daysUntil(date) <= 1 } == true
+    return contract.copy(
+        lastCheckedOn = date,
+        probationKeptSince = when {
+            !kept -> null
+            carriesOn -> contract.probationKeptSince
+            else -> date
+        },
         updatedAt = now,
     )
 }

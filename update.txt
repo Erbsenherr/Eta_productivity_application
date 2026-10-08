@@ -1,9 +1,11 @@
-Quality of life:
--Auf "gerade" gedrückt halten ruft pomodoro auf. Ein kurzes Drücken soll den gesamten Namen (bei zu langen) anzeigen.
--in der "Heute anstehend" liste soll durch kurzes klicken auf den Eintrag ebenfalls der ganze Name gezeigt werden.
--Pomodoro timer einstellungen sollen ebenfalls komplett frei wählbar sein.
--Bei erstellen wiederkehrender Aufgaben, soll die Anzeige in der Wochenanzeige rot werden, wenn sich die wiederkehrende Aufgabe mit einer anderen überschneidet.
--Wenn sich eine Aufgabe mit einer anderen überschneidet, soll es einen "nächster freier Slot" Knopf geben. Dann wird die Aufgabe automatisch dorthin bewegt
+Quality of Life:
+-Gedrückt halten eines Eintrags in der "heute anstehend" Liste soll ebenfalls das "Bearbeiten" Fenster aufrufen
+-Wochenende selbst definieren können: Aktuell wird einfach angenommen, dass das Wochenende Freitag/Samstag/Sonntag ist. Das soll auch der Standard bleiben, der Nutzer soll aber andere Wochentagskombinationen wählen können, sollte sein Arbeitsalltag zB. andere Tage priorisieren.
 
-Bugfixes:
--Bei "Tasks Gruppieren?" fehlt der Bestätigungsknopf: Aktuell kann man nur abbrechen oder "nur verschieben".
+Features:
+-Gedrückt halten des "Absagen" Buttons ermöglicht direktes Absagen wegen höherer Gewalt (kurz drücken: Absagen, gedrückt halten: Absagen + höhere Gewalt, also kein Punktverlust). Bei diesem Gedrückt halten füllt sich der "Absagen" Button farblich von links nach rechts auf. Der Text Darunter soll die "Abendrückblick lässt höhere Gewalt gelten" klausel entfernen. Stattdessen soll hier "Gedrückt halten, wenn wegen höherer Gewalt".
+-Für wiederholbare Tasks: Wiederholen BIS (Enddatum).
+-Wenn der Nutzer sich dazu entschieden hat, gebrochenen Verträgen weiter zu folgen, dann kann er sie weiterhin (wie die laufenden Verträge) am Abend abgehaken, er bekommt allerdings keine Punkte. Wenn zwei Wochen lang ununterbrochen der Vertrag abgehakt wird, kann er den Vertrag wieder einsetzen. ALlerdings wird die Laufzeit im Sinne des Freischaltens eines Legacy Contracts wieder auf 0 gesetzt.
+
+Bugs:
+-Wenn man das Schlaf-Setup macht, kann man nicht angeben, dass man zB. Samstag um 1:00 Uhr nachts schlafen gehen möchte. Es sollte also möglich sein, dort auch "in den Sonntag" zu gehen.

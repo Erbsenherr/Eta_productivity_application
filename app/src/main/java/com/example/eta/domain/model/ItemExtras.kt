@@ -5,6 +5,7 @@ import com.example.eta.domain.growth.quantitySetting
 import com.example.eta.domain.growth.withQuantity
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
 
 /**
  * What the "Extras" box adds to a card, gathered into one value.
@@ -29,6 +30,9 @@ import kotlin.time.Instant
  * parameter of its own on every save path for the reason this class exists; it
  * is written through [withQuantity], which keeps the count a task has reached
  * across an edit that does not move its start.
+ *
+ * [repeatUntil] is the seventh: the last day a standing task repeats on. Only
+ * the recurring form asks for it, and a ToDo simply carries none.
  */
 data class ItemExtras(
     val pomodoroWork: Duration? = null,
@@ -37,6 +41,7 @@ data class ItemExtras(
     val reminderMessage: String? = null,
     val deadlineAt: Instant? = null,
     val quantity: QuantitySetting? = null,
+    val repeatUntil: LocalDate? = null,
 ) {
     val hasPomodoro: Boolean get() = pomodoroWork != null && pomodoroPause != null
 
@@ -54,6 +59,7 @@ data class ItemExtras(
             reminderMessage = item.reminderMessage,
             deadlineAt = item.deadlineAt,
             quantity = item.quantitySetting,
+            repeatUntil = item.repeatUntil,
         )
     }
 }
@@ -68,6 +74,7 @@ fun Item.withExtras(extras: ItemExtras): Item = copy(
     reminderLeadHours = extras.reminderLeadHours,
     reminderMessage = extras.reminderMessage?.takeIf { it.isNotBlank() },
     deadlineAt = extras.deadlineAt,
+    repeatUntil = extras.repeatUntil,
 ).withQuantity(extras.quantity)
 
 /**

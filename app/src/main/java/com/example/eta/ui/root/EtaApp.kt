@@ -278,6 +278,11 @@ private fun MainScaffold(
                         key = "quickadd-$dateKey",
                         factory = quickAddViewModelFactory(container),
                     ),
+                    // The very view model "Heute umplanen" opens with, by key.
+                    plannerViewModel = viewModel(
+                        key = "planner-today-$dateKey",
+                        factory = plannerViewModelFactory(container, PlannerDay.TODAY),
+                    ),
                     onPlanTomorrow = { flow = AppFlow.Planner },
                     onReplanToday = { flow = AppFlow.PlannerToday },
                     onPlanWeek = { flow = AppFlow.WeekPlanner },

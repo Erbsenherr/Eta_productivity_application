@@ -97,6 +97,8 @@ fun RecurrenceRule.occurrencesBetween(from: LocalDate, to: LocalDate): List<Loca
  * never duplicates or resurrects a block the user deleted from a past day.
  *
  * Definitions without a start time or duration are skipped rather than guessed at.
+ * One with a `repeatUntil` lays nothing down after that day, however often and
+ * however far ahead this is asked.
  */
 fun expandRecurring(
     definitions: List<Item>,
@@ -110,7 +112,9 @@ fun expandRecurring(
     val start = item.startTime ?: return@flatMap emptyList()
     val duration: Duration = item.estimatedDuration ?: return@flatMap emptyList()
 
-    rule.occurrencesBetween(from, to)
+    val last = item.repeatUntil?.let { minOf(it, to) } ?: to
+
+    rule.occurrencesBetween(from, last)
         .filterNot { date -> (item.id to date) in existing }
         // A suspended task produces no block at all, which is also why a holiday
         // never triggers a "Nachholen von …": there is nothing to drop.

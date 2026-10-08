@@ -104,3 +104,21 @@ be changed there too. The morning's *length* stays one answer.
   set and lays down the other through the ordinary `saveSettings` path.
 - **`isOwnedBySettings(id)` replaced the `SETTINGS_OWNED_ITEM_IDS` set**, since the
   owned ids are no longer two fixed strings.
+
+- **Which days the weekend is, is the user's to say** (step 33).
+  `UserSetup.weekendDays` is the set of days a weekend night **ends** on —
+  Saturday and Sunday (`DEFAULT_WEEKEND`) unless chosen otherwise, so someone
+  working Wednesday to Sunday can have Monday and Tuesday. `nightEndingOn` is
+  still the one place that decides, which is why nothing else had to change. The
+  picker appears under "Andere Zeiten" and refuses to drop the last day: a
+  weekend of no days is "Wie unter der Woche", and that is the switch above it.
+  The set means nothing while `weekendNight` is null.
+- **A bedtime after midnight was always representable and never said so.** The
+  report was that "Samstag um 1:00 Uhr nachts" could not be entered. The model
+  had it — `sleepOffset()` is positive, the night lies wholly on the wake day —
+  but the fields were labelled "(Fr, Sa)" whatever the hour, so 01:00 read as
+  Friday at one. The labels are now computed (`NightTimes.sleepDays` /
+  `bedPrepDays`: the day before, or the wake day itself after midnight) and a
+  hint under the hour says which day's one o'clock it is. `WeekendNightTest` pins
+  the reported case. **Unverified on a device**: if the dial itself refused the
+  hour, that is a different bug and still open.

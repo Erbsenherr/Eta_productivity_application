@@ -71,6 +71,8 @@ above everything when it has something to say.
   the planner enforces. The button below the list is for what needs the planner:
   calling something off, moving it by more than a nudge, adding what was not
   foreseen. That is `AppFlow.PlannerToday` — a flow, not a tab.
+- **A long press on an open row opens the planner's "Bearbeiten" window** (step
+  33), through the planner's own view model — see *Step 33*.
 - **Confirming what is running asks what to do with the time.** The "Gerade" box
   has a button of its own, and a tick in "Heute anstehend" goes the same way:
   *Plan beibehalten · Task vorziehen · Pause einfügen, dann vorziehen* — but only

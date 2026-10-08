@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.domain.contract.SlotStatus
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.ContractState
+import com.example.eta.domain.model.REINSTATEMENT_STREAK
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
@@ -38,6 +39,7 @@ import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.theme.EtaTheme
+import kotlinx.datetime.LocalDate
 
 /** The Selbstverträge tab: three slots, the legacy contracts, and what is behind them. */
 @Composable
@@ -99,6 +101,8 @@ fun ContractsScreen(
                 SlotBox(
                     slot = slot,
                     status = status,
+                    today = state.today,
+                    onReinstate = { contract -> viewModel.restartProbation(contract) },
                     upgradable = state.upgradable.any { (status as? SlotStatus.Taken)?.contract?.id == it.id },
                     onSign = { signingSlot = slot },
                     onUpgrade = { contract -> viewModel.upgradeToLegacy(contract) },
@@ -191,6 +195,8 @@ fun ContractsScreen(
 private fun SlotBox(
     slot: Int,
     status: SlotStatus,
+    today: LocalDate,
+    onReinstate: (Contract) -> Unit,
     upgradable: Boolean,
     onSign: () -> Unit,
     onUpgrade: (Contract) -> Unit,
@@ -278,6 +284,32 @@ private fun SlotBox(
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
+                    // The way back in before the lock runs out: two weeks kept
+                    // without a gap. Counted where the contract is read, so the
+                    // run is something to watch grow rather than a surprise.
+                    val streak = status.contract.probationStreak(today)
+                    if (status.contract.canBeReinstated(today)) {
+                        EtaText(
+                            text = "$streak Abende in Folge gehalten — der Vertrag kann " +
+                                "wieder eingesetzt werden. Er zahlt dann wieder, und die " +
+                                "Laufzeit beginnt bei null: bis Legacy braucht es erneut " +
+                                "einen vollen Monat.",
+                            style = EtaTheme.typography.caption,
+                            color = EtaTheme.colors.success,
+                        )
+                        EtaButton(
+                            text = "Wieder einsetzen",
+                            onClick = { onReinstate(status.contract) },
+                        )
+                    } else if (!status.decisionDue) {
+                        EtaText(
+                            text = "$streak von $REINSTATEMENT_STREAK Abenden in Folge " +
+                                "gehalten. Sind es $REINSTATEMENT_STREAK ohne Lücke, " +
+                                "lässt er sich wieder einsetzen.",
+                            style = EtaTheme.typography.caption,
+                            color = EtaTheme.colors.textMuted,
+                        )
+                    }
                 }
             }
         }

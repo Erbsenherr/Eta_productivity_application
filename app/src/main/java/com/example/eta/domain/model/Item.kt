@@ -60,6 +60,13 @@ data class Item(
     /** RECURRING only: the time of day its blocks are placed at. */
     val startTime: LocalTime? = null,
     /**
+     * RECURRING only: the last day this still lays an occurrence down on. Null
+     * repeats without end. Expansion itself consults it, which is what makes the
+     * end durable — see `expandRecurring` — and once the day has passed the
+     * definition is retired like one ended by hand.
+     */
+    val repeatUntil: LocalDate? = null,
+    /**
      * Defaults stamped onto every block this definition produces: the journey
      * there, the journey back and the break afterwards. See
      * [PlannedBlock.travelBefore].

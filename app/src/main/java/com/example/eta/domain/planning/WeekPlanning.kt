@@ -4,7 +4,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.setup.UserSetup
-import com.example.eta.domain.setup.sleepDuration
+import com.example.eta.domain.setup.sleepMinutesPerWeek
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -103,7 +103,8 @@ fun weekBudget(
     weekList: List<Item>,
 ): WeekBudget {
     val wholeWeek = DAYS_PER_WEEK * MINUTES_PER_DAY
-    val sleep = (setup?.sleepDuration()?.inWholeMinutes?.toInt() ?: 0) * DAYS_PER_WEEK
+    // Night by night: a weekend that sleeps longer has fewer hours to give.
+    val sleep = setup?.sleepMinutesPerWeek() ?: 0
     val social = setup?.socialTimePerWeek?.inWholeMinutes?.toInt() ?: 0
 
     return WeekBudget(

@@ -40,7 +40,7 @@ import com.example.eta.domain.setup.UserSetup
         Subtask::class,
         SubtaskCheck::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -677,5 +677,27 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
 val MIGRATION_20_21 = object : Migration(20, 21) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `weekendNight` TEXT")
+    }
+}
+
+/**
+ * 21 -> 22: a weekend of the user's choosing, an end date for a standing task,
+ * and the run of kept evenings that lets a broken contract back in.
+ *
+ * - **`user_setup.weekendDays`**: the days a weekend night ends on, as names in
+ *   week order. `SATURDAY,SUNDAY` for every existing row — what the weekend was
+ *   while it could not be chosen.
+ * - **`items.repeatUntil`**: the last day a recurring definition lays an
+ *   occurrence down on. Null repeats without end, which is every row so far.
+ * - **`contracts.probationKeptSince`**: null for everyone, a contract already on
+ *   probation included — its run starts counting with the next kept evening.
+ */
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `weekendDays` TEXT NOT NULL DEFAULT 'SATURDAY,SUNDAY'",
+        )
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `repeatUntil` TEXT")
+        connection.execSQL("ALTER TABLE `contracts` ADD COLUMN `probationKeptSince` TEXT")
     }
 }

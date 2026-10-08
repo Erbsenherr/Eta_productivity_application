@@ -14,6 +14,7 @@ import com.example.eta.domain.planning.overlaps
 import com.example.eta.domain.setup.WEEK
 import kotlin.time.Duration
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 
 /**
@@ -175,6 +176,7 @@ private data class GroupKey(
     val breakAfter: Duration?,
     val endSound: Boolean,
     val rhythm: Rhythm,
+    val repeatUntil: LocalDate?,
 )
 
 /**
@@ -201,6 +203,7 @@ fun groupRecurring(definitions: List<Item>): List<RecurringGroup> =
                 breakAfter = item.breakAfter,
                 endSound = item.endSound,
                 rhythm = Rhythm.of(item.recurrenceRule!!),
+                repeatUntil = item.repeatUntil,
             )
         }
         .values

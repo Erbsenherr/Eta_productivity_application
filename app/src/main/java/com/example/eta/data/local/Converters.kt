@@ -65,6 +65,15 @@ class Converters {
     @ColumnTypeConverter
     fun nameToDayOfWeek(value: String?): DayOfWeek? = value?.let { DayOfWeek.valueOf(it) }
 
+    /** In week order, so the same set is always the same string. */
+    @ColumnTypeConverter
+    fun weekdaySetToString(value: Set<DayOfWeek>?): String? =
+        value?.let { days -> DayOfWeek.entries.filter { it in days }.joinToString(",") { it.name } }
+
+    @ColumnTypeConverter
+    fun stringToWeekdaySet(value: String?): Set<DayOfWeek>? =
+        value?.split(',')?.filter { it.isNotEmpty() }?.map(DayOfWeek::valueOf)?.toSet()
+
     @ColumnTypeConverter
     fun weeklySlotToString(value: WeeklySlot?): String? = value?.encode()
 

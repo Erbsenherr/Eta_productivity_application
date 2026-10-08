@@ -34,6 +34,7 @@ import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDurationPicker
 import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
+import com.example.eta.ui.components.EtaHoldButton
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
@@ -115,6 +116,11 @@ fun BlockEditDialog(
     ) -> Unit,
     onRemove: () -> Unit,
     onCancelBlock: () -> Unit = {},
+    /**
+     * "Absagen" held down: called off because of something nobody could help,
+     * and therefore not charged for. Only offered where there is a charge.
+     */
+    onCancelExcused: () -> Unit = {},
     onCopyToWeek: () -> Unit = {},
     /**
      * Whether calling this block off is going to cost anything.
@@ -289,20 +295,32 @@ fun BlockEditDialog(
                     onClick = onRemove,
                 )
             }
-            EtaButton(
-                text = "Absagen",
-                style = EtaButtonStyle.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onCancelBlock,
-            )
+            // A hold is the excuse. Where calling off costs nothing there is
+            // nothing to excuse, and the button is the plain one.
+            if (cancellationCosts) {
+                EtaHoldButton(
+                    text = "Absagen",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onCancelBlock,
+                    onHold = onCancelExcused,
+                )
+            } else {
+                EtaButton(
+                    text = "Absagen",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onCancelBlock,
+                )
+            }
             EtaText(
                 text = if (cancellationCosts) {
                     "Absagen kostet die abgesagten Stunden an Punkten. " +
                         if (entry.block.isMovable) {
-                            "»Vom Tag nehmen« nicht — die Aufgabe wandert zurück in die Woche."
+                            "»Vom Tag nehmen« nicht — die Aufgabe wandert zurück in die Woche. "
                         } else {
-                            "Der Abendrückblick lässt »höhere Gewalt« gelten."
-                        }
+                            ""
+                        } +
+                        "Gedrückt halten, wenn wegen höherer Gewalt."
                 } else {
                     "Der Tag läuft noch nicht — im Voraus abzusagen kostet nichts. " +
                         "Die Stunden sind dann wieder frei."

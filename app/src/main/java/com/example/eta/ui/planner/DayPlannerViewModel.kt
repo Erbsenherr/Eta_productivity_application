@@ -126,6 +126,14 @@ data class PlannerUiState(
     val foldable: List<Item> = emptyList(),
 )
 
+/**
+ * The reason stored for a cancellation excused by holding "Absagen" down.
+ *
+ * The evening's own excuse asks for a sentence; this one is given in the moment
+ * and has none, so the record says how it came about instead.
+ */
+const val FORCE_MAJEURE_ON_THE_SPOT = "beim Absagen angegeben"
+
 /** Told to the user after a drop, when the plan did something other than asked. */
 sealed interface PlacementFeedback {
     data class Moved(val name: String, val to: LocalTime) : PlacementFeedback
@@ -598,9 +606,14 @@ class DayPlannerViewModel(
      * for it. No catch-up is offered: calling something off in advance is a
      * decision, not the evening's admission that it did not happen.
      */
-    fun cancel(entry: BlockWithItem) {
+    fun cancel(entry: BlockWithItem, forceMajeure: Boolean = false) {
         viewModelScope.launch {
-            planRepository.discard(entry.block)
+            // Held down rather than tapped: called off, and excused in the same
+            // breath. The evening then has no charge to book for it.
+            planRepository.discard(
+                entry.block,
+                forceMajeure = FORCE_MAJEURE_ON_THE_SPOT.takeIf { forceMajeure },
+            )
             // The same consequence the evening's "Fällt aus" has, and for the same
             // reason: a called-off ToDo would otherwise sit in `Stage.DAY` with no
             // block to show it, invisible in every list. `returnedToCollection`

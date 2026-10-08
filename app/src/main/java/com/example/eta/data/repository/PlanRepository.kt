@@ -144,10 +144,21 @@ class PlanRepository(
      * back on the next top-up. The row has to stay for the schedule to know the
      * day was already decided — and a discarded block is also one the evening
      * reevaluation no longer asks about.
+     *
+     * [forceMajeure] excuses it in the same write, for a cancellation that was
+     * nobody's doing and is said to be so on the spot — see [excuse]. One write
+     * rather than two calls, each of which would save its own copy of the row
+     * and the second undo the first.
      */
-    suspend fun discard(block: PlannedBlock) {
+    suspend fun discard(block: PlannedBlock, forceMajeure: String? = null) {
         val now = clock.now()
-        blockDao.upsert(block.copy(discardedAt = now, updatedAt = now))
+        blockDao.upsert(
+            block.copy(
+                discardedAt = now,
+                forceMajeure = forceMajeure ?: block.forceMajeure,
+                updatedAt = now,
+            ),
+        )
     }
 
     /** Taking a calling-off back. The mirror of [discard], for a change of mind. */

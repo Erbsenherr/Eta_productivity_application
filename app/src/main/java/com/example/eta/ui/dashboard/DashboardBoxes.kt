@@ -622,6 +622,12 @@ fun TasksBox(
     onDurationChange: ((BlockWithItem, Duration) -> Unit)? = null,
     onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
     onUncancel: ((BlockWithItem) -> Unit)? = null,
+    /**
+     * A long press on a row still open: the same "Bearbeiten" window the planner
+     * opens. Handed the block's **id** — the gesture outlives the row it was
+     * read from, and an id cannot go stale.
+     */
+    onEdit: ((blockId: String) -> Unit)? = null,
     emptyHint: String = "Nichts geplant.",
     /**
      * Set to make the box foldable, under this name — see [rememberFold]. Open
@@ -679,6 +685,7 @@ fun TasksBox(
                         onDurationChange = onDurationChange,
                         onStartChange = onStartChange,
                         onUncancel = onUncancel,
+                        onEdit = onEdit,
                     )
                 }
             }
@@ -693,6 +700,7 @@ private fun TaskRow(
     onDurationChange: ((BlockWithItem, Duration) -> Unit)?,
     onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
     onUncancel: ((BlockWithItem) -> Unit)? = null,
+    onEdit: ((blockId: String) -> Unit)? = null,
 ) {
     var pickingStart by remember(entry.block.id) { mutableStateOf(false) }
     var offeringUncancel by remember(entry.block.id) { mutableStateOf(false) }
@@ -703,18 +711,23 @@ private fun TaskRow(
     // still visible — and therefore the only place it can be taken back.
     val cancelled = entry.block.isDiscarded
     val canUncancel = cancelled && onUncancel != null
+    // A finished row has nothing left to edit: it has left the plan, and the
+    // planner does not offer it either.
+    val canEdit = entry.block.isOpen && onEdit != null
+    val latestOnEdit by rememberUpdatedState(onEdit)
+    val blockId = entry.block.id
 
     Column(
         // Keyed by what the lambdas depend on, so nothing in them can go stale.
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(entry.block.id, canUncancel) {
+            .pointerInput(blockId, canUncancel, canEdit) {
                 detectTapGestures(
                     onTap = { showFullName = !showFullName },
-                    onLongPress = if (canUncancel) {
-                        { offeringUncancel = true }
-                    } else {
-                        null
+                    onLongPress = when {
+                        canUncancel -> { _ -> offeringUncancel = true }
+                        canEdit -> { _ -> latestOnEdit?.invoke(blockId) }
+                        else -> null
                     },
                 )
             },

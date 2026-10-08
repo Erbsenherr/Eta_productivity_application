@@ -335,6 +335,13 @@ data class UserSetup(
      * setup answered before this existed says.
      */
     val weekendNight: NightTimes? = null,
+    /**
+     * Which days count as the weekend: the days a [weekendNight] **ends** on, so
+     * the evening before each belongs to it as well. Saturday and Sunday unless
+     * the user's week runs differently — someone working Wednesday to Sunday has
+     * their weekend on Monday and Tuesday. Means nothing without a [weekendNight].
+     */
+    val weekendDays: Set<DayOfWeek> = DEFAULT_WEEKEND,
     /** How much of the morning belongs to getting going, starting at [wakeTime]. */
     val morningDuration: Duration,
     val meals: MealPlan,

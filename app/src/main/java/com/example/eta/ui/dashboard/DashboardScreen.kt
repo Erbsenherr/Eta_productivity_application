@@ -36,6 +36,9 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
+import com.example.eta.ui.planner.BlockEditDialog
+import com.example.eta.ui.planner.DayPlannerViewModel
+import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.quickadd.QuickAddPanel
 import com.example.eta.ui.quickadd.QuickAddViewModel
@@ -59,6 +62,12 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     quickAddViewModel: QuickAddViewModel,
     modifier: Modifier = Modifier,
+    /**
+     * Today's planner, for the "Bearbeiten" window a long press in "Heute
+     * anstehend" opens. The same view model the "Heute umplanen" flow uses, so
+     * an edit made here is the edit made there — one implementation, not two.
+     */
+    plannerViewModel: DayPlannerViewModel? = null,
     onPlanTomorrow: () -> Unit = {},
     onReplanToday: () -> Unit = {},
     onPlanWeek: () -> Unit = {},
@@ -93,6 +102,7 @@ fun DashboardScreen(
                         now = now,
                         viewModel = viewModel,
                         quickAddViewModel = quickAddViewModel,
+                        plannerViewModel = plannerViewModel,
                         onCloseDay = onCloseDay,
                         onPlanTomorrow = onPlanTomorrow,
                         onReplanToday = onReplanToday,
@@ -112,10 +122,15 @@ private fun TodayPage(
     now: Instant,
     viewModel: DashboardViewModel,
     quickAddViewModel: QuickAddViewModel,
+    plannerViewModel: DayPlannerViewModel?,
     onCloseDay: () -> Unit,
     onPlanTomorrow: () -> Unit,
     onReplanToday: () -> Unit,
 ) {
+    // Held as an id and resolved against the list as it is now: the row may
+    // have been ticked off or called off while the dialog stood open.
+    var editingId by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -289,6 +304,7 @@ private fun TodayPage(
             },
             onStartChange = viewModel::setStart,
             onUncancel = viewModel::uncancel,
+            onEdit = plannerViewModel?.let { { id: String -> editingId = id } },
         )
 
         // Small corrections happen in the list above. This is the way to the
@@ -319,6 +335,61 @@ private fun TodayPage(
 
         Spacer(Modifier.size(EtaTheme.spacing.xl))
     }
+
+    if (plannerViewModel != null) {
+        state.todayBlocks
+            .firstOrNull { it.block.id == editingId && it.block.isOpen }
+            ?.let { entry ->
+                TodayBlockEditor(entry, plannerViewModel, onDone = { editingId = null })
+            }
+    }
+}
+
+/**
+ * The planner's own edit dialog, opened from "Heute anstehend".
+ *
+ * Everything it does goes through [plannerViewModel], exactly as it does on the
+ * planner screen; this only decides which block it is about.
+ */
+@Composable
+private fun TodayBlockEditor(
+    entry: BlockWithItem,
+    plannerViewModel: DayPlannerViewModel,
+    onDone: () -> Unit,
+) {
+    val planner by plannerViewModel.uiState.collectAsStateWithLifecycle()
+
+    BlockEditDialog(
+        entry = entry,
+        subtasks = planner.subtasks[entry.item.id].orEmpty(),
+        foldCandidates = planner.foldable.foldCandidatesExcept(entry.item.id),
+        onSubtasks = { plannerViewModel.saveSubtasks(entry.block.id, it) },
+        onDismiss = onDone,
+        onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate ->
+            plannerViewModel.edit(
+                entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate,
+            )
+            onDone()
+        },
+        onRemove = {
+            plannerViewModel.remove(entry)
+            onDone()
+        },
+        onCancelBlock = {
+            plannerViewModel.cancel(entry)
+            onDone()
+        },
+        onCancelExcused = {
+            plannerViewModel.cancel(entry, forceMajeure = true)
+            onDone()
+        },
+        onCopyToWeek = {
+            plannerViewModel.copyToWeek(entry)
+            onDone()
+        },
+        // This list is today's, and today's plan is a promise already made.
+        cancellationCosts = true,
+    )
 }
 
 @Composable

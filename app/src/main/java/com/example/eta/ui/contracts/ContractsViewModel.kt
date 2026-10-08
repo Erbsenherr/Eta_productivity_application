@@ -125,7 +125,8 @@ class ContractsViewModel(
     }
 
     /**
-     * The month is served: the promise is taken up again, term back to zero.
+     * The promise is taken up again, term back to zero — because the month is
+     * served, or because two weeks were kept in a row while serving it.
      *
      * Same words, same effort, same signature — only the run-up is gone, so it
      * needs a full month again before it can become legacy. Making a promise

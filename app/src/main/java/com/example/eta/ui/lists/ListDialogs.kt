@@ -414,6 +414,7 @@ fun recurringSummary(group: RecurringGroup): String = buildString {
     }
     group.representative.startTime?.let { append(" · ${it.formatClock()}") }
     group.representative.estimatedDuration?.let { append(" · ${it.formatShort()}") }
+    group.representative.repeatUntil?.let { append(" · bis ${it.formatLong()}") }
     // A growth task is an ordinary standing task and belongs in this list; what
     // it has extra is where its length is going, and the row is the place to say
     // so rather than making the user open it to find out.

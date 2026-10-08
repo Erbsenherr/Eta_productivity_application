@@ -3,6 +3,7 @@ package com.example.eta.data.repository
 import com.example.eta.data.local.ContractDao
 import com.example.eta.domain.contract.abandonedContract
 import com.example.eta.domain.contract.editedContract
+import com.example.eta.domain.contract.probationAnswered
 import com.example.eta.domain.contract.rejectionReason
 import com.example.eta.domain.contract.restartedContract
 import com.example.eta.domain.model.Contract
@@ -82,11 +83,11 @@ class ContractRepository(
      * being asked about every evening, and pays nothing for as long as the lock
      * runs.
      *
-     * A contract **already on probation** only gets the date. It is broken
-     * already; the consequence is running, and the answer is the record of a
-     * habit rather than a verdict with something still to decide. Marking it
-     * broken a second time would move nothing and would lose the fact that it is
-     * still being served.
+     * A contract **already on probation** stays on it whatever the answer. It
+     * is broken already; the consequence is running, and marking it broken a
+     * second time would move nothing and would lose the fact that it is still
+     * being served. The answer is counted, though — see [probationAnswered]:
+     * two weeks of "gehalten" in a row are what lets it be put back into force.
      */
     suspend fun recordVerdict(
         contract: Contract,
@@ -98,18 +99,23 @@ class ContractRepository(
         val answered = contract.copy(lastCheckedOn = date, updatedAt = now)
         contractDao.upsert(
             when {
-                contract.isOnProbation -> answered
+                contract.isOnProbation -> probationAnswered(contract, kept, date, now)
                 kept -> answered
-                keepServing -> answered.copy(state = ContractState.PROBATION, closedAt = null)
+                keepServing -> answered.copy(
+                    state = ContractState.PROBATION,
+                    closedAt = null,
+                    probationKeptSince = null,
+                )
                 else -> answered.copy(state = ContractState.BROKEN, closedAt = now)
             },
         )
     }
 
     /**
-     * The month is up and the promise is taken up again: same words, term at zero.
+     * The promise is taken up again: same words, term at zero. Earned either by
+     * the month being up or by two kept weeks in a row — see [restartedContract].
      *
-     * Returns false when the decision is not actually due — the rules live in
+     * Returns false when neither is the case — the rules live in
      * `domain/contract`, so what a screen offers and what a test asserts are the
      * same code.
      */
