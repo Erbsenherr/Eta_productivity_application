@@ -45,6 +45,7 @@ import com.example.eta.domain.streak.Streak
 import com.example.eta.domain.streak.streakOf
 import com.example.eta.domain.staging.daysUntilBan
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,6 +101,8 @@ data class DashboardUiState(
     val subtasks: Map<String, List<Subtask>> = emptyMap(),
     /** Which steps today has ticked off, by block id. */
     val checked: Map<String, Set<String>> = emptyMap(),
+    /** When each of them was ticked, by block id and step — a routine shows it. */
+    val checkTimes: Map<String, Map<String, Instant>> = emptyMap(),
 ) {
     /**
      * The crown: legacy contracts are worth more per day than the cap credits.
@@ -220,8 +223,8 @@ class DashboardViewModel(
         )
     }.combine(subtaskRepository.observeByItem()) { state, subtasks ->
         state.copy(subtasks = subtasks)
-    }.combine(subtaskRepository.observeChecked(today)) { state, checked ->
-        state.copy(checked = checked)
+    }.combine(subtaskRepository.observeCheckTimes(today)) { state, times ->
+        state.copy(checked = times.mapValues { it.value.keys }, checkTimes = times)
     }.combine(conflictRepository.observeDismissed(today)) { state, dismissed ->
         // Read off the blocks each time rather than stored: a collision is a fact
         // about where things stand, and moving one of the two blocks has to make

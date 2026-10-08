@@ -370,14 +370,16 @@ private enum class EtaTab(val label: String) {
     Lists("Listen"),
     Contracts("Verträge"),
     Reminders("Erinnerungen"),
-    Settings("Einstellungen"),
 
     /**
-     * Last, as the user asked, and its own tab because of the one thing it has
-     * that no list can express: the **order** growth tasks hold, which is what
-     * settles a slot two of them both want.
+     * Its own tab because of the one thing it has that no list can express: the
+     * **order** growth tasks hold, which is what settles a slot two of them both
+     * want.
      */
     Growth("Growth-Tasks"),
+
+    /** Far right, as the user asked: it is the tab opened least. */
+    Settings("Einstellungen"),
 }
 
 /**

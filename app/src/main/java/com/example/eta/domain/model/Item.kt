@@ -150,6 +150,13 @@ data class Item(
     val quantityTarget: Int? = null,
     val quantityEvery: Int = 1,
     val quantityProgress: Int = 0,
+    /**
+     * Routine-Modus: the steps of this task are worked through **in order**, one
+     * at a time. The "Gerade" box then shows only the step that is due, with a
+     * checkbox behind it; ticking it stamps the time and reveals the next. Means
+     * nothing for a task without steps.
+     */
+    val routineMode: Boolean = false,
     /** SPEND only, signed: Custom Earn is positive (+1.5/h), Custom Spend negative (-5/h). */
     val pointsPerHour: Double? = null,
     /**

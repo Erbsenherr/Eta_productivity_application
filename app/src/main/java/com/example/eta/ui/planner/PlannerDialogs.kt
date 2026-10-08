@@ -337,6 +337,12 @@ fun BlockEditDialog(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onCopyToWeek,
             )
+            EtaText(
+                text = "Legt eine weitere Instanz dieser Aufgabe in der Wochenliste an. " +
+                    "Der Termin hier bleibt, wie er ist.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
         }
 
         // The group's own steps. A fold of its own rather than a row inside

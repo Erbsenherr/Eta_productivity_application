@@ -41,6 +41,16 @@ fun isOwnedBySettings(id: String): Boolean = SETTINGS_OWNED_KEYS.any { key ->
 }
 
 /**
+ * Whether [id] is the morning routine — one definition, or one per night.
+ *
+ * The morning is a task with steps in Routine-Modus. Its steps are the user's
+ * and live in `subtasks`; these are the rows they have to be on, all of them
+ * alike, however many nights the week has.
+ */
+fun isMorningRoutine(id: String): Boolean =
+    id == setupId("morning") || id.startsWith(setupId("morning-"))
+
+/**
  * The recurring definitions that follow from the answers.
  *
  * Category is what decides whether a block pays points, so it is assigned by
@@ -219,5 +229,6 @@ fun UserSetup.recurringItems(now: Instant): List<Item> {
         }
     }
 
-    return items
+    // The morning is a routine: its steps are ticked off one after the other.
+    return items.map { if (isMorningRoutine(it.id)) it.copy(routineMode = true) else it }
 }

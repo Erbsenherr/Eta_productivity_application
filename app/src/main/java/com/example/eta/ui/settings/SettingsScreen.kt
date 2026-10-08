@@ -56,6 +56,8 @@ import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.theme.AppDesign
 import com.example.eta.ui.theme.Brightness
 import com.example.eta.ui.theme.DesignChoice
+import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.ui.subtasks.MorningRoutineSteps
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -99,6 +101,7 @@ fun SettingsScreen(
     val phrase by viewModel.phrase.collectAsStateWithLifecycle()
     val phraseAccepted by viewModel.phraseAccepted.collectAsStateWithLifecycle()
     val alarms by viewModel.alarms.collectAsStateWithLifecycle()
+    val morningSteps by viewModel.morningSteps.collectAsStateWithLifecycle()
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip"),
@@ -183,6 +186,7 @@ fun SettingsScreen(
                 )
 
                 SleepStep(setup, viewModel::update)
+                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
                 WakeAlarmBox(setup, viewModel::update)
                 SocialTimeBox(setup, viewModel::update)
                 StillActiveBox(setup, viewModel::update)
@@ -619,7 +623,7 @@ private fun MessageBox(message: SettingsMessage, onDismiss: () -> Unit) {
                 val detail = when (message) {
                     // The rule every edit to a standing task follows.
                     SettingsMessage.Saved ->
-                        "Bettfertig und Morgenzeit gelten ab dem ersten noch nicht " +
+                        "Bettfertig und Morgenroutine gelten ab dem ersten noch nicht " +
                             "bestätigten Tag."
 
                     is SettingsMessage.Exported -> "${message.bytes / 1024} KB geschrieben."
@@ -640,6 +644,35 @@ private fun MessageBox(message: SettingsMessage, onDismiss: () -> Unit) {
                 }
             }
             EtaButton(text = "OK", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+        }
+    }
+}
+
+/**
+ * The steps of the morning routine.
+ *
+ * Under the sleep card, because that is where the morning's hour and length are
+ * set. Saved at once, unlike the answers around it: the steps are not part of
+ * the draft, and a list edited in a dialog with its own "Sichern" that then
+ * waited for a second one further down would lose edits.
+ */
+@Composable
+private fun MorningRoutineBox(
+    steps: List<SubtaskDraft>,
+    onSave: (List<SubtaskDraft>) -> Unit,
+) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Morgenroutine", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Beginnt mit dem Aufstehen und dauert so lange, wie oben unter " +
+                    "„Morgenroutine“ steht. Die Schritte laufen im Routine-Modus: " +
+                    "„Gerade“ zeigt immer nur den nächsten, Abhaken hält die Uhrzeit " +
+                    "fest. Änderungen an den Schritten gelten sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            MorningRoutineSteps(steps = steps, onSave = onSave)
         }
     }
 }

@@ -40,7 +40,7 @@ import com.example.eta.domain.setup.UserSetup
         Subtask::class,
         SubtaskCheck::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -699,5 +699,35 @@ val MIGRATION_21_22 = object : Migration(21, 22) {
         )
         connection.execSQL("ALTER TABLE `items` ADD COLUMN `repeatUntil` TEXT")
         connection.execSQL("ALTER TABLE `contracts` ADD COLUMN `probationKeptSince` TEXT")
+    }
+}
+
+/**
+ * 22 -> 23: the Routine-Modus, and the morning becoming one.
+ *
+ * **`items.routineMode`**, off for everything — except the questionnaire's
+ * morning, which is renamed from "Morgenzeit" to "Morgenroutine" in the same
+ * step. Only a row still carrying the old name is renamed; the mode is switched
+ * on for every morning row, since that is what the settings would write the next
+ * time they are saved anyway.
+ */
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `items` ADD COLUMN `routineMode` INTEGER NOT NULL DEFAULT 0",
+        )
+        connection.execSQL(
+            """
+            UPDATE `items` SET `routineMode` = 1
+            WHERE `id` = 'setup:morning' OR `id` LIKE 'setup:morning-%'
+            """.trimIndent(),
+        )
+        connection.execSQL(
+            """
+            UPDATE `items` SET `name` = 'Morgenroutine', `normalizedName` = 'morgenroutine'
+            WHERE (`id` = 'setup:morning' OR `id` LIKE 'setup:morning-%')
+              AND `name` = 'Morgenzeit'
+            """.trimIndent(),
+        )
     }
 }

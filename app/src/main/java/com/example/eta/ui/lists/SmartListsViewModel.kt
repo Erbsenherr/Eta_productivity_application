@@ -30,6 +30,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.SharingStarted
+import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.domain.subtask.drafts
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -117,7 +119,7 @@ class SmartListsViewModel(
     private val recurringTaskService: RecurringTaskService,
     private val reevaluationService: ReevaluationService,
     private val subtaskRepository: SubtaskRepository,
-    setupRepository: SetupRepository,
+    private val setupRepository: SetupRepository,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -161,6 +163,15 @@ class SmartListsViewModel(
     }
 
     /** The setup's answers, for the night the Wochenschema books. */
+    /** The morning routine's steps — see `SetupRepository.saveMorningSteps`. */
+    val morningSteps: StateFlow<List<SubtaskDraft>> = setupRepository.observeMorningSteps()
+        .map { it.drafts() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun saveMorningSteps(steps: List<SubtaskDraft>) {
+        viewModelScope.launch { setupRepository.saveMorningSteps(steps) }
+    }
+
     val setup: StateFlow<UserSetup?> = setupRepository.observe().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

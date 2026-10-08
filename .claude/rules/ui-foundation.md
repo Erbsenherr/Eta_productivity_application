@@ -55,7 +55,7 @@ setup, `MainScaffold` splits everything into **tabs** and **flows**, and that sp
 is the point:
 
 - A **tab** is a place you can always get back to — Heute, Listen, Verträge,
-  Erinnerungen, Einstellungen, Growth-Tasks — so `EtaTabBar` stays put beneath it.
+  Erinnerungen, Growth-Tasks, Einstellungen, in that order since step 34 — so `EtaTabBar` stays put beneath it.
 - A **flow** is something you are in the middle of: a planning phase, the
   concretizing step, the holiday editor. It covers the bar and leaves by finishing
   or by going back.

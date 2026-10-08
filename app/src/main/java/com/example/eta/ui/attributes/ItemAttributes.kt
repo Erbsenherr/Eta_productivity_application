@@ -867,6 +867,8 @@ fun ExtrasBox(
                 setting = subtasks,
                 onChange = onSubtasks,
                 candidates = foldCandidates,
+                routineMode = extras.routineMode,
+                onRoutineMode = { onExtras(extras.copy(routineMode = it)) },
             )
         }
     }
@@ -885,6 +887,8 @@ private fun SubtaskSection(
     setting: SubtaskSetting,
     onChange: (SubtaskSetting) -> Unit,
     candidates: List<FoldCandidate>,
+    routineMode: Boolean,
+    onRoutineMode: (Boolean) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
 
@@ -908,6 +912,13 @@ private fun SubtaskSection(
             text = "Subtasks erstellen / bearbeiten",
             style = EtaButtonStyle.Secondary,
             onClick = { open = true },
+        )
+        CheckRow(
+            checked = routineMode,
+            onCheckedChange = onRoutineMode,
+            label = "Routine-Modus",
+            hint = "Die Schritte werden der Reihe nach abgearbeitet: „Gerade“ zeigt " +
+                "immer nur den anstehenden, und Abhaken hält die Uhrzeit fest.",
         )
     }
 

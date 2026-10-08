@@ -33,6 +33,9 @@ import kotlinx.datetime.LocalDate
  *
  * [repeatUntil] is the seventh: the last day a standing task repeats on. Only
  * the recurring form asks for it, and a ToDo simply carries none.
+ *
+ * [routineMode] is the eighth, and belongs to the steps: asked inside the
+ * Subtasks fold, because it says how they are worked through.
  */
 data class ItemExtras(
     val pomodoroWork: Duration? = null,
@@ -42,6 +45,7 @@ data class ItemExtras(
     val deadlineAt: Instant? = null,
     val quantity: QuantitySetting? = null,
     val repeatUntil: LocalDate? = null,
+    val routineMode: Boolean = false,
 ) {
     val hasPomodoro: Boolean get() = pomodoroWork != null && pomodoroPause != null
 
@@ -60,6 +64,7 @@ data class ItemExtras(
             deadlineAt = item.deadlineAt,
             quantity = item.quantitySetting,
             repeatUntil = item.repeatUntil,
+            routineMode = item.routineMode,
         )
     }
 }
@@ -75,6 +80,7 @@ fun Item.withExtras(extras: ItemExtras): Item = copy(
     reminderMessage = extras.reminderMessage?.takeIf { it.isNotBlank() },
     deadlineAt = extras.deadlineAt,
     repeatUntil = extras.repeatUntil,
+    routineMode = extras.routineMode,
 ).withQuantity(extras.quantity)
 
 /**

@@ -1,11 +1,7 @@
 Quality of Life:
--Gedrückt halten eines Eintrags in der "heute anstehend" Liste soll ebenfalls das "Bearbeiten" Fenster aufrufen
--Wochenende selbst definieren können: Aktuell wird einfach angenommen, dass das Wochenende Freitag/Samstag/Sonntag ist. Das soll auch der Standard bleiben, der Nutzer soll aber andere Wochentagskombinationen wählen können, sollte sein Arbeitsalltag zB. andere Tage priorisieren.
+-unter "In die Woche kopieren" erklären, das dadurch eine weitere Instanz der Task erstellt wird.
 
-Features:
--Gedrückt halten des "Absagen" Buttons ermöglicht direktes Absagen wegen höherer Gewalt (kurz drücken: Absagen, gedrückt halten: Absagen + höhere Gewalt, also kein Punktverlust). Bei diesem Gedrückt halten füllt sich der "Absagen" Button farblich von links nach rechts auf. Der Text Darunter soll die "Abendrückblick lässt höhere Gewalt gelten" klausel entfernen. Stattdessen soll hier "Gedrückt halten, wenn wegen höherer Gewalt".
--Für wiederholbare Tasks: Wiederholen BIS (Enddatum).
--Wenn der Nutzer sich dazu entschieden hat, gebrochenen Verträgen weiter zu folgen, dann kann er sie weiterhin (wie die laufenden Verträge) am Abend abgehaken, er bekommt allerdings keine Punkte. Wenn zwei Wochen lang ununterbrochen der Vertrag abgehakt wird, kann er den Vertrag wieder einsetzen. ALlerdings wird die Laufzeit im Sinne des Freischaltens eines Legacy Contracts wieder auf 0 gesetzt.
-
-Bugs:
--Wenn man das Schlaf-Setup macht, kann man nicht angeben, dass man zB. Samstag um 1:00 Uhr nachts schlafen gehen möchte. Es sollte also möglich sein, dort auch "in den Sonntag" zu gehen.
+Changes:
+-Der "Einstellungen" Reiter soll ganz rechts, neben Growth Tasks sein.
+-Für Subtasks soll der "Routine-Modus" aktivierbar sein. Es wird dann in der "Gerade" Box der Name der Routine gezeigt, darunter, wie bei den Subtasks, dann die aktuell anstehende Subtask (aber nicht, was danach kommt). Hinter der anstehenden Subtask ist eine Checkbox. Wird diese gecheckt, dann bekommt die Subtask zu dem Zeitpunkt einen Zeitstempel und die nächste Subtask in der Routine wird freigeschaltet (also sichtbar gemacht).
+-Die Morgenzeit soll mit "Morgenroutine" ausgetauscht werden. Sie soll so er stellt werden, wie eine Task mit Subtasks im Routinemodus. Die Subtasks können sowohl in den Einstellungen, als auch im Wiederkehrende Aufgaben fenster hinzugefügt werden/entfernt werden.

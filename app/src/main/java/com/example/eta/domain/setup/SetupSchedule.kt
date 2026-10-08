@@ -73,7 +73,8 @@ private fun MutableList<SetupSpan>.addEveryDay(
 object SetupLabels {
     const val SLEEP = "Schlafen"
     const val BED_PREP = "Bettfertig machen"
-    const val MORNING = "Morgenzeit"
+    /** The morning, worked through step by step — see [isMorningRoutine]. */
+    const val MORNING = "Morgenroutine"
 
     /** The break inside a work block — never a question of its own. */
     const val PAUSE = "Pause"

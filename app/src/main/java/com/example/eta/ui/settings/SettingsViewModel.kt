@@ -21,6 +21,8 @@ import com.example.eta.domain.planning.nextWake
 import com.example.eta.domain.streak.CATCH_UP_PHRASE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.domain.subtask.drafts
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -78,6 +80,19 @@ class SettingsViewModel(
      */
     private val _draft = MutableStateFlow<UserSetup?>(null)
     val draft: StateFlow<UserSetup?> = _draft.asStateFlow()
+
+    /**
+     * The morning routine's steps. Not part of the draft and not waiting for
+     * "Einrichtung sichern": they are rows of their own, and the builder's
+     * Sichern is their commit point, as it is on the Listen tab.
+     */
+    val morningSteps: StateFlow<List<SubtaskDraft>> = setupRepository.observeMorningSteps()
+        .map { it.drafts() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun saveMorningSteps(steps: List<SubtaskDraft>) {
+        viewModelScope.launch { setupRepository.saveMorningSteps(steps) }
+    }
 
     private val _message = MutableStateFlow<SettingsMessage?>(null)
     val message: StateFlow<SettingsMessage?> = _message.asStateFlow()

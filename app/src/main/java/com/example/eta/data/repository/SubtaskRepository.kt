@@ -4,7 +4,9 @@ import com.example.eta.data.local.SubtaskDao
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
 import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.domain.subtask.matchedTo
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
@@ -46,6 +48,13 @@ class SubtaskRepository(
             checks.groupBy { it.blockId }.mapValues { (_, rows) -> rows.map { it.subtaskId }.toSet() }
         }
 
+    /** When each step was ticked on [date], by block — the routine's timestamps. */
+    fun observeCheckTimes(date: LocalDate): Flow<Map<String, Map<String, Instant>>> =
+        dao.observeChecksForDate(date).map { checks ->
+            checks.groupBy { it.blockId }
+                .mapValues { (_, rows) -> rows.associate { it.subtaskId to it.checkedAt } }
+        }
+
     /**
      * Writes the list the builder came back with.
      *
@@ -59,17 +68,21 @@ class SubtaskRepository(
     suspend fun save(itemId: String, drafts: List<SubtaskDraft>) {
         val now = clock.now()
         val existing = dao.forItem(itemId).associateBy { it.id }
-        val kept = drafts.mapNotNull { it.id }.toSet()
+        // Which row each draft lands on. Not simply its id: the same list is
+        // saved onto every weekday of a standing task — see [matchedTo].
+        val matched = drafts.matchedTo(existing.values.sortedBy { it.position })
+        val kept = matched.filterNotNull().toSet()
 
         val rows = drafts.mapIndexed { index, draft ->
-            val row = draft.id?.let { existing[it] }
+            val row = matched[index]?.let { existing[it] }
             row?.copy(
                 position = index,
                 name = draft.name.trim(),
                 note = draft.note?.trim()?.takeIf { it.isNotBlank() },
                 updatedAt = now,
             ) ?: Subtask(
-                id = draft.id ?: UUID.randomUUID().toString(),
+                // Always a fresh id: a draft's own belongs to another card's row.
+                id = UUID.randomUUID().toString(),
                 itemId = itemId,
                 position = index,
                 name = draft.name.trim(),

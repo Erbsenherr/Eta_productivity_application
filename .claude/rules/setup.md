@@ -49,7 +49,7 @@ questionnaire says so while the user is still looking at it. With
 
 Whether a generated block pays points is decided by whether it carries a category,
 and that is assigned by meaning: the frame of the day — Bettfertig machen,
-Morgenzeit, Pause, Freizeit — has `category = null` and yields nothing, while
+Morgenroutine, Pause, Freizeit — has `category = null` and yields nothing, while
 Hausputz, Sport, Kochen and Achtsamkeit carry theirs. Sleep produces no item at
 all; it is configuration the planner shades (`colors.sleep`) and the free-hour
 maths subtracts.

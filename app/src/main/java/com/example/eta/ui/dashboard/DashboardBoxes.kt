@@ -30,6 +30,7 @@ import com.example.eta.domain.planning.hasPomodoro
 import com.example.eta.domain.planning.pomodoroPhaseAt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -44,6 +45,8 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.model.Subtask
+import com.example.eta.domain.subtask.RoutineProgress
+import com.example.eta.domain.subtask.routineProgress
 import com.example.eta.domain.planning.DailyPhaseStatus
 import com.example.eta.domain.streak.Streak
 import com.example.eta.ui.components.EtaButton
@@ -157,6 +160,8 @@ fun NowBox(
     /** The steps inside each card, by item id, and this day's ticks by block id. */
     subtasks: Map<String, List<Subtask>> = emptyMap(),
     checked: Map<String, Set<String>> = emptyMap(),
+    /** When each step was ticked, by block id — shown by a task in Routine-Modus. */
+    checkTimes: Map<String, Map<String, Instant>> = emptyMap(),
     onCheckSubtask: (blockId: String, subtaskId: String, checked: Boolean) -> Unit = { _, _, _ -> },
     /**
      * "Erledigt" for what is running — one button for the whole group, whatever it
@@ -225,6 +230,7 @@ fun NowBox(
                             running = running,
                             steps = subtasks[entry.entry.item.id].orEmpty(),
                             checkedIds = checked[entry.entry.block.id].orEmpty(),
+                            checkTimes = checkTimes[entry.entry.block.id].orEmpty(),
                             onCheckSubtask = { subtaskId, on ->
                                 onCheckSubtask(entry.entry.block.id, subtaskId, on)
                             },
@@ -259,11 +265,13 @@ private fun NowLine(
     running: Boolean,
     steps: List<Subtask> = emptyList(),
     checkedIds: Set<String> = emptySet(),
+    checkTimes: Map<String, Instant> = emptyMap(),
     onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit = { _, _ -> },
     onConfirm: () -> Unit = {},
 ) {
     val entry = now.entry
     val block = entry.block
+    val routine = entry.item.routineMode && steps.isNotEmpty()
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -309,7 +317,15 @@ private fun NowLine(
         // The steps, tickable while the group is being worked through. On the "Als
         // Nächstes" page they are read-only: nothing has begun yet, and a checkbox
         // there would invite ticking off what has not happened.
-        steps.sortedBy { it.position }.forEach { step ->
+        if (routine) {
+            RoutineSteps(
+                progress = steps.routineProgress(checkedIds),
+                checkTimes = checkTimes,
+                running = running,
+                onCheckSubtask = onCheckSubtask,
+            )
+        }
+        (if (routine) emptyList() else steps.sortedBy { it.position }).forEach { step ->
             val done = step.id in checkedIds
             if (running) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -359,6 +375,95 @@ private fun NowLine(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onConfirm,
             )
+        }
+    }
+}
+
+/**
+ * A task in Routine-Modus: the one step that is due, and nothing after it.
+ *
+ * The point of a routine is not having to decide what comes next, so the box
+ * does not offer the list to choose from — only the step that is due, with its
+ * checkbox **behind** it. Ticking it stamps the time and brings up the next.
+ *
+ * The step before stays visible on one line with that time: it is where the
+ * timestamp can be read, and the only place a tick made by mistake can be taken
+ * back, the step itself having left the screen.
+ */
+@Composable
+private fun RoutineSteps(
+    progress: RoutineProgress,
+    checkTimes: Map<String, Instant>,
+    running: Boolean,
+    onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit,
+) {
+    if (!running) {
+        // Nothing has begun: the routine is announced, not started.
+        EtaText(
+            text = "Routine · ${progress.total} " +
+                if (progress.total == 1) "Schritt" else "Schritte",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textSecondary,
+        )
+        return
+    }
+
+    val zone = TimeZone.currentSystemDefault()
+    fun stamp(id: String): String =
+        checkTimes[id]?.toLocalDateTime(zone)?.time?.formatClock()?.let { " · $it" } ?: ""
+
+    EtaText(
+        text = if (progress.isFinished) {
+            "Alle ${progress.total} Schritte erledigt"
+        } else {
+            "Schritt ${progress.done + 1} von ${progress.total}"
+        },
+        style = EtaTheme.typography.label,
+        color = if (progress.isFinished) EtaTheme.colors.success else EtaTheme.colors.accent,
+    )
+
+    progress.previous?.let { previous ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EtaText(
+                text = "✓ ${previous.name}${stamp(previous.id)}",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+                modifier = Modifier.weight(1f),
+            )
+            EtaText(
+                text = "zurücknehmen",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.accent,
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onCheckSubtask(previous.id, false) },
+                ),
+            )
+        }
+    }
+
+    progress.current?.let { current ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                EtaText(text = current.name, style = EtaTheme.typography.bodyStrong)
+                current.note?.takeIf { it.isNotBlank() }?.let { note ->
+                    EtaText(
+                        text = note,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
+            }
+            Spacer(Modifier.width(EtaTheme.spacing.sm))
+            // Keyed by the step: the box that was just ticked must not be the
+            // one the next step is drawn with.
+            key(current.id) {
+                EtaCheckbox(
+                    checked = false,
+                    onCheckedChange = { onCheckSubtask(current.id, true) },
+                )
+            }
         }
     }
 }

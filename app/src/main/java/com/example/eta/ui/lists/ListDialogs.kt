@@ -55,6 +55,8 @@ import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.subtasks.FoldCandidate
+import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.ui.subtasks.MorningRoutineSteps
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.time.Duration
 import kotlinx.datetime.DayOfWeek
@@ -426,8 +428,10 @@ fun recurringSummary(group: RecurringGroup): String = buildString {
  * A standing task, tapped in the list.
  *
  * [ownedBySettings] marks the two that hang off the night — Bettfertig machen and
- * Morgenzeit. They are shown so the list is complete, and changed where the night
- * is: in the settings, which regenerate them from the sleep and wake times.
+ * the Morgenroutine. They are shown so the list is complete, and changed where
+ * the night is: in the settings, which regenerate them from the sleep and wake
+ * times. The one exception is the routine's **steps** ([morningSteps] non-null):
+ * those are the user's, not derived from anything, and can be changed here too.
  */
 @Composable
 fun RecurringGroupDialog(
@@ -436,6 +440,8 @@ fun RecurringGroupDialog(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onEnd: () -> Unit,
+    morningSteps: List<SubtaskDraft>? = null,
+    onMorningSteps: (List<SubtaskDraft>) -> Unit = {},
 ) {
     val item = group.representative
     var confirmingEnd by remember(group.ids) { mutableStateOf(false) }
@@ -459,9 +465,22 @@ fun RecurringGroupDialog(
         }
 
         if (ownedBySettings) {
+            if (morningSteps != null) {
+                EtaField(
+                    label = "Schritte",
+                    hint = "Im Routine-Modus: einer nach dem anderen. Gilt für jeden Morgen.",
+                ) {
+                    MorningRoutineSteps(steps = morningSteps, onSave = onMorningSteps)
+                }
+            }
             EtaText(
-                text = "Hängt an deinen Schlafzeiten und wird in den Einstellungen " +
-                    "unter „Schlaf und Morgen“ geändert.",
+                text = if (morningSteps != null) {
+                    "Uhrzeit und Dauer hängen an deinen Schlafzeiten und werden in den " +
+                        "Einstellungen unter „Schlaf und Morgen“ geändert."
+                } else {
+                    "Hängt an deinen Schlafzeiten und wird in den Einstellungen " +
+                        "unter „Schlaf und Morgen“ geändert."
+                },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )

@@ -31,6 +31,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.weekOccupancy
+import com.example.eta.domain.setup.isMorningRoutine
 import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
@@ -64,6 +65,7 @@ fun SmartListsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val todaySettled by viewModel.todaySettled.collectAsStateWithLifecycle()
     val setup by viewModel.setup.collectAsStateWithLifecycle()
+    val morningSteps by viewModel.morningSteps.collectAsStateWithLifecycle()
     val booked = remember(state.definitions, setup) { weekOccupancy(state.definitions, setup) }
 
     // Every list starts closed, and after that stays the way it was left —
@@ -323,6 +325,10 @@ fun SmartListsScreen(
         RecurringGroupDialog(
             group = group,
             ownedBySettings = group.ids.any(::isOwnedBySettings),
+            // The live list rather than the group's own: the weekdays and the
+            // weekend are two rows here and one routine.
+            morningSteps = morningSteps.takeIf { group.ids.any(::isMorningRoutine) },
+            onMorningSteps = viewModel::saveMorningSteps,
             onDismiss = { openedGroup = null },
             onEdit = {
                 editingGroup = group

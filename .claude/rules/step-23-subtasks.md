@@ -43,6 +43,10 @@ that is a screen that can get it wrong.
 
 **Database 18**, `MIGRATION_17_18`: the two tables, nothing on `items`.
 
+Since step 34 a task's steps can be worked through one at a time — the
+**Routine-Modus** — and `save` no longer trusts a draft's id across cards; see
+*Step 34* for both.
+
 #### The arithmetic, and the two decisions in it
 
 `domain/subtask/Subtasks.kt`, tested in `SubtaskTest`:

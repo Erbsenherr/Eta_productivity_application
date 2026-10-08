@@ -153,6 +153,11 @@ fun SubtaskBuilderDialog(
      * for the list and the reordering to drift.
      */
     footer: (@Composable () -> Unit)? = null,
+    /**
+     * Whether the group can be renamed here. Not where its name is not the
+     * user's to give — the morning routine is named by the app.
+     */
+    showName: Boolean = true,
 ) {
     var name by remember { mutableStateOf(setting.groupName) }
     var rows by remember {
@@ -169,12 +174,14 @@ fun SubtaskBuilderDialog(
     var reducing by remember { mutableStateOf(false) }
 
     EtaDialog(title = title, onDismiss = onDismiss) {
-        EtaField(label = "Name der Gruppe") {
-            EtaTextField(
-                value = name,
-                onValueChange = { name = it },
-                placeholder = "Wie heißt die Aufgabe?",
-            )
+        if (showName) {
+            EtaField(label = "Name der Gruppe") {
+                EtaTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = "Wie heißt die Aufgabe?",
+                )
+            }
         }
 
         EtaText(
@@ -485,5 +492,57 @@ private fun SubtaskEditDialog(
                 },
             )
         }
+    }
+}
+
+/**
+ * The morning routine's steps, and the way to change them.
+ *
+ * One composable for the two places the user asked for — the settings and the
+ * standing task's own window — so the list reads the same in both and both save
+ * through the same call. The name field is left out: the routine is named by
+ * the app, and regenerated with the night it hangs off.
+ */
+@Composable
+fun MorningRoutineSteps(
+    steps: List<SubtaskDraft>,
+    onSave: (List<SubtaskDraft>) -> Unit,
+) {
+    var editing by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+        if (steps.isEmpty()) {
+            EtaText(
+                text = "Noch keine Schritte — die Morgenroutine ist dann einfach ein Block.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        } else {
+            steps.forEachIndexed { index, step ->
+                EtaText(
+                    text = "${index + 1}. ${step.name}",
+                    style = EtaTheme.typography.body,
+                    color = EtaTheme.colors.textSecondary,
+                )
+            }
+        }
+        EtaButton(
+            text = if (steps.isEmpty()) "Schritte anlegen" else "Schritte bearbeiten",
+            style = EtaButtonStyle.Secondary,
+            onClick = { editing = true },
+        )
+    }
+
+    if (editing) {
+        SubtaskBuilderDialog(
+            setting = SubtaskSetting(groupName = "", subtasks = steps),
+            title = "Morgenroutine",
+            showName = false,
+            onDismiss = { editing = false },
+            onSave = {
+                onSave(it.subtasks)
+                editing = false
+            },
+        )
     }
 }

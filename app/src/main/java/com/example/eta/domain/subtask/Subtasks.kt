@@ -159,3 +159,52 @@ fun orderedParts(parts: List<MergePart>, list: List<SubtaskDraft>): List<MergePa
     val position = list.mapIndexed { index, draft -> draft.name to index }.toMap()
     return parts.sortedBy { position[it.name] ?: Int.MAX_VALUE }
 }
+
+/**
+ * Which existing row each draft lands on — its id, or null for a new row.
+ *
+ * A draft that carries the id of one of [existing] keeps that row, and with it
+ * every tick standing against it. A draft whose id belongs to **another** card
+ * does not: a standing task is one definition per weekday, the form holds the
+ * steps of one of them, and the same list is then saved onto each. Writing those
+ * rows under their foreign ids would move them from one weekday to the next, and
+ * only the last one saved would still have any. Such a draft takes the row of the
+ * same name here, if there is one nobody else claimed, and is new otherwise.
+ */
+fun List<SubtaskDraft>.matchedTo(existing: List<Subtask>): List<String?> {
+    val own = existing.map { it.id }.toSet()
+    val claimed = mapNotNull { it.id }.filter { it in own }.toMutableSet()
+    return map { draft ->
+        draft.id?.takeIf { it in own }
+            ?: existing.firstOrNull { it.id !in claimed && it.name == draft.name.trim() }
+                ?.id
+                ?.also { claimed += it }
+    }
+}
+
+/**
+ * Where a routine stands: the one step that is due, and the one before it.
+ *
+ * A routine is worked through in the order of its list, so what is due is simply
+ * the first step not ticked yet — ticking out of order cannot happen, there being
+ * only the one checkbox. [previous] is the last one done, which is what the box
+ * names with its time, and what a mistaken tick is taken back from.
+ */
+data class RoutineProgress(
+    val current: Subtask?,
+    val previous: Subtask?,
+    val done: Int,
+    val total: Int,
+) {
+    val isFinished: Boolean get() = total > 0 && current == null
+}
+
+fun List<Subtask>.routineProgress(checked: Set<String>): RoutineProgress {
+    val ordered = sortedBy { it.position }
+    return RoutineProgress(
+        current = ordered.firstOrNull { it.id !in checked },
+        previous = ordered.lastOrNull { it.id in checked },
+        done = ordered.count { it.id in checked },
+        total = ordered.size,
+    )
+}

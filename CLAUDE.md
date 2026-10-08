@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (482 tests
-as of step 33), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (494 tests
+as of step 34), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -247,7 +247,7 @@ one off would otherwise delete it forever. The Erfolgsliste is therefore the vie
 over *completed blocks* (`observeErfolgsliste`), which is also what gives it the
 "Name, Datum und Uhrzeit" the docs ask for: name from the item, date and time from
 the block. **Standing tasks are excluded since step 23**, at the user's request: a
-list filling up with Morgenzeit, Pause and Freizeit every day is one nobody reads. `Stage.DONE` still retires one-shot ToDos so they leave the active
+list filling up with Morgenroutine, Pause and Freizeit every day is one nobody reads. `Stage.DONE` still retires one-shot ToDos so they leave the active
 lists — `ItemRepository.retireCompletedTodos` runs at settlement, the moment a day
 is accounted for. Nothing used to set that stage at all.
 
@@ -341,6 +341,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-26-small-ones.md` | *Step 26*: the hidden "Gruppieren" button, tap to unfold a name, free pomodoro phases, the red mark in the Wochenschema, "Nächster freier Slot" |
 | `step-30-designs.md` | *Step 30*: designs (`AppDesign`: Eta, Legacy) and `Brightness`, `applyDesignToWindow`, the widget's colours · *The launch screen* |
 | `step-33-small-ones.md` | *Step 33*: the long press in "Heute anstehend", holding "Absagen" for höhere Gewalt (`EtaHoldButton`), "Wiederholen bis" (`Item.repeatUntil`) |
+| `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -395,7 +396,8 @@ hidden button · 27. Billing a task finished early · 28. Task names read aloud 
 screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text ·
 32. The questionnaire reordered, skippable pages and a weekend night ·
 33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
-and a broken contract's way back.
+and a broken contract's way back · 34. The Routine-Modus, and a morning that
+is one.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

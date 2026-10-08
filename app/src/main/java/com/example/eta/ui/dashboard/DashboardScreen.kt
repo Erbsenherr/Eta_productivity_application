@@ -175,6 +175,7 @@ private fun TodayPage(
             onLongPress = { entry, running -> pomodoroFor = entry to running },
             subtasks = state.subtasks,
             checked = state.checked,
+            checkTimes = state.checkTimes,
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
         )

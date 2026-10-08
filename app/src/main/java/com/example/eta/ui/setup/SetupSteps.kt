@@ -170,8 +170,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                 )
             }
             EtaField(
-                label = "Zeit am Morgen",
-                hint = "Ab dem Aufstehen — Anziehen, Frühstück, Ankommen.",
+                label = "Morgenroutine",
+                hint = "Wie lange sie dauert, ab dem Aufstehen — Anziehen, Frühstück, " +
+                    "Ankommen. Ihre Schritte legst du in den Einstellungen oder im " +
+                    "Reiter Listen an.",
             ) {
                 EtaDurationPicker(
                     value = draft.morningDuration,
