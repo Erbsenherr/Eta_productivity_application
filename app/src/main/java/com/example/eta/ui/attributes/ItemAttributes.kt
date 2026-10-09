@@ -137,6 +137,14 @@ data class TodoAttributes(
      * note that has waited three weeks does not move its one-month clock.
      */
     val unlockFrom: LocalDate? = null,
+    /**
+     * Whether [unlockFrom] already stands, and may therefore only be brought
+     * forward — see `Item.cappedUnlock`. [unlockCeiling] is then the latest day
+     * the form offers; null inside a fixed form means "free at once", which
+     * leaves nothing later to offer.
+     */
+    val unlockFixed: Boolean = false,
+    val unlockCeiling: LocalDate? = null,
     val duration: Duration = DEFAULT_DURATION,
     val travelBefore: Duration? = null,
     val returnAfter: Duration? = null,
@@ -172,6 +180,8 @@ data class TodoAttributes(
             // Kept even when it has passed: the clock to the Sperrliste counts
             // from it, and an edit that dropped it would wind that clock back.
             unlockFrom = item.targetDate,
+            unlockFixed = item.isConcretized,
+            unlockCeiling = item.targetDate.takeIf { item.isConcretized },
             duration = item.estimatedDuration ?: DEFAULT_DURATION,
             travelBefore = item.travelBefore,
             returnAfter = item.returnAfter,
@@ -341,26 +351,46 @@ fun TodoAttributeFields(
         var picking by remember { mutableStateOf(false) }
         val unlock = value.unlockFrom
         val later = unlock != null && unlock > today
+        // Once it stands, the day can only come forward. With nothing between
+        // today and the day that stands there is nothing left to choose.
+        val ceiling = value.unlockCeiling
+        val movable = !value.unlockFixed || (ceiling != null && ceiling > today)
         EtaField(
             label = "Freigeschaltet ab",
-            hint = if (later) {
-                "Vorher lässt sich die Aufgabe nicht einplanen. Die Monatsfrist bis zur " +
-                    "Sperrliste läuft erst ab diesem Tag."
-            } else {
-                "Sofort planbar. Antippen, um einen späteren Tag zu wählen."
+            hint = when {
+                value.unlockFixed && later ->
+                    "Steht fest und lässt sich nur noch vorziehen, nicht mehr nach " +
+                        "hinten schieben. Die Monatsfrist bis zur Sperrliste läuft ab " +
+                        "diesem Tag."
+                value.unlockFixed ->
+                    "Steht fest — die Aufgabe ist freigeschaltet und lässt sich nicht " +
+                        "mehr nach hinten schieben."
+                later ->
+                    "Vorher lässt sich die Aufgabe nicht einplanen. Die Monatsfrist bis " +
+                        "zur Sperrliste läuft erst ab diesem Tag. Einmal gesichert, lässt " +
+                        "sich der Tag nur noch vorziehen."
+                else ->
+                    "Sofort planbar. Antippen, um einen späteren Tag zu wählen — einmal " +
+                        "gesichert, lässt er sich nur noch vorziehen."
             },
         ) {
-            EtaButton(
-                text = if (unlock == null || unlock == today) "Heute" else unlock.formatWithYear(),
-                style = EtaButtonStyle.Secondary,
-                onClick = { picking = true },
-            )
+            val label = if (unlock == null || unlock == today) "Heute" else unlock.formatWithYear()
+            if (movable) {
+                EtaButton(
+                    text = label,
+                    style = EtaButtonStyle.Secondary,
+                    onClick = { picking = true },
+                )
+            } else {
+                EtaText(text = label, style = EtaTheme.typography.bodyStrong)
+            }
         }
         if (picking) {
             EtaDatePickerDialog(
                 title = "Freigeschaltet ab",
                 value = unlock ?: today,
                 today = today,
+                maximum = ceiling.takeIf { value.unlockFixed },
                 onDismiss = { picking = false },
                 onConfirm = { day ->
                     // Today is "at once", and at once is no date.

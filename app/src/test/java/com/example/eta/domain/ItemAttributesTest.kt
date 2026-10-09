@@ -43,6 +43,53 @@ class ItemAttributesTest {
         assertTrue(finished.isConcretized)
     }
 
+    private fun finished(unlock: LocalDate?) = Item.newTodo(
+        name = "Steuer",
+        category = Category.FOKUS,
+        priority = Priority.MUST,
+        targetDate = unlock,
+        estimatedDuration = 1.hours,
+        now = now,
+    )
+
+    @Test
+    fun `an unlock day that stands can be brought forward but not pushed back`() {
+        val card = finished(LocalDate(2026, 10, 1))
+
+        assertEquals(LocalDate(2026, 9, 15), card.cappedUnlock(LocalDate(2026, 9, 15)))
+        assertEquals(LocalDate(2026, 10, 1), card.cappedUnlock(LocalDate(2026, 10, 1)))
+        // Later is cut back to the day that stands.
+        assertEquals(LocalDate(2026, 10, 1), card.cappedUnlock(LocalDate(2027, 3, 1)))
+        // "Heute" is the furthest forward there is.
+        assertEquals(null, card.cappedUnlock(null))
+    }
+
+    @Test
+    fun `a card that is free at once stays free at once`() {
+        assertEquals(null, finished(null).cappedUnlock(LocalDate(2027, 3, 1)))
+    }
+
+    @Test
+    fun `a bare note has not been asked yet and takes any day`() {
+        val bare = Item.newQuickTodo("Steuer", now)
+
+        assertEquals(LocalDate(2027, 3, 1), bare.cappedUnlock(LocalDate(2027, 3, 1)))
+    }
+
+    @Test
+    fun `the form knows whether the day stands, and the latest it may offer`() {
+        val bare = TodoAttributes.of(Item.newQuickTodo("Steuer", now), today)
+        assertFalse(bare.unlockFixed)
+
+        val dated = TodoAttributes.of(finished(LocalDate(2026, 10, 1)), today)
+        assertTrue(dated.unlockFixed)
+        assertEquals(LocalDate(2026, 10, 1), dated.unlockCeiling)
+
+        val atOnce = TodoAttributes.of(finished(null), today)
+        assertTrue(atOnce.unlockFixed)
+        assertEquals(null, atOnce.unlockCeiling)
+    }
+
     @Test
     fun `no route through the form can leave a ToDo without a category`() {
         // `TodoAttributes.category` is not nullable, which is the whole guard: the

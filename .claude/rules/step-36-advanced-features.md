@@ -62,8 +62,15 @@ day a ToDo was aimed at, unlocking a week before; it is now the unlock day itsel
   February for not having been planned.
 - **`TodoAttributes.of` keeps a past unlock day** rather than reading it as today:
   the clock counts from it, and an edit that dropped it would wind the clock back.
-- **Yes, this makes the ban evadable** by setting a far unlock day. It is what was
-  asked for, and it is at least a visible act with a date on it.
+- **Once it stands it can only be brought forward** (added the same day, at the
+  user's request, to close the obvious way round the ban). `Item.cappedUnlock`
+  is the rule: a card that `isConcretized` keeps its day or takes an earlier one,
+  null — "Heute" — included; a later one is cut back, and a card free at once
+  stays so. A bare note takes any day, not having been asked yet.
+  `ItemRepository.concretize` applies it, so the form is not the only guard; the
+  form mirrors it with `TodoAttributes.unlockFixed` / `unlockCeiling`, the
+  picker's `maximum`, and plain text instead of a button when nothing earlier than
+  the standing day is left to choose. Pinned in `ItemAttributesTest`.
 - **The migration moves every waiting ToDo's date a week earlier** (`COLLECTION`
   and `WEEK` only), so each unlocks on exactly the day it would have.
 - **`EtaDatePickerDialog`** (`ui/components/EtaDatePicker.kt`) is the app's first
@@ -100,5 +107,5 @@ day is picked. Ticked, each weekday gets its own "Beginn am …" picker.
   happen regularly.
 - **`patchnotes/`** — see `CLAUDE.md`.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (525), `assembleRelease`,
+**Verified by the compiler (`--rerun-tasks`), the suite (529), `assembleRelease`,
 `lint`, and the migration's columns against `25.json`.** Nobody has seen any of it.

@@ -57,8 +57,8 @@ private val WEEKDAY_LETTERS = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
  * there being no Material to borrow one from.
  *
  * Tapping a day **is** the answer and closes the window; there is nothing else
- * in it to set. ‹ › turn the month, « » the year. Days before [minimum] are
- * drawn faint and do nothing.
+ * in it to set. ‹ › turn the month, « » the year. Days before [minimum] or
+ * after [maximum] are drawn faint and do nothing.
  */
 @Composable
 fun EtaDatePickerDialog(
@@ -68,6 +68,8 @@ fun EtaDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
     minimum: LocalDate = today,
+    /** The last day on offer, for an answer that may only be brought forward. */
+    maximum: LocalDate? = null,
 ) {
     // The first of the month on show; opens on the month the value is in.
     var shown by remember { mutableStateOf(LocalDate(value.year, value.month, 1)) }
@@ -106,7 +108,8 @@ fun EtaDatePickerDialog(
                             day = day,
                             selected = day == value,
                             isToday = day == today,
-                            enabled = day != null && day >= minimum,
+                            enabled = day != null && day >= minimum &&
+                                (maximum == null || day <= maximum),
                             onClick = { day?.let(onConfirm) },
                             modifier = Modifier.weight(1f),
                         )

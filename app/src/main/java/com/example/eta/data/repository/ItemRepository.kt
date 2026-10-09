@@ -167,7 +167,9 @@ class ItemRepository(
             item.concretized(
                 category = category,
                 priority = priority,
-                targetDate = targetDate,
+                // Enforced here as well as in the form: the rule is about the
+                // ban clock, and a form is not the place a rule is kept.
+                targetDate = item.cappedUnlock(targetDate),
                 estimatedDuration = estimatedDuration,
                 travelBefore = travelBefore,
                 returnAfter = returnAfter,

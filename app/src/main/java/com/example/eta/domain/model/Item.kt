@@ -189,6 +189,24 @@ data class Item(
     val availableFrom: LocalDate? get() = targetDate
 
     /**
+     * The unlock day an edit may store, given the one it [requested].
+     *
+     * **Once it stands it can only be brought forward.** A card that has been
+     * finished — [isConcretized] — has said when it is free, and the one-month
+     * clock to the Sperrliste counts from that day; an edit that could push the
+     * day back would be a way of resetting that clock at will. So a later day is
+     * cut back to the one that stands, and a card that is free at once stays so.
+     * Earlier is always allowed, null — "Heute" — included.
+     *
+     * A bare note has not been asked yet and takes whatever it is given.
+     */
+    fun cappedUnlock(requested: LocalDate?): LocalDate? = when {
+        !isConcretized -> requested
+        targetDate == null || requested == null -> null
+        else -> minOf(requested, targetDate)
+    }
+
+    /**
      * Whether this may be pulled into a plan for [date]. A ToDo without a target
      * date — an auto-created make-up, for instance — is available right away.
      */
