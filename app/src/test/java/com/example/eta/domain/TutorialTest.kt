@@ -448,6 +448,8 @@ class TutorialTest {
     @Test
     fun `the mail step lets go when the question can no longer be answered`() {
         val step = QUICKSTART_STEPS.first { it.title == "Was nicht geklappt hat" }
+        // The question stands below a list that now fills the screen.
+        assertTrue(step.text(TutorialFacts()).contains("Scrolle nach unten"))
         val discarded = exampleDay().changing(TUTORIAL_MAIL_ID) { it.copy(discardedAt = now) }
         val facts = tutorialFacts(emptyList(), emptyList(), discarded, emptyList(), false)
 

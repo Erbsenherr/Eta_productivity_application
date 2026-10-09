@@ -361,8 +361,9 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         title = "Was nicht geklappt hat",
         text = {
             "Die Mail hast du heute nicht geschafft, willst sie aber nicht ausfallen " +
-                "lassen. Tippe bei ihr auf »Fällt aus« — Eta fragt dann nach. " +
-                "Antworte mit »Nachholen«."
+                "lassen. Tippe bei ihr auf »Fällt aus« — Eta fragt dann nach. Die " +
+                "Frage erscheint unter der Liste: Scrolle nach unten und antworte " +
+                "mit »Nachholen«."
         },
         kind = StepKind.TASK,
         checks = { facts ->
