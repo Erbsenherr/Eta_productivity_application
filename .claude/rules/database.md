@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 26.** When changing an entity, diff the hand-written SQL against the
+**Version 27.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -38,6 +38,7 @@ Room stores enums by name in a TEXT column.
 | 23→24 | `rewards` and `reward_tasks` (`rewardId` cascades, `itemId` is a plain column on purpose), `user_setup.pointsSystem` (`INTEGER NOT NULL DEFAULT 1`) — see *Step 35* |
 | 24→25 | `user_setup.growthTasks` / `contracts` / `rewards` (`INTEGER NOT NULL DEFAULT 1` — on for whoever upgrades, off for a new setup), and every waiting ToDo's `targetDate` moved a week earlier, the column having become the unlock day — see *Step 36* |
 | 25→26 | `planned_blocks.flexible` (`INTEGER NOT NULL DEFAULT 0`) — see *"Flexibel"* in `day-planner.md` |
+| 26→27 | `user_setup.unplannedPenalty` (`INTEGER NOT NULL DEFAULT 1`) and `unplannedPenaltyPerHour` (`REAL NOT NULL DEFAULT 1.5`) — the charge for unplanned time as it stood while it was a constant; see *Step 38* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

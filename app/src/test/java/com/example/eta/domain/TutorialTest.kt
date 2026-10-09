@@ -294,10 +294,19 @@ class TutorialTest {
 
         assertEquals(listOf("Was nicht geklappt hat"), opening(TutorialGate.REEVALUATION_DISCARD + TUTORIAL_MAIL_ID))
         assertEquals(listOf("Passt das noch?"), opening(TutorialGate.REEVALUATION_SETTLE))
-        assertEquals(listOf("Dauer"), opening(TutorialGate.CONCRETIZE_TODO))
-        assertEquals(listOf("Wiederholen bis"), opening(TutorialGate.CONCRETIZE_RECURRING))
+        // "Übernehmen" is a step of its own for each card, with the frame on it.
+        assertEquals(
+            listOf(TutorialSpot.TODO_SAVE),
+            QUICKSTART_STEPS.filter { TutorialGate.CONCRETIZE_TODO in it.allow }.map { it.spot },
+        )
+        assertEquals(
+            listOf(TutorialSpot.RECURRING_SAVE),
+            QUICKSTART_STEPS.filter { TutorialGate.CONCRETIZE_RECURRING in it.allow }.map { it.spot },
+        )
         assertEquals(listOf(QUICKSTART_STEPS.last().title), opening(TutorialGate.PLANNER_CONFIRM))
-        assertEquals(listOf("Geschafft"), opening(TutorialGate.CONCRETIZE_DONE))
+        // The way to the day planning stays shut; one step says it comes later.
+        assertTrue(opening(TutorialGate.CONCRETIZE_DONE).isEmpty())
+        assertEquals(listOf("Geschafft"), opening(TutorialGate.CONCRETIZE_LATER_NOTE))
         assertEquals(listOf("Die Woche steht"), opening(TutorialGate.WEEK_FINISH))
         assertTrue(opening(TutorialGate.CONCRETIZE_DELETE).isEmpty())
         assertTrue(opening(TutorialGate.REEVALUATION_DISMISS_MAKE_UP).isEmpty())
@@ -422,13 +431,19 @@ class TutorialTest {
         assertTrue(QUICKSTART_STEPS.first { it.title == "Dein Punktekonto" }.text(TutorialFacts()).contains("Advanced Features"))
         // The settlement is the page between the tasks and the journal.
         assertTrue(titles.indexOf("Die Abrechnung") in (titles.indexOf("Hervorragend!") + 1) until titles.indexOf("Kurz nachdenken"))
+        // Why empty time costs, straight after the page that shows it costing.
+        assertEquals(titles.indexOf("Die Abrechnung") + 1, titles.indexOf("Warum leere Zeit Punkte kostet"))
+        // And the third revolver after the second.
+        assertEquals(titles.indexOf("Punkte verdienen und ausgeben") + 1, titles.indexOf("Der dritte Revolver: Pause"))
         assertTrue(titles.indexOf("Der zweite Revolver") > titles.indexOf("Der Tagesplaner"))
         assertTrue(QUICKSTART_STEPS.last().text(TutorialFacts()).contains("Einstellungen → Tutorial"))
     }
 
     @Test
     fun `the settlement step follows the page it explains and no other`() {
-        val step = QUICKSTART_STEPS.first { it.title == "Die Abrechnung" }
+        // The page is read first; the step after it is the one that moves on.
+        assertEquals(StepKind.TEXT, QUICKSTART_STEPS.first { it.title == "Die Abrechnung" }.kind)
+        val step = QUICKSTART_STEPS.first { it.title == "Warum leere Zeit Punkte kostet" }
         fun at(page: String) = TutorialFacts(signals = mapOf(TutorialSignal.REEVALUATION_STEP to page))
 
         assertFalse(step.ready(at("TASKS")))
@@ -491,5 +506,29 @@ class TutorialTest {
         assertEquals(TutorialId.REWARDS, TutorialId.named("REWARDS"))
         assertNull(TutorialId.named("NOPE"))
         assertNull(TutorialId.named(null))
+    }
+
+    @Test
+    fun `once the ToDo is noted the frame moves from the box to its two dots`() {
+        val step = QUICKSTART_STEPS.first { it.spot == TutorialSpot.QUICK_ADD }
+
+        assertEquals(TutorialSpot.QUICK_ADD, step.spotAt(TutorialFacts()))
+        assertFalse(step.swipeHint(TutorialFacts()))
+
+        val half = TutorialFacts(todoNoted = true)
+        assertEquals(TutorialSpot.QUICK_ADD_PAGES, step.spotAt(half))
+        assertTrue(step.swipeHint(half))
+        assertTrue(step.text(half).contains("zweite"))
+
+        val both = TutorialFacts(todoNoted = true, recurringNoted = true)
+        assertEquals(TutorialSpot.QUICK_ADD, step.spotAt(both))
+        assertFalse(step.swipeHint(both))
+    }
+
+    @Test
+    fun `a step without a moving frame keeps the one it names`() {
+        val step = QUICKSTART_STEPS.first { it.spot == TutorialSpot.NOW }
+
+        assertEquals(TutorialSpot.NOW, step.spotAt(TutorialFacts(todoNoted = true)))
     }
 }

@@ -1,13 +1,11 @@
-Change: Der Punktetracker soll standardmäßig doch angeschaltet sein. Er soll in dem Tutorial berücksichtigt werden:
--Die Punktebox auf dem "Heute" Screen soll beleuchtet werden
--Der Einfluss der Kategorie auf die Punkteberechnung soll beleuchtet werden
--Die Ausgabe und das dazulernen von Punkten durch Custom earn Custom spend soll beleuchtet werden
--Die Punkteabrechnung am Ende des Tages soll beleuchtet werden
--Es soll erwähnt werden, dass das Punktesystem abgeschaltet werden kann.
--Am Ende des Tutorials soll außerdem erwähnt werden, dass es weitere Tutorials zu den anderen fortgeschrittenen Features gibt.
-
--Der "Soziale Interaktion" Reiter im Menü soll entfernt werden, genauso wie jede Erwähnung dessen. Es ist schlicht nicht mehr relevant.
-
--Es soll Tutorials geben, in denen das Anlegen und Funktionieren der Advanced Features beleuchtet werden (außer Punktetracker, da dieser bereits im Standard Tutorial enthalten sein soll)
--Sowohl in dem Tutorial Reiter des Menüs, als auch aus dem Advanced Features Reiter soll auf die neuen Tutorials zugegriffen werden können
--Es soll außerdem ein Tutorial geben, in dem einmal Schritt für Schritt alle Extras erläutert werden.
+Bugfixes:
+-Wenn das Tutorial startet ist "Als Nächstes" aktivert, wobei "Gerade" angekündigt wird.
+Changes:
+-Wenn der Punktstand <= 0 ist, kann kein "Custom Spend" verteilt werden.
+-In den Einstellungen Advanced features unter dem Punkt "Punkteseystem" soll die Menge an Punkten, die pro unverplanter Stunde (nach Stunde 2) abgezogen werden, eingestellt werden können. Auch soll das gesamte Feature entfernt werden können.
+Changes:
+-Wenn man "Katzenstreu kaufen" notiert hat, soll der rot-pulsierende Rahmen verschwinden und stattdessen die Anzeige gehighlighted werden, die die Möglichkeit zum Swipen impliziert. Mit anderen worten, es soll deutlicher gemacht werden, dass das Wiederkehrende toDo erst erreicht werden muss.
+-Nach Tutorialseite 14 soll eine zusätzliche Box eingefügt werden, die erklärt, warum leere Zeiten Punktabzu geben: Der Designphilosophie von eta nach sollte es so wenig unverplante Zeitpunkte geben wie möglich. Das bedeutet keinesfalls, dass man daher weniger Freizeit haben muss; allerdings, dass diese Freizeit im geplanten Rahmen stattfindet. Das ist insbesondere dann empfohlen, wenn man Schwierigkeiten mit strukturiertem Alltag hat. Man kann dieses Feature allerdings in den Einstellungen unter "Advanced Features" deaktivieren.
+-Tutorial punkt 24: Hier kann erst "Weiter" gedrückt werden, wenn die Task übernommen wurde. Die rot pulsierende Box highlighted jedoch "Wiederholen bis". Hier soll der Nutzer erst einmal Weiter drücken, was dann den roten Rahmen um den "Übernehmen" Knopf legt. Erst dann soll die App auf des Nutzers Drücken des Knopfes warten.
+-Tutorial punkt 25: "Weiter zur Tagesplanung" ausgrauen und dadrunter schreiben, dass wir später zu diesem Punkt kommen.
+-Tutorial punkt 31: Hiernach soll noch der Pause reiter erwähnt werden. Das ist dafür, wenn ohne viel Komplikation eine kurze Pause nach einer oder mehreren Tasks eingefügt werden soll. Es ist Empfohlen, Pausen mit entspannung zu verbringen und auf seine Bildschirmzeit zu achten.

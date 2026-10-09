@@ -12,7 +12,8 @@ paths:
 
 One item from `update.txt`, with three additions from the user: streamline text and
 UI, make it repeatable from the settings (at the very bottom), and **it must never
-touch the user's data**. No schema change — the database stays at **version 26**.
+touch the user's data**. The tutorial itself needs no schema change; the fourth
+round's adjustable charge (below) is what took the database to **version 27**.
 
 #### A practice app, not a set of practice screens
 
@@ -193,6 +194,48 @@ tutorial screen on needs a gate**, or it is the old desynchronisation again.
 The step after the mail is **höhere Gewalt**: hold the cancelled row, give a
 reason; done is `forceMajeure` on the block.
 
+#### Fourth round: what a phone showed
+
+- **The "now" box opened on "Als Nächstes" under a running task.** Not a
+  tutorial bug: the day arrives a frame or two after the box, so
+  `rememberPagerState`'s initial page always saw "nothing running". `NowBox` now
+  turns to page 0 whenever something *starts* running, and only reports its page
+  to the tutorial after that (`settled`) — the page it happened to open on had
+  also been counting as the swipe the second step asks for.
+- **A frame can move within a step** (`TutorialStep.spotFor`, `spotAt`). The
+  Quick-Add step frames the box until the ToDo is noted, then **its two dots**
+  (`QUICK_ADD_PAGES`) with a text of its own and the swipe hint: what is missing
+  then is not typing but finding the second page. `swipeHint` is a function of
+  the facts for the same reason.
+- **"Übernehmen" is a step of its own**, per card, with the frame on the button
+  (`TODO_SAVE` / `RECURRING_SAVE`). Asked for while the frame still stood on the
+  field before it, "Weiter" stayed grey for a reason the screen did not show.
+  Only "Wiederholen bis" was reported; "Dauer" had the same shape and got the
+  same split.
+- **"Weiter zur Tagesplanung" stays grey for good** in the tutorial
+  (`CONCRETIZE_DONE` is opened by no step), and at "Geschafft" a line under it
+  says the day planning comes later — `CONCRETIZE_LATER_NOTE`, a gate that
+  shows a sentence rather than opening a button.
+- **Two more steps**: why empty time costs points, on the settlement page — "Die
+  Abrechnung" became a `TEXT` step and the new one is the `FOLLOW` that turns
+  the page — and the Pause revolver after the second one.
+
+#### Two rules that changed with it
+
+- **The charge for unplanned time is the user's to set.**
+  `UserSetup.unplannedPenalty` (on) and `unplannedPenaltyPerHour` (1.5), under the
+  Punktetracker in `AdvancedFeaturesBox` (`UnplannedPenaltyRows`), applied at
+  once. Two answers rather than a rate that may be zero, so switching it off and
+  on comes back to the chosen rate; `unplannedRate` is the one figure
+  `ReevaluationService` hands `settleDay`. The stepper stops at half a point —
+  "nothing" is the checkbox. The two free hours stay a constant.
+- **A Custom Spend needs points to spend.** `DayPlannerViewModel.canSpend` is
+  the ledger balance `> 0` — as it stands, not as tonight will leave it. The
+  card stays in the revolver, reads "kein Guthaben", and a drop is answered with
+  `PlacementFeedback.NoPoints` rather than swallowed. A Custom Spend already on
+  a day is left alone. The practice account is at zero or below by the time the
+  tutorial reaches the planner, and its text says the card is locked.
+
 #### The hooks in the real screens
 
 Kept to four kinds (the gates above being the fourth), all no-ops outside the tutorial (`LocalTutorialGuide` is
@@ -234,7 +277,7 @@ there is a setup row, and it is a fact about this install. Not in a backup.
 - **A process death mid-run starts over** at the choice (first run) or returns to
   the app (repeat): the practice database lived in memory.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (564, 33 in
+**Verified by the compiler (`--rerun-tasks`), the suite (567, 35 in
 `TutorialTest`), `assembleRelease` and `lint`.** Nobody has seen it, and more than
 usual rests on that here: whether an in-memory Room database opens on a phone,
 whether the frame and the scroll-into-view land where they should, how much of a

@@ -550,6 +550,10 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
                 label = "Punktetracker",
                 hint = "Punktestand, Abrechnung am Abend und alle Punktangaben.",
             )
+            // Under the tracker and only with it: it is a rule of the points.
+            if (setup.pointsSystem) {
+                UnplannedPenaltyRows(setup, onChange)
+            }
             CheckRow(
                 checked = setup.growthTasks,
                 onCheckedChange = { on -> onChange { it.copy(growthTasks = on) } },
@@ -675,6 +679,55 @@ private fun CancellationBox(setup: UserSetup, onChange: OnSetupChange) {
 
 /** Half a point, the scale the rest of the app counts in. */
 private const val CANCELLATION_STEP = 0.5
+
+/**
+ * The charge for hours nothing was planned into: whether there is one, and how
+ * much.
+ *
+ * Applied at once, like the switches it sits among. It never goes to zero by the
+ * stepper — "nothing" is what the checkbox is for, and a rate of zero with the
+ * box ticked would be a switch that looks on and does nothing.
+ */
+@Composable
+private fun UnplannedPenaltyRows(setup: UserSetup, onChange: OnSetupChange) {
+    Column(
+        modifier = Modifier.padding(start = EtaTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
+    ) {
+        CheckRow(
+            checked = setup.unplannedPenalty,
+            onCheckedChange = { on -> onChange { it.copy(unplannedPenalty = on) } },
+            label = "Abzug für unverplante Zeit",
+            hint = "Zwei Stunden am Tag dürfen leer bleiben; jede weitere wache Stunde " +
+                "ohne Plan kostet Punkte. Geplante Freizeit zählt als verplant.",
+        )
+        if (setup.unplannedPenalty) {
+            EtaField(
+                label = "Punkte je unverplanter Stunde",
+                hint = "Ab der dritten Stunde.",
+            ) {
+                EtaStepper(
+                    value = formatPoints(setup.unplannedPenaltyPerHour),
+                    valueWidth = 72.dp,
+                    onDecrement = {
+                        onChange {
+                            it.copy(
+                                unplannedPenaltyPerHour =
+                                    (it.unplannedPenaltyPerHour - CANCELLATION_STEP)
+                                        .coerceAtLeast(CANCELLATION_STEP),
+                            )
+                        }
+                    },
+                    onIncrement = {
+                        onChange {
+                            it.copy(unplannedPenaltyPerHour = it.unplannedPenaltyPerHour + CANCELLATION_STEP)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
 
 /**
  * Where the data lives.

@@ -564,6 +564,7 @@ internal fun plannerViewModelFactory(
                 setupRepository = container.setupRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
                 weekPlanningService = container.weekPlanningService,
+                pointsRepository = container.pointsRepository,
                 day = day,
                 clock = container.clock,
             )

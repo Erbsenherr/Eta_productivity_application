@@ -29,6 +29,8 @@ import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
+import com.example.eta.ui.components.tutorialSpot
+import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.theme.EtaTheme
 import kotlinx.coroutines.launch
@@ -133,6 +135,12 @@ private fun PanelHeading(page: Int, onSelectPage: (Int) -> Unit) {
             style = EtaTheme.typography.heading,
             modifier = Modifier.weight(1f),
         )
+        // Framed by the tutorial when it is the second page that is wanted: the
+        // dots are the only thing on the box that says there is one.
+        Row(
+            modifier = Modifier.tutorialSpot(TutorialSpot.QUICK_ADD_PAGES),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
         repeat(PAGE_COUNT) { dot ->
             val interactionSource = remember(dot) { MutableInteractionSource() }
             Box(
@@ -153,6 +161,7 @@ private fun PanelHeading(page: Int, onSelectPage: (Int) -> Unit) {
                         onClick = { onSelectPage(dot) },
                     ),
             )
+        }
         }
     }
 }

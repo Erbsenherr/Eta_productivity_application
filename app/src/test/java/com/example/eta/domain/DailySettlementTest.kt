@@ -1,5 +1,6 @@
 package com.example.eta.domain
 
+import com.example.eta.domain.setup.UserSetup
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Category
@@ -234,6 +235,31 @@ class DailySettlementTest {
         val settlement = settleDay(blocks, emptyList(), sleep, ALLOWANCE)
         assertEquals(4.0, settlement.unplannedHours, 0.0001)
         assertEquals(3.0, settlement.unplannedPenalty, 0.0001)
+    }
+
+    @Test
+    fun `the unplanned hours cost what the setup says, and nothing once switched off`() {
+        // The same day: four unplanned hours, two of them free.
+        val blocks = listOf(
+            entry("a", LocalTime(7, 0), 6.hours, completed = true),
+            entry("b", LocalTime(14, 0), 6.hours, completed = true),
+        )
+        val setup = UserSetup.draft(Instant.parse("2026-09-01T08:00:00Z"))
+
+        // Untouched, the setup charges exactly what the rule always did.
+        assertEquals(UNPLANNED_PENALTY_PER_HOUR, setup.unplannedRate, 0.0)
+
+        val dearer = setup.copy(unplannedPenaltyPerHour = 2.5)
+        val charged = settleDay(blocks, emptyList(), sleep, ALLOWANCE, unplannedPenaltyPerHour = dearer.unplannedRate)
+        assertEquals(5.0, charged.unplannedPenalty, 0.0001)
+
+        // Off keeps the rate for when it is switched back on, and charges nothing.
+        val off = dearer.copy(unplannedPenalty = false)
+        assertEquals(2.5, off.unplannedPenaltyPerHour, 0.0)
+        val free = settleDay(blocks, emptyList(), sleep, ALLOWANCE, unplannedPenaltyPerHour = off.unplannedRate)
+        assertEquals(4.0, free.unplannedHours, 0.0001)
+        assertEquals(0.0, free.unplannedPenalty, 0.0001)
+        assertEquals(charged.total + 5.0, free.total, 0.0001)
     }
 
     @Test

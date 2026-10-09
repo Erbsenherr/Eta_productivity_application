@@ -160,6 +160,8 @@ class TutorialViewModel(
             combine(_index, facts, _phase) { index, facts, phase -> Triple(index, facts, phase) }
                 .collect { (index, facts, phase) ->
                     val step = steps.getOrNull(index) ?: return@collect
+                    // The frame follows the step as it goes on.
+                    if (phase == TutorialPhase.RUNNING) guide.spot = step.spotAt(facts)
                     if (phase == TutorialPhase.RUNNING &&
                         step.kind == StepKind.FOLLOW &&
                         !_arrivedReady.value &&
@@ -325,7 +327,7 @@ class TutorialViewModel(
             evening = late
             _session.value?.clock?.jumpTo(if (late) TUTORIAL_EVENING else TUTORIAL_MORNING)
         }
-        guide.spot = step.spot
+        guide.spot = step.spotAt(facts.value)
         guide.allowed = step.allow
         _hint.value = null
         _arrivedReady.value = step.kind == StepKind.FOLLOW && step.ready(facts.value)

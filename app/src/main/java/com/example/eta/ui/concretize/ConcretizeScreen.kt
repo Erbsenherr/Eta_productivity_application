@@ -36,6 +36,7 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
+import com.example.eta.ui.components.LocalTutorialGuide
 import com.example.eta.ui.components.tutorialAllows
 import com.example.eta.ui.components.tutorialSpot
 import com.example.eta.domain.tutorial.TutorialGate
@@ -141,6 +142,16 @@ fun ConcretizeScreen(
                 enabled = tutorialAllows(TutorialGate.CONCRETIZE_DONE),
                 onClick = onDone,
             )
+            // Only in the tutorial, at the step that would otherwise leave the
+            // user looking at a grey button with no word about why.
+            if (LocalTutorialGuide.current?.allowed?.contains(TutorialGate.CONCRETIZE_LATER_NOTE) == true) {
+                EtaText(
+                    text = "Im Tutorial kommen wir später zur Tagesplanung — zuerst " +
+                        "folgt die Wochenplanung.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
 
             Spacer(Modifier.size(EtaTheme.spacing.xl))
         }
@@ -166,6 +177,7 @@ private fun ConcretizeCard(
         onDiscard = onDiscard,
         onSave = { onSave(name, attributes) },
         saveEnabled = tutorialAllows(TutorialGate.CONCRETIZE_TODO),
+        saveSpot = TutorialSpot.TODO_SAVE,
     ) {
         TodoAttributeFields(
             value = attributes,
@@ -207,6 +219,7 @@ private fun ConcretizeRecurringCard(
         onSave = { onSave(name, attributes) },
         saveEnabled = attributes.weekdays.isNotEmpty() &&
             tutorialAllows(TutorialGate.CONCRETIZE_RECURRING),
+        saveSpot = TutorialSpot.RECURRING_SAVE,
     ) {
         // Against the standing schedule as it is now, so a Tuesday evening that
         // is already taken says so before the note becomes a second one.
@@ -255,6 +268,8 @@ private fun CardFrame(
     onDiscard: () -> Unit,
     onSave: () -> Unit,
     saveEnabled: Boolean = true,
+    /** The id the tutorial frames "Übernehmen" by, one per kind of card. */
+    saveSpot: String = "",
     fields: @Composable () -> Unit,
 ) {
     // Two taps: this button sits beside "Übernehmen" on a form, and a slip here
@@ -285,7 +300,12 @@ private fun CardFrame(
                     onClick = { if (confirmingDelete) onDiscard() else confirmingDelete = true },
                 )
                 Spacer(Modifier.weight(1f))
-                EtaButton(text = "Übernehmen", enabled = saveEnabled, onClick = onSave)
+                EtaButton(
+                    text = "Übernehmen",
+                    enabled = saveEnabled,
+                    onClick = onSave,
+                    modifier = Modifier.tutorialSpot(saveSpot),
+                )
             }
         }
     }

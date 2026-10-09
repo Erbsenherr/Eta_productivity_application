@@ -138,7 +138,7 @@ fun TutorialCoach(
                 }
             }
 
-            if (step.swipeHint && !passable) SwipeHint()
+            if (step.swipeHint(facts) && !passable) SwipeHint()
 
             if (hint != null) {
                 EtaText(

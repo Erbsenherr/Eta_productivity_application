@@ -1,6 +1,8 @@
 package com.example.eta.domain.setup
 
+import com.example.eta.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
 import androidx.room3.Entity
+import androidx.room3.Ignore
 import androidx.room3.PrimaryKey
 import com.example.eta.domain.model.RecurrenceRule
 import com.example.eta.domain.model.WeekParity
@@ -372,6 +374,18 @@ data class UserSetup(
      */
     val cancellationPenaltyPerHour: Double = DEFAULT_CANCELLATION_PENALTY,
     /**
+     * Whether a day is charged for the hours nothing was planned into, and what
+     * one such hour costs past the two that are free.
+     *
+     * Two answers rather than a rate that may be zero: switching the charge off
+     * and on again should come back to the rate that was chosen, not to a
+     * default. Both under the Punktetracker in the Advanced Features — the charge
+     * is the points' firmest opinion about how a day should be spent, and that
+     * opinion is the user's to hold or not.
+     */
+    val unplannedPenalty: Boolean = true,
+    val unplannedPenaltyPerHour: Double = UNPLANNED_PENALTY_PER_HOUR,
+    /**
      * The "Bin ich noch bei der Sache?" question during long tasks, and how many
      * times a day it is asked. Off by default, like every sound that was not
      * there before: nobody agreed to be asked by upgrading.
@@ -416,6 +430,10 @@ data class UserSetup(
     /** The weekday the devaluation is measured against. */
     @get:androidx.room3.Ignore
     val inflationWeekday: DayOfWeek get() = inflationDay ?: weeklyPlanningDay
+
+    /** What an unplanned hour costs as things stand: nothing while the charge is off. */
+    @get:Ignore
+    val unplannedRate: Double get() = if (unplannedPenalty) unplannedPenaltyPerHour else 0.0
 
     companion object {
         /**

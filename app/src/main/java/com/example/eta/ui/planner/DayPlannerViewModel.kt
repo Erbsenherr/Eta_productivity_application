@@ -6,6 +6,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.AddItemResult
 import com.example.eta.data.repository.ItemRepository
 import com.example.eta.data.repository.PlanRepository
+import com.example.eta.data.repository.PointsRepository
 import com.example.eta.data.repository.ScheduleMaintenance
 import com.example.eta.data.repository.GroupAnswers
 import com.example.eta.data.repository.SubtaskGroupService
@@ -55,6 +56,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -154,6 +156,9 @@ sealed interface PlacementFeedback {
     /** The whole day was called off at once; [count] cards were dealt with. */
     data class DayCleared(val count: Int) : PlacementFeedback
 
+    /** A Custom Spend was reached for with nothing on the account to spend. */
+    data object NoPoints : PlacementFeedback
+
     /**
      * A group was made, but the day had no stretch long enough for it — so it
      * stands where it was and overlaps what follows.
@@ -227,6 +232,7 @@ class DayPlannerViewModel(
     setupRepository: SetupRepository,
     private val scheduleMaintenance: ScheduleMaintenance,
     private val weekPlanningService: WeekPlanningService,
+    pointsRepository: PointsRepository,
     private val day: PlannerDay = PlannerDay.TOMORROW,
     private val clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
@@ -260,6 +266,23 @@ class DayPlannerViewModel(
 
     /** How many priority tiers the user has waved past by hand. */
     private val skippedTiers = MutableStateFlow(0)
+
+    /**
+     * Whether a Custom Spend may be planned: only with points to spend.
+     *
+     * The account as it stands, not as tonight will leave it — points are
+     * credited in the evening, and spending against a harvest that has not
+     * happened is how an account goes below zero and stays there. True until the
+     * balance has been read, so the card is not shown locked for a frame.
+     */
+    val canSpend: StateFlow<Boolean> = pointsRepository.observeBalance()
+        .map { it > 0.0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    /** The drop of a Custom Spend that [canSpend] refuses: said, not swallowed. */
+    fun refuseSpend() {
+        _feedback.value = PlacementFeedback.NoPoints
+    }
 
     /** The day, its plan and the steps inside its cards — read together. */
     private val dayState = combine(

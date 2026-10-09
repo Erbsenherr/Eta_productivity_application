@@ -29,6 +29,7 @@ import com.example.eta.domain.planning.PomodoroPhaseKind
 import com.example.eta.domain.planning.hasPomodoro
 import com.example.eta.domain.planning.pomodoroPhaseAt
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -172,7 +173,22 @@ fun NowBox(
     onConfirm: (BlockWithItem) -> Unit = {},
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
-    ReportToTutorial(TutorialSignal.NOW_PAGE, pagerState.currentPage.toString())
+
+    // The day arrives a frame or two after the box does, so the first
+    // composition always sees "nothing running" and would open on "Als
+    // Nächstes" — and stay there, under a task that is in full swing. Whenever
+    // something *starts* running, here or by the clock, the box turns to it.
+    var settled by remember { mutableStateOf(false) }
+    val running = current != null
+    LaunchedEffect(running) {
+        if (running) {
+            pagerState.scrollToPage(0)
+            settled = true
+        }
+    }
+    // Only once that has happened: the page the box happened to open on is not
+    // a page the user turned to.
+    if (settled) ReportToTutorial(TutorialSignal.NOW_PAGE, pagerState.currentPage.toString())
 
     EtaSurface(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {

@@ -15,6 +15,7 @@ import com.example.eta.domain.model.PointsReason
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.reevaluation.ContractVerdict
 import com.example.eta.domain.reevaluation.DailySettlement
+import com.example.eta.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
 import com.example.eta.domain.reevaluation.settleDay
 import com.example.eta.domain.reward.yieldOf
 import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
@@ -89,6 +90,7 @@ class ReevaluationService(
             // What a called-off hour costs, from the standing configuration.
             cancellationPenaltyPerHour = setup?.cancellationPenaltyPerHour
                 ?: DEFAULT_CANCELLATION_PENALTY,
+            unplannedPenaltyPerHour = setup?.unplannedRate ?: UNPLANNED_PENALTY_PER_HOUR,
         )
     }
 

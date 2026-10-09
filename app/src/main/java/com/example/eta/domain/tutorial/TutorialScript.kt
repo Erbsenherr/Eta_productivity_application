@@ -77,8 +77,11 @@ object TutorialGate {
     /** "Löschen" on a note. No step opens it. */
     const val CONCRETIZE_DELETE = "concretize.delete"
 
-    /** The button under the notes that leaves the step. */
+    /** The button under the notes that leaves the step. No step opens it. */
     const val CONCRETIZE_DONE = "concretize.done"
+
+    /** Not a button: the line under that one saying the day planning comes later. */
+    const val CONCRETIZE_LATER_NOTE = "concretize.laterNote"
     const val WEEK_FINISH = "week.finish"
     const val PLANNER_CONFIRM = "planner.confirm"
 }
@@ -97,6 +100,11 @@ object TutorialSpot {
     const val EXTRA_DEADLINE = "extras.deadline"
     const val EXTRA_SUBTASKS = "extras.subtasks"
     const val QUICK_ADD = "dashboard.quickAdd"
+
+    /** The two dots of the Quick-Add box: the way to its second page. */
+    const val QUICK_ADD_PAGES = "dashboard.quickAdd.pages"
+    const val TODO_SAVE = "todo.save"
+    const val RECURRING_SAVE = "recurring.save"
     const val TODAY_TASKS = "dashboard.tasks"
     const val TODO_CATEGORY = "todo.category"
     const val TODO_PRIORITY = "todo.priority"
@@ -162,14 +170,19 @@ class TutorialStep(
     val kind: StepKind = StepKind.TEXT,
     /** The part of the screen this is about; it is framed and scrolled to. */
     val spot: String? = null,
+    /**
+     * Where the frame moves to as the step goes on — null keeps [spot]. For a
+     * step of two halves, so the frame is on the half still to do.
+     */
+    val spotFor: ((TutorialFacts) -> String?)? = null,
     val checks: (TutorialFacts) -> List<TutorialCheck> = { emptyList() },
     /**
      * Whether the step may be left. Not always "every check is ticked": a
      * question that can no longer be answered must not hold the tutorial shut.
      */
     val ready: (TutorialFacts) -> Boolean = { facts -> checks(facts).all { it.done } },
-    /** Shows the little swipe hint — the step asks for a sideways wipe. */
-    val swipeHint: Boolean = false,
+    /** Whether to show the little swipe hint: the step asks for a sideways wipe now. */
+    val swipeHint: (TutorialFacts) -> Boolean = { false },
     /** From this step on the simulated day stands in the evening. */
     val evening: Boolean = false,
     /** The screen's own buttons this step opens — see [TutorialGate]. */
@@ -177,6 +190,9 @@ class TutorialStep(
 ) {
     /** Whether the tutorial can move past it right now, however it is left. */
     fun passable(facts: TutorialFacts): Boolean = kind != StepKind.TASK || ready(facts)
+
+    /** The part to frame right now. */
+    fun spotAt(facts: TutorialFacts): String? = spotFor?.invoke(facts) ?: spot
 }
 
 private fun text(stage: TutorialStage, title: String, body: String, spot: String? = null) =
@@ -213,7 +229,7 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         kind = StepKind.TASK,
         spot = TutorialSpot.NOW,
         checks = { listOf(TutorialCheck("Zu »Als Nächstes« wischen", it.saw(TutorialSignal.NOW_PAGE, "1"))) },
-        swipeHint = true,
+        swipeHint = { true },
     ),
     text(
         TutorialStage.DASHBOARD,
@@ -242,14 +258,26 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
     TutorialStep(
         stage = TutorialStage.DASHBOARD,
         title = "Aus dem Kopf, in die App",
-        text = {
-            "Schreib beides in die Quick-Add-Box — ein Name genügt. Für die zweite " +
-                "Notiz wischst du die Box zur Seite. Danach darfst du es vergessen: " +
-                "Eta erinnert sich für dich. (Nur zur Übung — nichts davon landet in " +
-                "deinen eigenen Listen.)"
+        text = { facts ->
+            if (facts.todoNoted && !facts.recurringNoted) {
+                "Die erste Notiz steht. »Regelmäßig Sport« soll sich wiederholen und " +
+                    "gehört auf die zweite Seite der Box: Wische sie zur Seite oder " +
+                    "tippe auf den zweiten Punkt oben rechts. Dort notierst du es."
+            } else {
+                "Schreib beides in die Quick-Add-Box — ein Name genügt. Beginne mit " +
+                    "»Katzenstreu kaufen«. Danach darfst du es vergessen: Eta erinnert " +
+                    "sich für dich. (Nur zur Übung — nichts davon landet in deinen " +
+                    "eigenen Listen.)"
+            }
         },
         kind = StepKind.TASK,
         spot = TutorialSpot.QUICK_ADD,
+        // Once the ToDo is noted the frame leaves the box for its two dots:
+        // what is missing now is not typing, it is finding the second page.
+        spotFor = { facts ->
+            if (facts.todoNoted && !facts.recurringNoted) TutorialSpot.QUICK_ADD_PAGES else null
+        },
+        swipeHint = { it.todoNoted && !it.recurringNoted },
         checks = {
             listOf(
                 TutorialCheck("»Katzenstreu kaufen« notieren", it.todoNoted),
@@ -360,15 +388,24 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         },
         allow = setOf(TutorialGate.REEVALUATION_NEXT),
     ),
+    text(
+        TutorialStage.REEVALUATION,
+        "Die Abrechnung",
+        "So rechnet Eta den Tag ab: Punkte für erledigte Aufgaben, Abzüge für " +
+            "Abgesagtes und für Zeit, die gar nicht verplant war. Der Beispieltag ist " +
+            "fast leer, deshalb fällt dieser Abzug hier groß aus. Gebucht wird erst " +
+            "beim Abschließen.",
+    ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
-        title = "Die Abrechnung",
+        title = "Warum leere Zeit Punkte kostet",
         text = {
-            "So rechnet Eta den Tag ab: Punkte für erledigte Aufgaben, Abzüge für " +
-                "Abgesagtes und für Zeit, die gar nicht verplant war. Der Beispieltag " +
-                "ist fast leer, deshalb fällt dieser Abzug hier groß aus — mit " +
-                "Freizeit im Plan passiert das nicht. Gebucht wird erst beim " +
-                "Abschließen. Tippe auf »Weiter«."
+            "Eta geht davon aus, dass ein Tag so wenig unverplante Zeit haben sollte " +
+                "wie möglich. Das heißt nicht weniger Freizeit — nur, dass auch sie " +
+                "im Plan steht. Gerade wer sich mit einem strukturierten Alltag " +
+                "schwertut, profitiert davon. Den Abzug kannst du unter " +
+                "Einstellungen → Advanced Features anpassen oder abschalten. " +
+                "Tippe im Fenster auf »Weiter«."
         },
         kind = StepKind.FOLLOW,
         ready = { facts ->
@@ -435,16 +472,22 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
             "aus deiner Planung heraus, damit sie deine Listen nicht verstopft.",
         spot = TutorialSpot.TODO_UNLOCK,
     ),
+    text(
+        TutorialStage.CONCRETIZE,
+        "Dauer",
+        "Schätze, wie lange du brauchst. Eta rechnet mit: In eine Woche passt nicht " +
+            "mehr, als sie freie Stunden hat.",
+        spot = TutorialSpot.TODO_DURATION,
+    ),
+    // A step of its own, with the frame on the button: asked for while the
+    // frame still stood on the field before it, "Weiter" stayed grey for a
+    // reason the screen did not show.
     TutorialStep(
         stage = TutorialStage.CONCRETIZE,
-        title = "Dauer",
-        text = {
-            "Schätze, wie lange du brauchst. Eta rechnet mit: In eine Woche passt " +
-                "nicht mehr, als sie freie Stunden hat. Tippe dann auf der Karte auf " +
-                "»Übernehmen«."
-        },
+        title = "Übernehmen",
+        text = { "Damit ist das ToDo fertig. Tippe auf der Karte auf »Übernehmen«." },
         kind = StepKind.TASK,
-        spot = TutorialSpot.TODO_DURATION,
+        spot = TutorialSpot.TODO_SAVE,
         checks = { listOf(TutorialCheck("ToDo übernehmen", it.todoNoted && it.openTodoNotes == 0)) },
         allow = setOf(TutorialGate.CONCRETIZE_TODO),
     ),
@@ -463,16 +506,22 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
             "Haken »Abweichende Uhrzeiten« — damit bekommt jeder Tag seine eigene.",
         spot = TutorialSpot.RECURRING_DAYS,
     ),
+    text(
+        TutorialStage.CONCRETIZE,
+        "Wiederholen bis",
+        "Manches endet an einem festen Tag, etwa das Lernen für eine Prüfung. Dafür " +
+            "gibt es »Wiederholen bis« — hier brauchst du es nicht.",
+        spot = TutorialSpot.RECURRING_UNTIL,
+    ),
     TutorialStep(
         stage = TutorialStage.CONCRETIZE,
-        title = "Wiederholen bis",
+        title = "Übernehmen",
         text = {
-            "Manches endet an einem festen Tag, etwa das Lernen für eine Prüfung. " +
-                "Dafür gibt es »Wiederholen bis« — hier brauchst du es nicht. " +
+            "Sind Wochentage gewählt, ist auch diese Aufgabe fertig. " +
                 "Tippe auf der Karte auf »Übernehmen«."
         },
         kind = StepKind.TASK,
-        spot = TutorialSpot.RECURRING_UNTIL,
+        spot = TutorialSpot.RECURRING_SAVE,
         checks = {
             listOf(
                 TutorialCheck(
@@ -487,7 +536,9 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         stage = TutorialStage.CONCRETIZE,
         title = "Geschafft",
         text = { "Alle Notizen sind ausgefüllt. Als Nächstes simulieren wir die Wochenplanung." },
-        allow = setOf(TutorialGate.CONCRETIZE_DONE),
+        // The screen's own button would lead to the day planning, which the
+        // tutorial reaches after the week; it stays grey and a line says so.
+        allow = setOf(TutorialGate.CONCRETIZE_LATER_NOTE),
     ),
 
     // --- The week -----------------------------------------------------------
@@ -562,7 +613,15 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         "Auch diese Karten ziehst du in den Tag. »Custom Earn« ist für Verdienst, " +
             "den keine Aufgabe abbildet, und bringt 1,5 Punkte pro Stunde. »Custom " +
             "Spend« ist dein Lohn: eine Stunde Serie oder Spielen kostet 5 Punkte. " +
-            "Beide Sätze lassen sich beim Einplanen anpassen.",
+            "Beide Sätze lassen sich beim Einplanen anpassen. Ausgeben geht nur mit " +
+            "Guthaben — bei einem Punktestand von 0 oder darunter ist die Karte gesperrt.",
+    ),
+    text(
+        TutorialStage.PLANNER,
+        "Der dritte Revolver: Pause",
+        "Ein weiterer Tipp auf den Knopf führt zur Pause: eine Viertelstunde, die du " +
+            "ohne Umstände hinter eine oder mehrere Aufgaben ziehst. Verbringe Pausen " +
+            "am besten mit Entspannung — und behalte deine Bildschirmzeit im Blick.",
     ),
     TutorialStep(
         stage = TutorialStage.PLANNER,

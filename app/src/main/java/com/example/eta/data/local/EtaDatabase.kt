@@ -44,7 +44,7 @@ import com.example.eta.domain.setup.UserSetup
         Reward::class,
         RewardTask::class,
     ],
-    version = 26,
+    version = 27,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -831,6 +831,24 @@ val MIGRATION_25_26 = object : Migration(25, 26) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL(
             "ALTER TABLE `planned_blocks` ADD COLUMN `flexible` INTEGER NOT NULL DEFAULT 0",
+        )
+    }
+}
+
+/**
+ * Version 27: the charge for unplanned time becomes the user's to set.
+ *
+ * `unplannedPenalty` on and `unplannedPenaltyPerHour` at 1.5 for every existing
+ * row — the rule exactly as it stood while it was a constant, so nobody's
+ * evening changes by upgrading.
+ */
+val MIGRATION_26_27 = object : Migration(26, 27) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `unplannedPenalty` INTEGER NOT NULL DEFAULT 1",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `unplannedPenaltyPerHour` REAL NOT NULL DEFAULT 1.5",
         )
     }
 }

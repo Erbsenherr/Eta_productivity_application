@@ -126,6 +126,7 @@ fun DayPlannerScreen(
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
     val breakPrompt by viewModel.breakPrompt.collectAsStateWithLifecycle()
     val mergeRequest by viewModel.mergeRequest.collectAsStateWithLifecycle()
+    val canSpend by viewModel.canSpend.collectAsStateWithLifecycle()
     // Whether the full builder is open, rather than the short question. Keyed by
     // the pair, so a second drop starts over instead of reopening the last one.
     var building by remember { mutableStateOf<String?>(null) }
@@ -197,7 +198,16 @@ fun DayPlannerScreen(
         RevolverEntry(id = NEW_TODO_ID, title = "Neues ToDo", subtitle = "spontan", accent = null),
     ) + SpendKind.entries
         .filter { pointsVisible || it.pointsPerHour == 0.0 }
-        .map { RevolverEntry(id = it.name, title = it.label, subtitle = "1 h", accent = null) }
+        .map { kind ->
+            // Spending takes points to spend; the card stays, and says why not.
+            val locked = kind == SpendKind.CUSTOM_SPEND && !canSpend
+            RevolverEntry(
+                id = kind.name,
+                title = kind.label,
+                subtitle = if (locked) "kein Guthaben" else "1 h",
+                accent = null,
+            )
+        }
     val breakEntries = listOf(
         RevolverEntry(
             id = BREAK_ID,
@@ -316,7 +326,12 @@ fun DayPlannerScreen(
                             if (dropped != null && minute != null) {
                                 when (val payload = dropped.payload) {
                                     is DragPayload.Task -> viewModel.place(payload.item, minute)
-                                    is DragPayload.Spend -> spendPrompt = payload.kind to minute
+                                    is DragPayload.Spend ->
+                                        if (payload.kind == SpendKind.CUSTOM_SPEND && !canSpend) {
+                                            viewModel.refuseSpend()
+                                        } else {
+                                            spendPrompt = payload.kind to minute
+                                        }
                                     is DragPayload.NewTodo -> newTodoMinute = minute
                                     // No dialog: a break has nothing to ask. Its
                                     // length is changed like any block's, by a
@@ -812,6 +827,10 @@ private fun BoxScope.PlacementBanner(
                     is PlacementFeedback.Overlapping ->
                         "»${feedback.name}« ist gruppiert, passt aber nirgends ganz hin — " +
                             "der Block überschneidet sich jetzt."
+
+                    PlacementFeedback.NoPoints ->
+                        "Custom Spend braucht Guthaben — dein Punktestand liegt bei 0 " +
+                            "oder darunter."
 
                     is PlacementFeedback.DayCleared -> when (feedback.count) {
                         0 -> "Es stand nichts mehr offen."

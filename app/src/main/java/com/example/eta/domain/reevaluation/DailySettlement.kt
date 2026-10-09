@@ -16,7 +16,7 @@ import kotlinx.datetime.TimeZone
 /** Hours a day may go unplanned before it starts costing. */
 const val FREE_UNPLANNED_HOURS = 2.0
 
-/** What every unplanned hour past [FREE_UNPLANNED_HOURS] costs. */
+/** What every unplanned hour past [FREE_UNPLANNED_HOURS] costs, unless the setup says otherwise. */
 const val UNPLANNED_PENALTY_PER_HOUR = 1.5
 
 /** Giving up the day's free time pays this per hour. */
@@ -166,6 +166,8 @@ fun settleDay(
     freeTimeAllowanceMinutes: Int,
     cancellationPenaltyPerHour: Double = DEFAULT_CANCELLATION_PENALTY,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /** Zero while the charge is switched off — `UserSetup.unplannedRate`. */
+    unplannedPenaltyPerHour: Double = UNPLANNED_PENALTY_PER_HOUR,
 ): DailySettlement {
     val harvest = blocks
         .filter { it.block.isCompleted }
@@ -216,6 +218,6 @@ fun settleDay(
         cancellationPenalty = cancelledHours * cancellationPenaltyPerHour,
         unplannedHours = unplannedHours,
         droppedHours = droppedHours,
-        unplannedPenalty = chargeable * UNPLANNED_PENALTY_PER_HOUR,
+        unplannedPenalty = chargeable * unplannedPenaltyPerHour.coerceAtLeast(0.0),
     )
 }
