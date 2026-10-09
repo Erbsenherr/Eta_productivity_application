@@ -11,7 +11,6 @@ import com.example.eta.domain.tutorial.QUICKSTART_STEPS
 import com.example.eta.domain.tutorial.TUTORIAL_EXTRAS_NOTE
 import com.example.eta.domain.tutorial.TutorialId
 import com.example.eta.domain.tutorial.StepKind
-import com.example.eta.domain.tutorial.TUTORIAL_DONE_IDS
 import com.example.eta.domain.tutorial.TUTORIAL_EVENING
 import com.example.eta.domain.tutorial.TUTORIAL_MAIL_ID
 import com.example.eta.domain.tutorial.TUTORIAL_MORNING
@@ -25,7 +24,15 @@ import com.example.eta.domain.tutorial.TutorialStage
 import com.example.eta.domain.tutorial.exitTarget
 import com.example.eta.domain.tutorial.remembering
 import com.example.eta.domain.tutorial.tutorialFacts
+import com.example.eta.domain.tutorial.TUTORIAL_BREAKFAST_ID
+import com.example.eta.domain.tutorial.TUTORIAL_CAT_ID
 import com.example.eta.domain.tutorial.tutorialItems
+import com.example.eta.domain.tutorial.tutorialSchedule
+import com.example.eta.domain.model.ItemRole
+import com.example.eta.domain.reevaluation.settleDay
+import com.example.eta.domain.setup.conflicts
+import com.example.eta.domain.planning.sleepStretches
+import kotlinx.datetime.DayOfWeek
 import com.example.eta.domain.tutorial.tutorialSetup
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
@@ -52,17 +59,24 @@ class TutorialTest {
     private val now = Instant.parse("2026-10-09T23:58:00Z")
     private val today = LocalDate(2026, 10, 9)
 
+    /** Three of the example's own tasks — not the whole day, which is the point of some tests. */
+    private val TUTORIAL_DONE_IDS = setOf(TUTORIAL_BREAKFAST_ID, TUTORIAL_WORK_ID, TUTORIAL_CAT_ID)
+
     private class FixedClock(var instant: Instant) : Clock {
         override fun now(): Instant = instant
     }
 
     /** The example day as the seed lays it down: one block per task, today. */
     private fun exampleDay(): List<BlockWithItem> {
-        val items = tutorialItems(today.dayOfWeek, now)
+        val items = tutorialSchedule(today.dayOfWeek, now)
         val byId = items.associateBy { it.id }
         return expandRecurring(items, today, today, emptySet(), now)
             .map { BlockWithItem(it, byId.getValue(it.itemId)) }
     }
+
+    /** Everything on the day but the mail: what the evening is asked to tick off. */
+    private val List<BlockWithItem>.othersIds: Set<String>
+        get() = map { it.item.id }.filterTo(mutableSetOf()) { it != TUTORIAL_MAIL_ID }
 
     private fun List<BlockWithItem>.completing(ids: Set<String>) = map { entry ->
         if (entry.item.id in ids) entry.copy(block = entry.block.copy(completedAt = now)) else entry
@@ -111,22 +125,81 @@ class TutorialTest {
     // --- the example day ----------------------------------------------------
 
     @Test
-    fun `every example task lays an occurrence down today`() {
+    fun `the example tasks stand on today among what a setup lays down`() {
         val day = exampleDay()
+        val names = day.map { it.item.name }
 
-        assertEquals(4, day.size)
+        assertTrue(names.containsAll(listOf("Frühstück", "Arbeiten", "Katze füttern", "Mail versenden")))
+        // The frame an ordinary setup gives a day, around them.
+        assertTrue(day.any { it.item.role == ItemRole.MORNING })
+        assertTrue(day.any { it.item.role == ItemRole.FREE_TIME })
+        assertTrue(day.any { it.item.role == ItemRole.BED_PREP })
+        assertTrue(day.size > 5)
         assertTrue(day.all { it.item.isConcretized })
         assertTrue(day.all { it.block.origin == BlockOrigin.RECURRING })
     }
 
     @Test
-    fun `the daily three stand on tomorrow as well and the weekly mail does not`() {
-        val items = tutorialItems(today.dayOfWeek, now)
+    fun `nothing in the practice week overlaps, on whichever weekday it is run`() {
+        DayOfWeek.entries.forEach { runOn ->
+            val items = tutorialSchedule(runOn, now)
+            val byId = items.associateBy { it.id }
+            // A whole week from the day it is run on: every weekday's own mix.
+            val start = (0..6).map { today.plus(DatePeriod(days = it)) }.first { it.dayOfWeek == runOn }
+            (0..6).map { start.plus(DatePeriod(days = it)) }.forEach { date ->
+                val spans = expandRecurring(items, date, date, emptySet(), now)
+                    .map { block ->
+                        val from = block.start.minuteOfDay()
+                        Triple(byId.getValue(block.itemId).name, from, from + block.plannedDuration.inWholeMinutes.toInt())
+                    }
+                    .sortedBy { it.second }
+                spans.zipWithNext().forEach { (a, b) ->
+                    assertTrue(
+                        "${a.first} runs into ${b.first} on ${date.dayOfWeek} (run on $runOn)",
+                        a.third <= b.second,
+                    )
+                }
+                assertTrue(spans.all { it.third <= 24 * 60 })
+            }
+        }
+    }
+
+    @Test
+    fun `the practice setup collides with nothing of its own either`() {
+        assertEquals(emptyList<Any>(), tutorialSetup(now).conflicts())
+    }
+
+    @Test
+    fun `the daily tasks stand on tomorrow as well and the weekly mail does not`() {
+        val items = tutorialSchedule(today.dayOfWeek, now)
         val tomorrow = today.plus(DatePeriod(days = 1))
 
         val ids = expandRecurring(items, tomorrow, tomorrow, emptySet(), now).map { it.itemId }.toSet()
 
-        assertEquals(TUTORIAL_DONE_IDS, ids)
+        assertTrue(ids.containsAll(setOf(TUTORIAL_BREAKFAST_ID, TUTORIAL_WORK_ID, TUTORIAL_CAT_ID)))
+        assertFalse(TUTORIAL_MAIL_ID in ids)
+    }
+
+    @Test
+    fun `the example day settles in the user's favour`() {
+        // Played as the tutorial asks: everything ticked, the mail called off
+        // and excused. A first settlement that came out negative would teach
+        // that planning costs.
+        val setup = tutorialSetup(now)
+        val day = exampleDay().let { it.completing(it.othersIds) }
+            .changing(TUTORIAL_MAIL_ID) { it.copy(discardedAt = now, forceMajeure = "Server") }
+        val settlement = settleDay(
+            blocks = day,
+            verdicts = emptyList(),
+            sleepMinutes = setup.sleepStretches(today.dayOfWeek).sumOf { it.last - it.first + 1 },
+            freeTimeAllowanceMinutes = day.filter { it.item.role == ItemRole.FREE_TIME }
+                .sumOf { it.block.plannedDuration.inWholeMinutes.toInt() },
+            timeZone = zone,
+            unplannedPenaltyPerHour = setup.unplannedRate,
+        )
+
+        assertTrue("harvest ${settlement.harvest}", settlement.harvest >= 7.0)
+        assertTrue("total ${settlement.total}", settlement.total > 0.0)
     }
 
     @Test
@@ -138,11 +211,9 @@ class TutorialTest {
     }
 
     @Test
-    fun `the practice setup lays down nothing of its own and shows what a newcomer sees`() {
+    fun `the practice setup shows what a newcomer sees`() {
         val setup = tutorialSetup(now)
 
-        // Bed preparation and the morning aside, which the seed never writes.
-        assertTrue(setup.recurringItems(now).all { it.id.startsWith("setup:bedprep") || it.id.startsWith("setup:morning") })
         // The points, and nothing else — exactly a fresh setup's own answer.
         assertTrue(setup.pointsSystem)
         assertFalse(setup.growthTasks || setup.contracts || setup.rewards)
@@ -206,12 +277,13 @@ class TutorialTest {
 
     @Test
     fun `the mail is read off its own block`() {
-        val day = exampleDay().completing(TUTORIAL_DONE_IDS)
+        val day = exampleDay().let { it.completing(it.othersIds) }
             .changing(TUTORIAL_MAIL_ID) { it.copy(discardedAt = now, makeUpItemId = "x") }
 
         val facts = tutorialFacts(emptyList(), emptyList(), day, emptyList(), false)
 
         assertTrue(facts.completedToday.containsAll(TUTORIAL_DONE_IDS))
+        assertEquals(0, facts.othersOpen)
         assertTrue(facts.mailDiscarded && facts.mailMadeUp && facts.mailAnswered)
         assertFalse(facts.mailCompleted)
     }
@@ -279,11 +351,15 @@ class TutorialTest {
     @Test
     fun `the mail ticked off holds the first evening step shut`() {
         val step = QUICKSTART_STEPS.first { it.title == "Tagesabschluss" }
-        val three = exampleDay().completing(TUTORIAL_DONE_IDS)
-        val four = exampleDay().completing(TUTORIAL_DONE_IDS + TUTORIAL_MAIL_ID)
+        val day = exampleDay()
+        val others = day.completing(day.othersIds)
+        val all = day.completing(day.othersIds + TUTORIAL_MAIL_ID)
+        // One of the setup's own tasks left open is still "not everything".
+        val nearly = day.completing(TUTORIAL_DONE_IDS)
 
-        assertTrue(step.ready(tutorialFacts(emptyList(), emptyList(), three, emptyList(), false)))
-        val facts = tutorialFacts(emptyList(), emptyList(), four, emptyList(), false)
+        assertTrue(step.ready(tutorialFacts(emptyList(), emptyList(), others, emptyList(), false)))
+        assertFalse(step.ready(tutorialFacts(emptyList(), emptyList(), nearly, emptyList(), false)))
+        val facts = tutorialFacts(emptyList(), emptyList(), all, emptyList(), false)
         assertFalse(step.ready(facts))
         assertEquals(2, step.checks(facts).size)
     }
@@ -338,7 +414,7 @@ class TutorialTest {
     @Test
     fun `a day played through as asked leaves no task open`() {
         val todo = Item.newTodo("Katzenstreu kaufen", Category.NEBENBEI, Priority.WANT, null, 1.hours, now)
-        val day = exampleDay().completing(TUTORIAL_DONE_IDS)
+        val day = exampleDay().let { it.completing(it.othersIds) }
             .changing(TUTORIAL_MAIL_ID) {
                 it.copy(discardedAt = now, makeUpItemId = "x", forceMajeure = "Server")
             }

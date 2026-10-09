@@ -7,7 +7,7 @@ import com.example.eta.domain.planning.DAYS_PER_WEEK
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.tutorial.TUTORIAL_EXTRAS_NOTE
 import com.example.eta.domain.tutorial.TutorialId
-import com.example.eta.domain.tutorial.tutorialItems
+import com.example.eta.domain.tutorial.tutorialSchedule
 import com.example.eta.domain.tutorial.tutorialSetup
 import kotlin.time.Clock
 import kotlinx.datetime.DatePeriod
@@ -21,9 +21,9 @@ import kotlinx.datetime.todayIn
  * Only a sandbox `AppContainer` builds one — the real container's is null — so
  * the example tasks have no route into the user's own data.
  *
- * The setup row is written directly rather than through `SetupRepository.complete`:
- * that would lay down the bed preparation and the morning as well, and the day
- * the tutorial talks about has exactly four tasks on it.
+ * The setup row is written directly rather than through `SetupRepository.complete`,
+ * because the schedule is the setup's tasks **and** the example's own, laid down
+ * together from `tutorialSchedule`.
  */
 class TutorialSeed(
     private val setupDao: SetupDao,
@@ -36,7 +36,7 @@ class TutorialSeed(
     suspend fun lay(tutorial: TutorialId) {
         val now = clock.now()
         val today = clock.todayIn(timeZone)
-        val items = tutorialItems(today.dayOfWeek, now)
+        val items = tutorialSchedule(today.dayOfWeek, now, tutorial.advanced)
 
         setupDao.upsert(tutorialSetup(now, tutorial.advanced))
         itemDao.upsertAll(items)

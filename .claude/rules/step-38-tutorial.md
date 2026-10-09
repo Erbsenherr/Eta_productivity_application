@@ -71,18 +71,32 @@ before midnight, which is exactly when a new app gets tried.
 - **`LocalEtaClock`** carries it to the two composables that read the time
   themselves: the dashboard's ticking "now", and `RepeatUntilRow`. Anything new
   that calls `Clock.System` in a composable should read the local instead.
-- **The example day** (`tutorialItems`): Frühstück 07:30, Arbeiten 09:00–12:00,
-  Katze füttern 12:00, Mail versenden 14:00, ids prefixed `tutorial:`.
-  **All four are standing tasks**, and the mail has to be: the evening offers
-  "Nachholen" only for a dropped *recurring* occurrence — a dropped ToDo goes back
-  to the Sammelliste and is asked nothing. So it is a weekly mail on whatever
-  weekday the tutorial runs, and the other three are daily, which also puts them
-  on tomorrow for the planner to plan around.
+- **The example day is a day of the app in use** (fifth round): the practice
+  setup is the questionnaire's own defaults — morning routine, sport, housekeeping,
+  cooking, free time, mindfulness, bed preparation — and the example's tasks stand
+  between them (`tutorialSchedule` = `tutorialItems` + the setup's
+  `recurringItems`). Frühstück 07:45, Arbeiten 09:00–12:00, Katze füttern 12:00,
+  Mail versenden 12:30, Arbeiten again 13:00–17:00; ids prefixed `tutorial:`.
+- **How the collisions were settled**, all on the tutorial's side: the setup's own
+  work answer is left out (`WorkSchedule.None`) — the example's "Arbeiten" *is* the
+  working day, and the script needs the cat, not a lunch break, to be what comes
+  next; breakfast moved behind the morning routine; the mail into the lunch hour;
+  the housekeeping from Saturday morning to 17:15. The afternoon's work is a second
+  item of the same name, an item having one occurrence a day. `TutorialTest` runs
+  the week from every weekday and pins that nothing overlaps.
+- **All the example's tasks are standing tasks**, and the mail has to be: the
+  evening offers "Nachholen" only for a dropped *recurring* occurrence — a dropped
+  ToDo goes back to the Sammelliste and is asked nothing. So it is a weekly mail on
+  whatever weekday the tutorial runs, and the others are daily, which also puts
+  them on tomorrow for the planner to plan around.
+- **The evening ticks off everything but the mail** — `TutorialFacts.othersOpen`,
+  not a list of ids, since the day's length now depends on the weekday.
+- **The day settles in the user's favour**, pinned in `TutorialTest`. With only
+  four short tasks it came out several points negative, which taught that planning
+  costs; filled, about four hours stay unplanned and the work pays for them.
 - **The setup row is written directly** (`TutorialSeed`), not through
-  `SetupRepository.complete`, which would add bed preparation and the morning to a
-  day the texts say has four tasks. `tutorialSetup` is the questionnaire's draft
-  with every page skipped, the points on, and the other Advanced Features on only
-  in a tutorial about one (`TutorialId.advanced`).
+  `SetupRepository.complete`: the schedule is the setup's tasks *and* the example's,
+  laid down together.
 
 #### Five tutorials (third round)
 
@@ -97,10 +111,6 @@ is told so it can add what that one needs.
   what a category pays, stops on the evening's settlement page ("Die
   Abrechnung"), and has the user turn to the second revolver before explaining
   Custom Earn and Custom Spend. Its last words point at the other tutorials.
-- **The settlement of the example day is negative**, and the step says why: four
-  short tasks leave most of the day unplanned, and unplanned time is charged.
-  Deliberately not papered over with a seeded free-time block — the day the
-  texts name has four tasks, and the charge is the mechanic.
 - **A feature tutorial stays on its feature's tab** (`TutorialStage.GROWTH` /
   `CONTRACTS` / `REWARDS`) and has one `TASK`: make one. Done is a count read off
   the practice database. **Creating happens in a dialog, and a dialog is a window
@@ -277,7 +287,7 @@ there is a setup row, and it is a fact about this install. Not in a backup.
 - **A process death mid-run starts over** at the choice (first run) or returns to
   the app (repeat): the practice database lived in memory.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (567, 35 in
+**Verified by the compiler (`--rerun-tasks`), the suite (570, 38 in
 `TutorialTest`), `assembleRelease` and `lint`.** Nobody has seen it, and more than
 usual rests on that here: whether an in-memory Room database opens on a phone,
 whether the frame and the scroll-into-view land where they should, how much of a

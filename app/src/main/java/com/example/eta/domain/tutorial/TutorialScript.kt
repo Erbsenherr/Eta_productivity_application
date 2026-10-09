@@ -134,8 +134,10 @@ data class TutorialFacts(
     /** Notes still waiting for their answers in the Sammelliste. */
     val openTodoNotes: Int = 0,
     val openRecurringNotes: Int = 0,
-    /** Example tasks ticked off today, by item id. */
+    /** Tasks ticked off today, by item id. */
     val completedToday: Set<String> = emptySet(),
+    /** Blocks of today, the mail aside, that are not ticked off. */
+    val othersOpen: Int = 0,
     val mailCompleted: Boolean = false,
     val mailDiscarded: Boolean = false,
     val mailMadeUp: Boolean = false,
@@ -235,7 +237,9 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         TutorialStage.DASHBOARD,
         "Der ganze Tag",
         "Als Nächstes fütterst du die Katze. Den ganzen Tag findest du unter " +
-            "»Heute anstehend«: Frühstück, Arbeiten, Katze füttern und Mail versenden.",
+            "»Heute anstehend«: Frühstück, Arbeiten, Katze füttern und Mail versenden " +
+            "— dazu alles, was Eta aus der Einrichtung kennt, von der Morgenroutine " +
+            "bis zur Freizeit am Abend.",
         spot = TutorialSpot.TODAY_TASKS,
     ),
     text(
@@ -327,8 +331,8 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         checks = { facts ->
             listOfNotNull(
                 TutorialCheck(
-                    "Frühstück, Arbeiten und Katze füttern abhaken",
-                    facts.completedToday.containsAll(TUTORIAL_DONE_IDS),
+                    "Alles außer »Mail versenden« abhaken",
+                    facts.completedToday.isNotEmpty() && facts.othersOpen == 0,
                 ),
                 TutorialCheck("Haken bei »Mail versenden« wieder entfernen", false)
                     .takeIf { facts.mailCompleted },
@@ -392,9 +396,9 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         TutorialStage.REEVALUATION,
         "Die Abrechnung",
         "So rechnet Eta den Tag ab: Punkte für erledigte Aufgaben, Abzüge für " +
-            "Abgesagtes und für Zeit, die gar nicht verplant war. Der Beispieltag ist " +
-            "fast leer, deshalb fällt dieser Abzug hier groß aus. Gebucht wird erst " +
-            "beim Abschließen.",
+            "Abgesagtes und für Zeit, die gar nicht verplant war — zwei Stunden am Tag " +
+            "dürfen leer bleiben, was darüber liegt, kostet. Gebucht wird erst beim " +
+            "Abschließen.",
     ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
@@ -496,7 +500,7 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         "Die wiederkehrende Aufgabe",
         "Vieles ist wie beim ToDo. Neu ist die Skizze deiner Woche: Grün ist frei, " +
             "grau belegt, und deine Aufgabe erscheint farbig, sobald du Tage wählst. " +
-            "So vermeidest du Überschneidungen. Im Tutorial ist die Woche fast leer.",
+            "So vermeidest du Überschneidungen.",
         spot = TutorialSpot.RECURRING_SCHEME,
     ),
     text(
@@ -689,6 +693,7 @@ fun tutorialFacts(
         openTodoNotes = collection.count { it.type == ItemType.TODO && !it.isConcretized },
         openRecurringNotes = notes.count { !it.isConcretized },
         completedToday = today.filter { it.block.isCompleted }.mapTo(mutableSetOf()) { it.item.id },
+        othersOpen = today.count { it.item.id != TUTORIAL_MAIL_ID && !it.block.isCompleted },
         mailCompleted = mail?.isCompleted == true,
         mailDiscarded = mail?.isDiscarded == true,
         mailMadeUp = mail?.makeUpItemId != null,
