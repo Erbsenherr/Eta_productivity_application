@@ -256,6 +256,7 @@ private fun TodayPage(
         // it, since the long press that opens it is on this box.
         if (pointsVisible) {
             PointsBox(
+                modifier = Modifier.tutorialSpot(TutorialSpot.POINTS),
                 balance = state.balance,
                 pendingHarvest = state.pendingHarvest,
                 plannedYield = state.plannedYield,

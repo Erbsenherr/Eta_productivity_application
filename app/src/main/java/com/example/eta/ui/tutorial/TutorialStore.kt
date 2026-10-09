@@ -13,6 +13,11 @@ data class TutorialState(
     val owed: Boolean,
     /** Asked for from the settings. Not kept across a restart. */
     val requested: Boolean = false,
+    /**
+     * Which one was asked for, by `TutorialId` name. Null is "let me choose" —
+     * the idea of the app again, then the list.
+     */
+    val requestedId: String? = null,
 ) {
     val active: Boolean get() = owed || requested
 }
@@ -44,19 +49,22 @@ class TutorialStore(context: Context) {
     /** The welcome page was read: on to the questionnaire, the tutorial after it. */
     fun introDone() = write(introSeen = true, owed = true)
 
-    /** "Tutorial wiederholen" in the settings. */
-    fun request() = _state.update { it.copy(requested = true) }
+    /**
+     * Asked for from the settings: the choice of tutorials, or — with [id] —
+     * one of them straight away.
+     */
+    fun request(id: String? = null) = _state.update { it.copy(requested = true, requestedId = id) }
 
     /** Finished, skipped or walked out of — it is not shown again by itself. */
     fun finish() {
         write(introSeen = _state.value.introSeen, owed = false)
-        _state.update { it.copy(requested = false) }
+        _state.update { it.copy(requested = false, requestedId = null) }
     }
 
     /** The debug reset: back to before the first start, welcome page included. */
     fun reset() {
         write(introSeen = false, owed = false)
-        _state.update { it.copy(requested = false) }
+        _state.update { it.copy(requested = false, requestedId = null) }
     }
 
     private fun write(introSeen: Boolean, owed: Boolean) {

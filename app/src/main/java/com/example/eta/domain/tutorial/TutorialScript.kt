@@ -6,7 +6,21 @@ import com.example.eta.domain.model.ItemType
 import com.example.eta.domain.model.MAKE_UP_NAME_PREFIX
 
 /** The screens the tutorial walks through, in order. Each is the app's own. */
-enum class TutorialStage { DASHBOARD, REEVALUATION, CONCRETIZE, WEEK, PLANNER }
+enum class TutorialStage {
+    DASHBOARD,
+    REEVALUATION,
+    CONCRETIZE,
+    WEEK,
+    PLANNER,
+
+    /** The evening's card of a note, for the Extras under it. */
+    EXTRAS,
+
+    /** The three tabs of the Advanced Features, each for its own tutorial. */
+    GROWTH,
+    CONTRACTS,
+    REWARDS,
+}
 
 /**
  * How a step is left.
@@ -35,6 +49,12 @@ object TutorialSignal {
 
     /** The page of the weekly planning in front, by its name. */
     const val WEEK_STEP = "week.step"
+
+    /** Which revolver the day planner has out, by its name. */
+    const val PLANNER_REVOLVER = "planner.revolver"
+
+    /** "1" once the Extras box of a card has been unfolded. */
+    const val EXTRAS_OPEN = "extras.open"
 }
 
 /**
@@ -67,6 +87,15 @@ object TutorialGate {
 object TutorialSpot {
     const val NOW = "dashboard.now"
     const val PHASE = "dashboard.phase"
+    const val POINTS = "dashboard.points"
+    const val EXTRAS = "extras.box"
+    const val EXTRA_SOUND = "extras.sound"
+    const val EXTRA_TRAVEL = "extras.travel"
+    const val EXTRA_BREAK = "extras.break"
+    const val EXTRA_POMODORO = "extras.pomodoro"
+    const val EXTRA_REMINDER = "extras.reminder"
+    const val EXTRA_DEADLINE = "extras.deadline"
+    const val EXTRA_SUBTASKS = "extras.subtasks"
     const val QUICK_ADD = "dashboard.quickAdd"
     const val TODAY_TASKS = "dashboard.tasks"
     const val TODO_CATEGORY = "todo.category"
@@ -109,6 +138,10 @@ data class TutorialFacts(
     val weekGoals: Int = 0,
     /** A card was dragged into tomorrow. */
     val plannedTomorrow: Boolean = false,
+    /** What the feature tutorials have the user make. */
+    val growthTasks: Int = 0,
+    val contracts: Int = 0,
+    val rewards: Int = 0,
     /** The latest value of each signal, and every "key=value" ever reported. */
     val signals: Map<String, String> = emptyMap(),
     val seen: Set<String> = emptySet(),
@@ -155,9 +188,14 @@ private fun text(stage: TutorialStage, title: String, body: String, spot: String
  * The texts describe what the screens **do**, which is not everywhere what the
  * first draft of the script assumed: a catch-up lands in the Sammelliste rather
  * than the week list, a note is not asked for when a Quick-Add is filled in, and
- * the weekly planning opens on its look back.
+ * the weekly planning opens on the devaluation and its look back.
+ *
+ * **The points are part of it** (third round): the tracker is on for a new setup
+ * and on in the practice app, so the account, what a category pays, the evening's
+ * settlement and the second revolver each get a step — and one sentence says
+ * where the whole thing is switched off.
  */
-val QUICKSTART: List<TutorialStep> = listOf(
+val QUICKSTART_STEPS: List<TutorialStep> = listOf(
     // --- The day itself -----------------------------------------------------
     text(
         TutorialStage.DASHBOARD,
@@ -183,6 +221,16 @@ val QUICKSTART: List<TutorialStep> = listOf(
         "Als Nächstes fütterst du die Katze. Den ganzen Tag findest du unter " +
             "»Heute anstehend«: Frühstück, Arbeiten, Katze füttern und Mail versenden.",
         spot = TutorialSpot.TODAY_TASKS,
+    ),
+    text(
+        TutorialStage.DASHBOARD,
+        "Dein Punktekonto",
+        "Erledigte Aufgaben bringen Punkte. Gutgeschrieben wird erst am Abend — bis " +
+            "dahin zeigt die Box, was heute schon erarbeitet und was geplant ist. " +
+            "Ausgeben kannst du sie für Dinge, die du dir gönnst; dazu später mehr. " +
+            "Wer lieber ohne Punkte plant, schaltet den Punktetracker unter " +
+            "Einstellungen → Advanced Features aus.",
+        spot = TutorialSpot.POINTS,
     ),
     text(
         TutorialStage.DASHBOARD,
@@ -287,8 +335,8 @@ val QUICKSTART: List<TutorialStep> = listOf(
         stage = TutorialStage.REEVALUATION,
         title = "Höhere Gewalt",
         text = {
-            "Manchmal fällt etwas aus, ohne dass du etwas dafür kannst. Mit dem " +
-                "Punktetracker kostet eine Absage Punkte — außer bei höherer Gewalt. " +
+            "Manchmal fällt etwas aus, ohne dass du etwas dafür kannst. Eine Absage " +
+                "am selben Tag kostet Punkte — außer bei höherer Gewalt. " +
                 "Heute war der Mailserver ausgefallen: Halte die Zeile »Mail versenden« " +
                 "gedrückt, bis sie sich füllt, und gib den Grund an."
         },
@@ -309,6 +357,22 @@ val QUICKSTART: List<TutorialStep> = listOf(
         kind = StepKind.FOLLOW,
         ready = { facts ->
             facts.signals[TutorialSignal.REEVALUATION_STEP].let { it != null && it != "TASKS" }
+        },
+        allow = setOf(TutorialGate.REEVALUATION_NEXT),
+    ),
+    TutorialStep(
+        stage = TutorialStage.REEVALUATION,
+        title = "Die Abrechnung",
+        text = {
+            "So rechnet Eta den Tag ab: Punkte für erledigte Aufgaben, Abzüge für " +
+                "Abgesagtes und für Zeit, die gar nicht verplant war. Der Beispieltag " +
+                "ist fast leer, deshalb fällt dieser Abzug hier groß aus — mit " +
+                "Freizeit im Plan passiert das nicht. Gebucht wird erst beim " +
+                "Abschließen. Tippe auf »Weiter«."
+        },
+        kind = StepKind.FOLLOW,
+        ready = { facts ->
+            facts.signals[TutorialSignal.REEVALUATION_STEP].let { it == "JOURNAL" || it == "RECURRING" }
         },
         allow = setOf(TutorialGate.REEVALUATION_NEXT),
     ),
@@ -352,7 +416,8 @@ val QUICKSTART: List<TutorialStep> = listOf(
         "Kategorie",
         "Wie sehr beansprucht dich die Aufgabe? Fokus: volle Konzentration, etwa " +
             "beim Lesen oder Schreiben. Nebenbei: Musik oder ein Hörbuch laufen mit. " +
-            "Achtsam: bewusst ohne Beschallung.",
+            "Achtsam: bewusst ohne Beschallung. Danach richten sich die Punkte: Fokus " +
+            "und Achtsam bringen 1 Punkt pro Stunde, Nebenbei einen halben.",
         spot = TutorialSpot.TODO_CATEGORY,
     ),
     text(
@@ -430,8 +495,10 @@ val QUICKSTART: List<TutorialStep> = listOf(
         stage = TutorialStage.WEEK,
         title = "Wochenplanung",
         text = {
-            "Einmal pro Woche planst du die nächsten sieben Tage. Es beginnt mit einem " +
-                "kurzen Rückblick. Tippe im Fenster auf »Weiter«."
+            "Einmal pro Woche planst du die nächsten sieben Tage. Zuerst der " +
+                "Wertverfall: Angesparte Punkte verlieren jede Woche 30 % — sie sind " +
+                "zum Ausgeben da. Dann ein kurzer Rückblick. Tippe im Fenster zweimal " +
+                "auf »Weiter«."
         },
         kind = StepKind.FOLLOW,
         ready = { it.signals[TutorialSignal.WEEK_STEP] == "PLAN" },
@@ -473,11 +540,38 @@ val QUICKSTART: List<TutorialStep> = listOf(
     ),
     TutorialStep(
         stage = TutorialStage.PLANNER,
+        title = "Der zweite Revolver",
+        text = {
+            "Oben steht die Prognose: so viele Punkte bringt der Tag, wenn alles " +
+                "erledigt wird. Der Knopf unten wechselt den Revolver. " +
+                "Tippe auf »Punkte«."
+        },
+        kind = StepKind.TASK,
+        checks = {
+            listOf(
+                TutorialCheck(
+                    "Zum Revolver »Punkte« wechseln",
+                    it.saw(TutorialSignal.PLANNER_REVOLVER, "SPEND"),
+                ),
+            )
+        },
+    ),
+    text(
+        TutorialStage.PLANNER,
+        "Punkte verdienen und ausgeben",
+        "Auch diese Karten ziehst du in den Tag. »Custom Earn« ist für Verdienst, " +
+            "den keine Aufgabe abbildet, und bringt 1,5 Punkte pro Stunde. »Custom " +
+            "Spend« ist dein Lohn: eine Stunde Serie oder Spielen kostet 5 Punkte. " +
+            "Beide Sätze lassen sich beim Einplanen anpassen.",
+    ),
+    TutorialStep(
+        stage = TutorialStage.PLANNER,
         title = "Gut gemacht!",
         text = {
             "Verplante Karten kannst du verschieben oder zurück auf den Revolver " +
                 "ziehen. Gedrückt halten zeigt weitere Optionen. Das war der " +
-                "Quickstart — viel Erfolg mit Eta!"
+                "Quickstart! Zu den Extras, den Growth-Tasks, den Verträgen und dem " +
+                "Belohn-o-mat gibt es eigene Tutorials: Einstellungen → Tutorial."
         },
         allow = setOf(TutorialGate.PLANNER_CONFIRM),
     ),
@@ -517,6 +611,9 @@ fun tutorialFacts(
     today: List<BlockWithItem>,
     tomorrow: List<BlockWithItem>,
     daySettled: Boolean,
+    growthTasks: Int = 0,
+    contracts: Int = 0,
+    rewards: Int = 0,
 ): TutorialFacts {
     // The user's own cards. A catch-up is a ToDo in the Sammelliste as well, but
     // it is Eta's doing, and must not pass for the note the tutorial asked for.
@@ -540,6 +637,9 @@ fun tutorialFacts(
         daySettled = daySettled,
         weekGoals = week.count { it.type == ItemType.TODO },
         plannedTomorrow = tomorrow.any { it.block.isHandPlaced },
+        growthTasks = growthTasks,
+        contracts = contracts,
+        rewards = rewards,
     )
 }
 

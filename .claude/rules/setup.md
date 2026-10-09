@@ -72,8 +72,9 @@ not fit a phone).
 - What "taken out" means per page: Hausputz, Sport and Achtsamkeit become null, work
   becomes `WorkSchedule.None`, the meals an **empty** `DailyCooking`, and free time a
   slot of **zero duration** — `recurringItems` and `weeklySpans` already drop both,
-  which is why neither needed to become nullable. **Skipped free time takes the
-  social budget with it**: they are one page.
+  which is why neither needed to become nullable. (The free-time page also asked
+  for a weekly social budget until step 38; the field is gone and the stored
+  figure is read by nothing.)
 - **`UserSetup.draft` must not collide with itself.** Someone who accepts every page
   gets no "Doppeltbelegung" — sport moved from 18:00 to 17:15 because it ran into
   the cooking at 18:30 — and `WeekendNightTest` pins it, with and without the

@@ -543,18 +543,6 @@ fun FreeTimeStep(draft: UserSetup, onChange: OnSetupChange) {
                     minimum = 15.minutes,
                 )
             }
-            EtaField(
-                label = "Soziale Interaktion pro Woche",
-                hint = "Ohne feste Uhrzeit — wird von den freien Stunden abgezogen.",
-            ) {
-                EtaDurationPicker(
-                    value = draft.socialTimePerWeek,
-                    onValueChange = { duration ->
-                        onChange { it.copy(socialTimePerWeek = duration) }
-                    },
-                    step = 30.minutes,
-                )
-            }
         }
     }
 }
@@ -847,7 +835,7 @@ fun SummaryStep(outlook: SetupOutlook) {
             }
             EtaText(
                 text = "Das ist die Zeit, die in der Wochenplanung zu vergeben ist — " +
-                    "abzüglich Schlaf, fester Termine und deiner Sozialzeit.",
+                    "abzüglich Schlaf und fester Termine.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )

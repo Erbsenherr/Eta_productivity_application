@@ -80,11 +80,50 @@ before midnight, which is exactly when a new app gets tried.
 - **The setup row is written directly** (`TutorialSeed`), not through
   `SetupRepository.complete`, which would add bed preparation and the morning to a
   day the texts say has four tasks. `tutorialSetup` is the questionnaire's draft
-  with every page skipped and every Advanced Feature off.
+  with every page skipped, the points on, and the other Advanced Features on only
+  in a tutorial about one (`TutorialId.advanced`).
+
+#### Five tutorials (third round)
+
+`TutorialId` (`domain/tutorial/TutorialCatalogue.kt`): **Quickstart**, **Extras**,
+**Growth-Tasks**, **Verträge**, **Belohn-o-mat**. Each is a list of steps over the
+same machinery; `TutorialViewModel.tutorial` says which runs, and `TutorialSeed.lay`
+is told so it can add what that one needs.
+
+- **The points are in the Quickstart, not a tutorial of their own.** The tracker
+  is on for a new setup now, and on in the practice app, so the Quickstart frames
+  the account ("Dein Punktekonto", which also says where to switch it off), says
+  what a category pays, stops on the evening's settlement page ("Die
+  Abrechnung"), and has the user turn to the second revolver before explaining
+  Custom Earn and Custom Spend. Its last words point at the other tutorials.
+- **The settlement of the example day is negative**, and the step says why: four
+  short tasks leave most of the day unplanned, and unplanned time is charged.
+  Deliberately not papered over with a seeded free-time block — the day the
+  texts name has four tasks, and the charge is the mechanic.
+- **A feature tutorial stays on its feature's tab** (`TutorialStage.GROWTH` /
+  `CONTRACTS` / `REWARDS`) and has one `TASK`: make one. Done is a count read off
+  the practice database. **Creating happens in a dialog, and a dialog is a window
+  of its own that covers the coach** — so the step says everything the form will
+  ask *before* it is opened, and says that the bar comes back afterwards. Nothing
+  can be framed or gated inside a dialog; do not write a step that needs it.
+- **The Extras tutorial runs on the evening's card** (`TutorialStage.EXTRAS`,
+  the same `ConcretizeScreen`), for that reason: it is the one place the Extras
+  box is not inside a dialog. A seeded note, "Zahnarzt", is what it is shown on.
+  `ExtrasBox` wraps each extra in a box with a `tutorialSpot`, and reports
+  `EXTRAS_OPEN` from inside the fold — composed only while it is open. The card's
+  own buttons stay grey throughout, no step opening them.
+- **Reached three ways**: the choice screen lists all of them under the
+  Quickstart; the tutorial page of the settings does; and so does the Advanced
+  Features page. From the settings a named one starts **at once**
+  (`TutorialStore.request(id)`, `enter(direct = …)`) — no idea page, no list.
+- The contracts tutorial does **not** walk into the evening to show the question
+  being asked: whether a contract signed today is asked about today was not
+  verified, and a step that waits for a page that may not come would hold the
+  tutorial shut.
 
 #### The script
 
-`domain/tutorial/TutorialScript.kt` holds `QUICKSTART`, pure Kotlin and pinned by
+`domain/tutorial/TutorialScript.kt` holds `QUICKSTART_STEPS`, pure Kotlin and pinned by
 `TutorialTest`. A step names its stage (which screen is up), a title, a text, and
 how it is left:
 
@@ -128,7 +167,7 @@ the note has left the Sammelliste by being filled in.
 **Where the script differs from `update.txt`, because the app does:** the catch-up
 lands in the **Sammelliste**, not the week list; filling in a Quick-Add asks for
 **no note** (still an open question in `CLAUDE.md`); the weekly planning opens on
-its **Rückblick** page; the Tagesabschluss's steps are not locked one by one. The
+the **Wertverfall** and its **Rückblick** page; the Tagesabschluss's steps are not locked one by one. The
 texts say what the screens do.
 
 #### Gates: the screens' own buttons wait for their step
@@ -195,7 +234,7 @@ there is a setup row, and it is a fact about this install. Not in a backup.
 - **A process death mid-run starts over** at the choice (first run) or returns to
   the app (repeat): the practice database lived in memory.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (557, 26 in
+**Verified by the compiler (`--rerun-tasks`), the suite (564, 33 in
 `TutorialTest`), `assembleRelease` and `lint`.** Nobody has seen it, and more than
 usual rests on that here: whether an in-memory Room database opens on a phone,
 whether the frame and the scroll-into-view land where they should, how much of a

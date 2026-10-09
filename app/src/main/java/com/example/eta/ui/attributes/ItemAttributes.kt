@@ -1,6 +1,7 @@
 package com.example.eta.ui.attributes
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -58,7 +59,9 @@ import com.example.eta.ui.components.EtaDurationPicker
 import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
 import com.example.eta.ui.components.EtaStepper
+import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.domain.tutorial.TutorialSpot
+import com.example.eta.ui.components.ReportToTutorial
 import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.tutorialSpot
@@ -954,6 +957,7 @@ fun ExtrasBox(
 
     EtaExpander(
         label = "Extras",
+        modifier = Modifier.tutorialSpot(TutorialSpot.EXTRAS),
         hint = "Wege, Pause, Töne, Pomodoro, Erinnerung" +
             (if (today != null) ", Deadline" else "") +
             (if (onSubtasks != null) ", Subtasks" else "") +
@@ -965,35 +969,54 @@ fun ExtrasBox(
             else -> "$active aktiv"
         },
     ) {
-        CheckRow(
-            checked = endSound,
-            onCheckedChange = onEndSound,
-            label = "Ton am Ende",
-            hint = "Meldet sich, wenn die geplante Zeit abgelaufen ist — nicht beim Abhaken.",
-        )
-        MarginRow(
-            label = "Anfahrtszeit",
-            hint = "Liegt vor der Aufgabe und gehört zu ihr — sie wird mitverschoben.",
-            value = travel,
-            onValueChange = onTravel,
-        )
-        MarginRow(
-            label = "Rückweg",
-            hint = "Der Weg zurück, direkt hinter der Aufgabe und noch vor der Pause.",
-            value = returnAfter,
-            onValueChange = onReturnAfter,
-        )
-        MarginRow(
-            label = "Pause danach",
-            hint = "Liegt ganz am Ende. Passt sie an keiner Stelle des Tages, wird beim " +
-                "Einplanen gefragt — die Wege selbst nie.",
-            value = breakAfter,
-            onValueChange = onBreakAfter,
-        )
-        PomodoroRow(extras = extras, onExtras = onExtras)
-        ReminderRow(extras = extras, onExtras = onExtras)
+        // Composed only while the box is open, which is what this says.
+        ReportToTutorial(TutorialSignal.EXTRAS_OPEN, "1")
+
+        // Each extra in a box of its own, so the tutorial can frame one of them.
+        Box(Modifier.tutorialSpot(TutorialSpot.EXTRA_SOUND)) {
+            CheckRow(
+                checked = endSound,
+                onCheckedChange = onEndSound,
+                label = "Ton am Ende",
+                hint = "Meldet sich, wenn die geplante Zeit abgelaufen ist — nicht beim Abhaken.",
+            )
+        }
+        Column(
+            modifier = Modifier.tutorialSpot(TutorialSpot.EXTRA_TRAVEL),
+            verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
+        ) {
+            MarginRow(
+                label = "Anfahrtszeit",
+                hint = "Liegt vor der Aufgabe und gehört zu ihr — sie wird mitverschoben.",
+                value = travel,
+                onValueChange = onTravel,
+            )
+            MarginRow(
+                label = "Rückweg",
+                hint = "Der Weg zurück, direkt hinter der Aufgabe und noch vor der Pause.",
+                value = returnAfter,
+                onValueChange = onReturnAfter,
+            )
+        }
+        Box(Modifier.tutorialSpot(TutorialSpot.EXTRA_BREAK)) {
+            MarginRow(
+                label = "Pause danach",
+                hint = "Liegt ganz am Ende. Passt sie an keiner Stelle des Tages, wird beim " +
+                    "Einplanen gefragt — die Wege selbst nie.",
+                value = breakAfter,
+                onValueChange = onBreakAfter,
+            )
+        }
+        Box(Modifier.tutorialSpot(TutorialSpot.EXTRA_POMODORO)) {
+            PomodoroRow(extras = extras, onExtras = onExtras)
+        }
+        Box(Modifier.tutorialSpot(TutorialSpot.EXTRA_REMINDER)) {
+            ReminderRow(extras = extras, onExtras = onExtras)
+        }
         if (today != null) {
-            DeadlineRow(today = today, extras = extras, onExtras = onExtras)
+            Box(Modifier.tutorialSpot(TutorialSpot.EXTRA_DEADLINE)) {
+                DeadlineRow(today = today, extras = extras, onExtras = onExtras)
+            }
         }
         if (onGrowth != null) {
             GrowthRow(growth = growth, onGrowth = onGrowth, issues = growthIssues)
@@ -1002,13 +1025,18 @@ fun ExtrasBox(
             QuantityRow(extras = extras, onExtras = onExtras)
         }
         if (subtasks != null && onSubtasks != null) {
-            SubtaskSection(
-                setting = subtasks,
-                onChange = onSubtasks,
-                candidates = foldCandidates,
-                routineMode = extras.routineMode,
-                onRoutineMode = { onExtras(extras.copy(routineMode = it)) },
-            )
+            Column(
+                modifier = Modifier.tutorialSpot(TutorialSpot.EXTRA_SUBTASKS),
+                verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
+            ) {
+                SubtaskSection(
+                    setting = subtasks,
+                    onChange = onSubtasks,
+                    candidates = foldCandidates,
+                    routineMode = extras.routineMode,
+                    onRoutineMode = { onExtras(extras.copy(routineMode = it)) },
+                )
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.eta.di.AppContainer
 import com.example.eta.domain.model.Stage
-import com.example.eta.domain.tutorial.QUICKSTART
+import com.example.eta.domain.tutorial.TutorialId
 import com.example.eta.domain.tutorial.StepKind
 import com.example.eta.domain.tutorial.TUTORIAL_EVENING
 import com.example.eta.domain.tutorial.TUTORIAL_MORNING
@@ -106,7 +106,11 @@ class TutorialViewModel(
     private val store: TutorialStore,
 ) : ViewModel() {
 
-    val steps: List<TutorialStep> = QUICKSTART
+    /** Which tutorial is running; its steps are what everything below walks. */
+    var tutorial: TutorialId = TutorialId.QUICKSTART
+        private set
+
+    val steps: List<TutorialStep> get() = tutorial.steps
 
     private val _phase = MutableStateFlow(TutorialPhase.IDLE)
     val phase: StateFlow<TutorialPhase> = _phase.asStateFlow()
@@ -134,7 +138,7 @@ class TutorialViewModel(
 
     /** Which half of the simulated day the clock stands in. */
     private var evening = false
-    private val eveningFrom = steps.indexOfFirst { it.evening }
+    private val eveningFrom: Int get() = steps.indexOfFirst { it.evening }
 
     val guide = TutorialGuide { key, value ->
         signals.update {
@@ -170,6 +174,13 @@ class TutorialViewModel(
     private fun databaseFacts(session: TutorialSession): Flow<TutorialFacts> {
         val container = session.container
         val today = session.clock.today
+        // What the feature tutorials have the user make, counted.
+        val made = combine(
+            container.growthService.observeGrowthTasks(),
+            container.contractRepository.observeAll(),
+            container.rewardRepository.observe(),
+        ) { growth, contracts, rewards -> Triple(growth.size, contracts.size, rewards.size) }
+
         return combine(
             container.itemRepository.observeStage(Stage.COLLECTION),
             container.itemRepository.observeStage(Stage.WEEK),
@@ -184,6 +195,8 @@ class TutorialViewModel(
                 tomorrow = tomorrowBlocks,
                 daySettled = dayPlan?.settledAt != null,
             )
+        }.combine(made) { facts, (growth, contracts, rewards) ->
+            facts.copy(growthTasks = growth, contracts = contracts, rewards = rewards)
         }.scan(TutorialFacts()) { earlier, now -> now.remembering(earlier) }
     }
 
@@ -191,8 +204,15 @@ class TutorialViewModel(
      * The tutorial has come onto the screen. Does nothing when it already was —
      * this view model outlives a rotation, and the run with it.
      */
-    fun enter(showConcept: Boolean) {
+    fun enter(showConcept: Boolean, direct: TutorialId? = null) {
         if (_phase.value != TutorialPhase.IDLE) return
+        if (direct != null) {
+            // Asked for by name, beside the switch it explains: no page about
+            // the idea of the app and no list to pick it from again.
+            _phase.value = TutorialPhase.CHOICE
+            start(direct)
+            return
+        }
         _phase.value = if (showConcept) TutorialPhase.CONCEPT else TutorialPhase.CHOICE
     }
 
@@ -201,12 +221,13 @@ class TutorialViewModel(
     }
 
     /** Builds the practice app and its example day, then shows the first step. */
-    fun startQuickstart() {
+    fun start(id: TutorialId) {
         if (_phase.value != TutorialPhase.CHOICE) return
         _phase.value = TutorialPhase.LOADING
+        tutorial = id
         viewModelScope.launch {
             val session = TutorialSession(appContext)
-            session.container.tutorialSeed?.lay()
+            session.container.tutorialSeed?.lay(id)
             signals.value = Signals()
             evening = false
             _session.value = session

@@ -159,10 +159,12 @@ class SetupScheduleTest {
     }
 
     @Test
-    fun `free hours subtract sleep, appointments and the social budget`() {
+    fun `free hours subtract sleep and appointments, and a stored social budget is not read`() {
+        // The question is gone; a figure left over from before must not shorten
+        // the week by hours no screen accounts for.
         val setup = bareSetup().copy(socialTimePerWeek = 3.hours)
-        // 7 × 24 h minus 7 × 9 h of night and winding down, minus 3 h social.
-        assertEquals((7 * 24 - 7 * 9 - 3) * 60, setup.freeMinutesPerWeek())
+        // 7 × 24 h minus 7 × 9 h of night and winding down.
+        assertEquals((7 * 24 - 7 * 9) * 60, setup.freeMinutesPerWeek())
     }
 
     @Test

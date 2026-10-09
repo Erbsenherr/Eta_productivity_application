@@ -77,22 +77,23 @@ fun tutorialItems(today: DayOfWeek, now: Instant): List<Item> = listOf(
 
 /**
  * The setup the practice database runs on: the questionnaire's defaults with
- * every optional page skipped, so the week is as good as empty, and every
- * Advanced Feature off, which is what a newcomer's own app looks like.
+ * every optional page skipped, so the week is as good as empty. The points are
+ * on, as they are for a newcomer; the other Advanced Features only where the
+ * tutorial is about one ([advanced]).
  *
  * Never the user's own answers — the tutorial reads nothing of theirs either.
  */
-fun tutorialSetup(now: Instant): UserSetup = UserSetup.draft(now)
+fun tutorialSetup(now: Instant, advanced: Boolean = false): UserSetup = UserSetup.draft(now)
     .skipping(SetupPart.entries.toSet())
     .copy(
         // The hour the simulated day jumps to: a quiet countdown at the foot of
         // the dashboard all morning, and owed — at the top — the moment the
         // tutorial says it is evening.
         dailyPlanningTime = TUTORIAL_EVENING,
-        pointsSystem = false,
-        growthTasks = false,
-        contracts = false,
-        rewards = false,
+        pointsSystem = true,
+        growthTasks = advanced,
+        contracts = advanced,
+        rewards = advanced,
         completedAt = now,
         updatedAt = now,
     )

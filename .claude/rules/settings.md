@@ -13,7 +13,9 @@ order under three section labels; the menu shows titles and nothing else, a tap
 opens the page, "‹ Einstellungen" or the system back returns. The page is held
 by name in `rememberSaveable`. Urlaubsmodus is a row that leads straight to its
 flow, Wertverfall and Absagen are listed only while the points are on, and
-Tutorial is the last row, under Debug.
+Tutorial is the last row, under Debug. The tutorial page lists every tutorial;
+the ones about a single subject (`FeatureTutorialsBox`) are mounted a second
+time under the Advanced Features switches, where "what is this?" gets asked.
 
 - **Saving stays explicit, per page.** `SettingsViewModel.dirty` compares the
   draft with the stored row: a page offers "Sichern" (grey while there is
@@ -33,14 +35,14 @@ answers arrive, so there is never a set of defaults on screen that the user migh
 save by accident.
 
 **Since step 18 only the answers that are configuration are here**: sleep and
-morning, the wake alarm, social time, the still-active question, the planning times,
+morning, the wake alarm, the still-active question, the planning times,
 the four "Advanced Features" switches (`AdvancedFeaturesBox` — see *Step 36*; they
 apply at once, and the points one folds the next two away), inflation and the cancellation rate. Meals, housekeeping, sport, free time,
 mindfulness and work are standing *tasks* and are edited on the Listen tab. Saving
 goes through `SetupRepository.saveSettings`, which regenerates only bed preparation
 and the morning (`SETTINGS_OWNED_ITEM_IDS`: `setup:bedprep`, `setup:morning`), never `complete` — calling `complete`
-here would overwrite every edit made on the Listen tab. Social time is not a task,
-so it has a `SocialTimeBox` of its own, and `SettingsMessage.Saved` lost its conflict
+here would overwrite every edit made on the Listen tab. The weekly social budget and its `SocialTimeBox` were removed in step 38, and
+`SettingsMessage.Saved` lost its conflict
 count, `UserSetup.conflicts()` having described answers that no longer describe the
 schedule.
 

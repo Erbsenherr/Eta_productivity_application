@@ -220,7 +220,7 @@ fun List<SetupSpan>.occupiedMinutes(): Int {
 }
 
 /**
- * What is left of the week once the standing schedule and the social budget are
+ * What is left of the week once the standing schedule is
  * taken out — the "Freistunden" the weekly planning phase distributes.
  */
 fun UserSetup.freeMinutesPerWeek(): Int {
@@ -228,6 +228,5 @@ fun UserSetup.freeMinutesPerWeek(): Int {
         .groupBy { it.weekday }
         .values
         .sumOf { it.occupiedMinutes() }
-    val social = socialTimePerWeek.inWholeMinutes.toInt()
-    return (WEEK.size * MINUTES_PER_DAY - occupied - social).coerceAtLeast(0)
+    return (WEEK.size * MINUTES_PER_DAY - occupied).coerceAtLeast(0)
 }

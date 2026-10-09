@@ -385,7 +385,7 @@ private fun MainScaffold(
                     },
                     onDebugReset = rootViewModel::resetEverything,
                     onOpenVacation = { flow = AppFlow.Vacation },
-                    onRepeatTutorial = container.tutorialStore::request,
+                    onStartTutorial = { id -> container.tutorialStore.request(id?.name) },
                 )
             }
         }
@@ -674,7 +674,7 @@ private fun smartListsViewModelFactory(container: AppContainer): ViewModelProvid
         }
     }
 
-private fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             RewardsViewModel(
@@ -684,7 +684,7 @@ private fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider.
         }
     }
 
-private fun growthTasksViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun growthTasksViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             GrowthTasksViewModel(
@@ -706,9 +706,9 @@ private fun remindersViewModelFactory(container: AppContainer): ViewModelProvide
         }
     }
 
-private fun contractsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun contractsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { ContractsViewModel(container.contractRepository) }
+        initializer { ContractsViewModel(container.contractRepository, clock = container.clock) }
     }
 
 internal fun reevaluationViewModelFactory(container: AppContainer): ViewModelProvider.Factory =

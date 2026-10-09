@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.eta.data.repository.WeekScope
+import com.example.eta.domain.tutorial.TutorialId
 import com.example.eta.domain.tutorial.TutorialStage
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
@@ -35,6 +36,12 @@ import com.example.eta.ui.components.LocalFeatures
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.LocalTutorialGuide
 import com.example.eta.ui.concretize.ConcretizeScreen
+import com.example.eta.ui.contracts.ContractsScreen
+import com.example.eta.ui.growth.GrowthTasksScreen
+import com.example.eta.ui.rewards.RewardsScreen
+import com.example.eta.ui.root.contractsViewModelFactory
+import com.example.eta.ui.root.growthTasksViewModelFactory
+import com.example.eta.ui.root.rewardsViewModelFactory
 import com.example.eta.ui.dashboard.DashboardScreen
 import com.example.eta.ui.planner.DayPlannerScreen
 import com.example.eta.ui.planner.PlannerDay
@@ -71,7 +78,12 @@ fun TutorialHost(store: TutorialStore) {
 
     // Asked for from the settings, the idea of the app is told again first; on
     // a first run it was read a moment ago, before the questionnaire.
-    LaunchedEffect(Unit) { tutorial.enter(showConcept = state.requested) }
+    LaunchedEffect(Unit) {
+        tutorial.enter(
+            showConcept = state.requested,
+            direct = TutorialId.named(state.requestedId),
+        )
+    }
 
     // Before the screens, so that a phase's own back handler still comes first.
     // Only while it runs: on the pages before it, back leaves the app as ever.
@@ -85,7 +97,7 @@ fun TutorialHost(store: TutorialStore) {
         )
 
         phase == TutorialPhase.CHOICE -> TutorialChoiceScreen(
-            onQuickstart = tutorial::startQuickstart,
+            onStart = tutorial::start,
             onSkip = tutorial::finish,
         )
 
@@ -122,9 +134,12 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
                 LocalViewModelStoreOwner provides session,
                 LocalTutorialGuide provides tutorial.guide,
                 LocalEtaClock provides session.clock,
-                // What a newcomer's own app shows: no points, no extra tabs.
-                LocalPointsVisible provides false,
-                LocalFeatures provides Features(growthTasks = false, contracts = false, rewards = false),
+                // The points are on, as for a newcomer. The other features only
+                // in a tutorial about one of them.
+                LocalPointsVisible provides true,
+                LocalFeatures provides tutorial.tutorial.advanced.let { on ->
+                    Features(growthTasks = on, contracts = on, rewards = on)
+                },
             ) {
                 StageScreen(step.stage, session, tutorial)
             }
@@ -174,12 +189,14 @@ private fun StageScreen(
             onClose = { tutorial.exitPressed(TutorialStage.REEVALUATION) },
         )
 
-        TutorialStage.CONCRETIZE -> ConcretizeScreen(
+        // The Extras live under every card; the evening's is the one that is
+        // not inside a dialog, which would cover the coach.
+        TutorialStage.CONCRETIZE, TutorialStage.EXTRAS -> ConcretizeScreen(
             viewModel = viewModel(
                 key = "tutorial-concretize",
                 factory = concretizeViewModelFactory(container),
             ),
-            onDone = { tutorial.exitPressed(TutorialStage.CONCRETIZE) },
+            onDone = { tutorial.exitPressed(stage) },
         )
 
         TutorialStage.WEEK -> WeekPlannerScreen(
@@ -200,17 +217,34 @@ private fun StageScreen(
             onClose = { tutorial.exitPressed(TutorialStage.PLANNER) },
             onTopUpWeek = tutorial::locked,
         )
+
+        TutorialStage.GROWTH -> GrowthTasksScreen(
+            viewModel = viewModel(key = "tutorial-growth", factory = growthTasksViewModelFactory(container)),
+        )
+
+        TutorialStage.CONTRACTS -> ContractsScreen(
+            viewModel = viewModel(
+                key = "tutorial-contracts",
+                factory = contractsViewModelFactory(container),
+            ),
+        )
+
+        TutorialStage.REWARDS -> RewardsScreen(
+            viewModel = viewModel(key = "tutorial-rewards", factory = rewardsViewModelFactory(container)),
+        )
     }
 }
 
 /**
- * Quickstart, or the long one.
+ * Which tutorial.
  *
- * The long one is drawn and greyed out rather than left off: it is announced,
- * and a choice of one would not read as a choice.
+ * The Quickstart leads; the long one is drawn and greyed out rather than left
+ * off, being announced. Below them the tutorials about one thing each — the
+ * Extras and the three Advanced Features — which nobody is led through, and
+ * which are also reachable from the settings beside what they explain.
  */
 @Composable
-private fun TutorialChoiceScreen(onQuickstart: () -> Unit, onSkip: () -> Unit) {
+private fun TutorialChoiceScreen(onStart: (TutorialId) -> Unit, onSkip: () -> Unit) {
     EtaScreen {
         TutorialPage {
             EtaText(text = "Tutorial", style = EtaTheme.typography.display)
@@ -231,7 +265,10 @@ private fun TutorialChoiceScreen(onQuickstart: () -> Unit, onSkip: () -> Unit) {
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textSecondary,
                     )
-                    EtaButton(text = "Quickstart starten", onClick = onQuickstart)
+                    EtaButton(
+                        text = "Quickstart starten",
+                        onClick = { onStart(TutorialId.QUICKSTART) },
+                    )
                 }
             }
 
@@ -251,13 +288,38 @@ private fun TutorialChoiceScreen(onQuickstart: () -> Unit, onSkip: () -> Unit) {
                 }
             }
 
+            EtaSurface(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+                    EtaText(text = "Einzelne Themen", style = EtaTheme.typography.heading)
+                    EtaText(
+                        text = "Kurze Tutorials zu dem, was über den Alltag hinausgeht. Am " +
+                            "besten nach dem Quickstart.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textSecondary,
+                    )
+                    TutorialId.further.forEach { id ->
+                        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+                            EtaButton(
+                                text = id.title,
+                                style = EtaButtonStyle.Secondary,
+                                onClick = { onStart(id) },
+                            )
+                            EtaText(
+                                text = id.summary,
+                                style = EtaTheme.typography.caption,
+                                color = EtaTheme.colors.textMuted,
+                            )
+                        }
+                    }
+                }
+            }
+
             Row {
                 Spacer(Modifier.weight(1f))
                 EtaButton(text = "Überspringen", style = EtaButtonStyle.Secondary, onClick = onSkip)
             }
             EtaText(
-                text = "Du kannst das Tutorial jederzeit wiederholen: in den Einstellungen, " +
-                    "ganz unten.",
+                text = "Alle Tutorials findest du jederzeit wieder: Einstellungen → Tutorial.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )

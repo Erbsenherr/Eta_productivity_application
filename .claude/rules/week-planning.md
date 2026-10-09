@@ -17,9 +17,9 @@ paths:
   disagree with it. Reopening the screen therefore cannot charge twice.
 - **Free hours come from the blocks, not from the setup answers.** The two agree for
   a fresh setup, but a recurring task created afterwards only shows up in the blocks
-  — a week computing its budget from `weeklySpans()` would be lying. Sleep and the
-  social lump come out first; social time has no fixed hour, so it can only be
-  reserved as a lump.
+  — a week computing its budget from `weeklySpans()` would be lying. Sleep comes out first. A weekly
+  "social" lump used to come out as well; the question was dropped in step 38 and
+  `weekBudget` no longer reads the stored figure.
 - **`costOf` is what a ToDo really costs the week**: its duration plus the break it
   earns. `breakFor` reads the rule as two tiers — an hour earns 15 minutes, an hour
   and a half or more earns 25. **Assumption:** "pro 1.5 Stunden" could also mean 25

@@ -71,7 +71,7 @@ class WeekPlanningTest {
         )
     }
 
-    /** Eight hours of night and four hours of social time a week. */
+    /** Eight hours of night — and a social budget from before the question was dropped. */
     private fun setup() = UserSetup.draft(now).copy(
         sleepTime = LocalTime(23, 0),
         wakeTime = LocalTime(7, 0),
@@ -115,9 +115,9 @@ class WeekPlanningTest {
     }
 
     @Test
-    fun `the week budget takes out sleep and the social lump first`() {
+    fun `the week budget takes out sleep and ignores a stored social lump`() {
         val budget = weekBudget(setup(), emptyList(), emptyList())
-        assertEquals((7 * 24 - 7 * 8) * 60 - 4 * 60, budget.availableMinutes)
+        assertEquals((7 * 24 - 7 * 8) * 60, budget.availableMinutes)
         assertEquals(budget.availableMinutes, budget.freeMinutes)
         assertFalse(budget.overbooked)
     }

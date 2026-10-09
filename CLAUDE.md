@@ -51,7 +51,7 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (557 tests
+this machine, so everything is verified by compilation, the unit suite (564 tests
 as of step 38), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
@@ -302,7 +302,8 @@ see *Step 35*.
 **The points system can be put out of sight** (`UserSetup.pointsSystem`), which
 hides every figure and books everything exactly as before. A screen that shows a
 figure in points reads `LocalPointsVisible` — see *Step 35*. It is one of four
-"Advanced Features", **all off for a new setup**; Growth-Tasks, Verträge and the
+"Advanced Features" — **the points on for a new setup since step 38, the other
+three off**; Growth-Tasks, Verträge and the
 Belohn-o-mat are the others and are read through `LocalFeatures` — see *Step 36*.
 
 `yieldOf(item, block)` in `domain/reward/Yield.kt` is the single place points are
@@ -378,7 +379,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
 | `step-35-belohnomat.md` | *Step 35*: the Belohn-o-mat (`Reward`, `pourInto`, Aufgabenbindung, the evening's fill page, placeholder sounds), the points system out of sight (`UserSetup.pointsSystem`, `LocalPointsVisible`), the long press on three list headings |
 | `step-36-advanced-features.md` | *Step 36*: Advanced Features (`LocalFeatures`, the four switches, applied at once), "Freigeschaltet ab" (`targetDate`'s new meaning, `collectionClockStart`, `EtaDatePickerDialog`), Abweichende Uhrzeiten (`rulesWithTimes`), the Sperrliste last, the free-time info button |
-| `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the script (`QUICKSTART`, `TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), and when it is shown (`TutorialStore`) |
+| `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the tutorials there are (`TutorialId`: Quickstart, Extras, Growth-Tasks, Verträge, Belohn-o-mat) and their scripts (`TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), and when it is shown (`TutorialStore`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -404,9 +405,10 @@ These came out of discussion with the user and are not all derivable from `Eta_d
 - **Sperrliste identity:** normalized name (trimmed, lowercased).
 - **Spend covers both** Custom Spend and Custom Earn via a signed `pointsPerHour`. The
   second revolver's third entry, "Social", is assumed neutral at 0
-  (`SOCIAL_POINTS_PER_HOUR`): the setup already budgets social time out of the free
-  hours, so paying for it again would count it twice. `Belohnungssystem.md` gives no
-  rate for it.
+  (`SOCIAL_POINTS_PER_HOUR`). `Belohnungssystem.md` gives no rate for it. The
+  weekly "Soziale Interaktion" budget it was once argued from is **gone** (step 38):
+  not asked, not shown, and `socialTimePerWeek` — the column stays — is read by
+  nothing.
 - **The questionnaire's framework blocks carry no category** and therefore no yield;
   "Arbeit / Uni" is the exception and counts as Fokus **for now** — the Listen tab is
   where that provisional choice gets corrected.

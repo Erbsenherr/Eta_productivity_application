@@ -391,12 +391,12 @@ data class UserSetup(
      * is written exactly as before, so switching it back on shows the balance as
      * if it had never been away. Read by the screens through `LocalPointsVisible`.
      *
-     * The first of the four "Advanced Features". All four are **off for a new
-     * setup**, so someone meeting the app for the first time finds three tabs
-     * and no account to puzzle over; whoever was already using them keeps them,
-     * the migration having switched every existing row on.
+     * The first of the four "Advanced Features", and the only one **on for a new
+     * setup** — the user's later decision: the points are what the app's rules
+     * are priced in, and the tutorial explains them. The other three stay off,
+     * so a newcomer still finds few tabs.
      */
-    val pointsSystem: Boolean = false,
+    val pointsSystem: Boolean = true,
     /**
      * Whether the Growth-Tasks tab and the Growth-Task extra are on show. Off
      * hides them; a task that already grows goes on growing.
@@ -435,7 +435,8 @@ data class UserSetup(
             // that are simply accepted must not collide with each other.
             sport = WeeklySlot(DayOfWeek.TUESDAY, LocalTime(17, 15), 1.hours),
             freeTime = DailySlot(LocalTime(20, 0), 1.hours + 30.minutes),
-            socialTimePerWeek = 4.hours,
+            // No longer asked or read; the column stays so no migration is needed.
+            socialTimePerWeek = Duration.ZERO,
             mindfulness = MindfulnessPlan.EveryDay(DailySlot(LocalTime(21, 30), 15.minutes)),
             work = WorkSchedule.EveryWorkday(
                 WorkBlock(

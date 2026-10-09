@@ -42,7 +42,9 @@ import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.snapToGrid
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.ReportToTutorial
 import com.example.eta.ui.components.tutorialAllows
+import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.domain.tutorial.TutorialGate
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
@@ -130,6 +132,7 @@ fun DayPlannerScreen(
 
     val scrollState = rememberScrollState()
     var revolverKind by remember { mutableStateOf(RevolverKind.TASKS) }
+    ReportToTutorial(TutorialSignal.PLANNER_REVOLVER, revolverKind.name)
     var revolverIndex by remember { mutableIntStateOf(0) }
 
     var rootOffset by remember { mutableStateOf(Offset.Zero) }

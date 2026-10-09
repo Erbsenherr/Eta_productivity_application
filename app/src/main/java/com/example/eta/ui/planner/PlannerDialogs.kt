@@ -710,7 +710,7 @@ fun SpendDialog(
                 hint = when (kind) {
                     SpendKind.CUSTOM_SPEND -> "Negativ: zehrt vom Konto."
                     SpendKind.CUSTOM_EARN -> "Positiv: schreibt gut."
-                    SpendKind.SOCIAL -> "Sozialzeit ist im Setup schon eingerechnet."
+                    SpendKind.SOCIAL -> "Neutral: bringt und kostet nichts."
                 },
             )
         }

@@ -94,8 +94,10 @@ private fun mergedMinutes(blocks: List<BlockWithItem>): Int {
 /**
  * What the week has left.
  *
- * Sleep and the social budget come out first, as `Planungsphase.md` asks — social
- * time has no fixed hour, so it can only be reserved as a lump.
+ * Sleep comes out first. There used to be a weekly lump of "social time" taken
+ * out as well; the question was dropped at the user's request, and a figure
+ * still stored from before is deliberately not read — it would shorten the week
+ * by hours nothing on any screen accounts for.
  */
 fun weekBudget(
     setup: UserSetup?,
@@ -105,10 +107,9 @@ fun weekBudget(
     val wholeWeek = DAYS_PER_WEEK * MINUTES_PER_DAY
     // Night by night: a weekend that sleeps longer has fewer hours to give.
     val sleep = setup?.sleepMinutesPerWeek() ?: 0
-    val social = setup?.socialTimePerWeek?.inWholeMinutes?.toInt() ?: 0
 
     return WeekBudget(
-        availableMinutes = (wholeWeek - sleep - social).coerceAtLeast(0),
+        availableMinutes = (wholeWeek - sleep).coerceAtLeast(0),
         committedMinutes = occupiedMinutesOfWeek(blocks),
         plannedMinutes = weekList.sumOf {
             costOf(it.estimatedDuration ?: Duration.ZERO).inWholeMinutes.toInt()

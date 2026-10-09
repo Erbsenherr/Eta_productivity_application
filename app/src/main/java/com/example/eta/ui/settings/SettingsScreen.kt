@@ -1,5 +1,6 @@
 package com.example.eta.ui.settings
 
+import com.example.eta.domain.tutorial.TutorialId
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -100,7 +101,11 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onDebugReset: (() -> Unit)? = null,
     onOpenVacation: () -> Unit = {},
-    onRepeatTutorial: (() -> Unit)? = null,
+    /**
+     * Starts a tutorial: null is the choice of all of them, an id that one at
+     * once. Offered on the tutorial page and beside the Advanced Features.
+     */
+    onStartTutorial: ((TutorialId?) -> Unit)? = null,
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -169,7 +174,7 @@ fun SettingsScreen(
                                 SettingsPage.INFLATION, SettingsPage.CANCELLATION ->
                                     setup?.pointsSystem == true
                                 SettingsPage.DEBUG -> onDebugReset != null
-                                SettingsPage.TUTORIAL -> onRepeatTutorial != null
+                                SettingsPage.TUTORIAL -> onStartTutorial != null
                                 else -> true
                             }
                         },
@@ -196,7 +201,7 @@ fun SettingsScreen(
                         onCatchUp = viewModel::catchUp,
                     )
 
-                    SettingsPage.TUTORIAL -> onRepeatTutorial?.let { TutorialBox(onRepeat = it) }
+                    SettingsPage.TUTORIAL -> onStartTutorial?.let { TutorialBox(onStart = it) }
                     SettingsPage.DEBUG -> onDebugReset?.let { DebugBox(onReset = it) }
 
                     // Everything below edits the draft of the stored answers.
@@ -224,11 +229,13 @@ fun SettingsScreen(
                             }
 
                             SettingsPage.WAKE -> WakeAlarmBox(setup, viewModel::update)
-                            SettingsPage.SOCIAL -> SocialTimeBox(setup, viewModel::update)
                             SettingsPage.STILL_ACTIVE -> StillActiveBox(setup, viewModel::update)
                             SettingsPage.ANNOUNCEMENT -> TaskAnnouncementBox(setup, viewModel::update)
                             SettingsPage.PLANNING -> PlanningStep(setup, viewModel::update)
-                            SettingsPage.FEATURES -> AdvancedFeaturesBox(setup, viewModel::setFeature)
+                            SettingsPage.FEATURES -> {
+                                AdvancedFeaturesBox(setup, viewModel::setFeature)
+                                onStartTutorial?.let { FeatureTutorialsBox(onStart = it) }
+                            }
                             SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
                             SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
                             else -> Unit
@@ -274,7 +281,6 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     SLEEP("Schlaf und Morgen", SettingsSection.SETUP),
     WAKE("Weckruf", SettingsSection.SETUP),
     PLANNING("Planungsphasen", SettingsSection.SETUP),
-    SOCIAL("Soziale Interaktion", SettingsSection.SETUP),
     STILL_ACTIVE("Bin ich noch bei der Sache?", SettingsSection.SETUP),
     ANNOUNCEMENT("Ansagen", SettingsSection.SETUP),
     FEATURES("Advanced Features", SettingsSection.SETUP),
@@ -406,33 +412,6 @@ private fun DesignBox(
 }
 
 /**
- * The weekly budget of social time.
- *
- * It used to sit under the free-time question, which is a standing task now and
- * lives on the Listen tab. This one has no hour and lays down no block — it is a
- * lump the weekly planning takes out of the free hours — so it stays here.
- */
-@Composable
-private fun SocialTimeBox(setup: UserSetup, onChange: OnSetupChange) {
-    EtaSurface(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
-            EtaText(text = "Soziale Interaktion", style = EtaTheme.typography.heading)
-            EtaField(
-                label = "Pro Woche",
-                hint = "Ohne feste Uhrzeit — wird in der Wochenplanung von den freien " +
-                    "Stunden abgezogen.",
-            ) {
-                EtaDurationPicker(
-                    value = setup.socialTimePerWeek,
-                    onValueChange = { duration -> onChange { it.copy(socialTimePerWeek = duration) } },
-                    step = 30.minutes,
-                )
-            }
-        }
-    }
-}
-
-/**
  * "Bin ich noch bei der Sache?" — asked at random moments during long tasks.
  *
  * Off by default. The count is per day across all tasks rather than per task, so
@@ -545,7 +524,8 @@ private fun TaskAnnouncementBox(setup: UserSetup, onChange: OnSetupChange) {
  * The four features a newcomer does not need on the first day, each on show or
  * not: the points, the Growth-Tasks, the contracts and the Belohn-o-mat.
  *
- * All off for a new setup, so the bar holds four tabs rather than seven. **A
+ * Only the points are on for a new setup, so the bar holds four tabs rather
+ * than seven. **A
  * switch hides and stops nothing**: points are booked, growth tasks grow,
  * contracts are paid as kept and rewards fill exactly as before, which is what
  * lets any of them be switched back on with everything where it would have been.
@@ -887,29 +867,65 @@ private fun MorningRoutineBox(
 }
 
 /**
- * "Tutorial wiederholen".
+ * The tutorials, all of them.
  *
- * Says before the button what it will and will not touch, because a tutorial
+ * Says before the buttons what they will and will not touch, because a tutorial
  * that has the user add and tick off tasks reads like something that might do
  * so to their own.
  */
 @Composable
-private fun TutorialBox(onRepeat: () -> Unit) {
+private fun TutorialBox(onStart: (TutorialId?) -> Unit) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaText(text = "Tutorial", style = EtaTheme.typography.heading)
             EtaText(
-                text = "Führt dich noch einmal durch einen simulierten Tag. Es arbeitet " +
-                    "nur mit Übungsdaten — deine Aufgaben, Punkte und Einstellungen " +
-                    "bleiben unberührt.",
+                text = "Führt dich noch einmal durch einen simulierten Tag. Alle Tutorials " +
+                    "arbeiten nur mit Übungsdaten — deine Aufgaben, Punkte und " +
+                    "Einstellungen bleiben unberührt.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textSecondary,
             )
             EtaButton(
                 text = "Tutorial wiederholen",
                 style = EtaButtonStyle.Secondary,
-                onClick = onRepeat,
+                onClick = { onStart(null) },
             )
+        }
+    }
+    FeatureTutorialsBox(onStart = onStart)
+}
+
+/**
+ * The tutorials about one thing each: the Extras and the three Advanced Features.
+ *
+ * Mounted twice — on the tutorial page, and under the switches of the Advanced
+ * Features, which is where the question "what is this?" is actually asked.
+ */
+@Composable
+private fun FeatureTutorialsBox(onStart: (TutorialId?) -> Unit) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Tutorials zu einzelnen Themen", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Kurz, mit Übungsdaten, und unabhängig davon, ob das Feature bei " +
+                    "dir eingeschaltet ist.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+            TutorialId.further.forEach { id ->
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+                    EtaButton(
+                        text = id.title,
+                        style = EtaButtonStyle.Secondary,
+                        onClick = { onStart(id) },
+                    )
+                    EtaText(
+                        text = id.summary,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
+            }
         }
     }
 }

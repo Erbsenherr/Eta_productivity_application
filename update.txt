@@ -1,9 +1,13 @@
-Quality of Life:
--Im tutorial: schritt zurück ermöglichen.
--Zwischen Schritt 7 und 8: Anstelle automatisch den Tagesabschluss zu prompten, erzähle dem Nutzer, die Zeit wäre voran geschritten und jetzt sei die Planungszeit erreicht. Dann zeig ihm den gehighlighteten Tagesabschlussbutton. So soll er in den Tagesabschluss gelangen.
--Bei Schritt 8: Der Nutzer soll nicht voranschreiten können, wenn er einen Haken bei "Mail versenden" gesetzt hat.
--Bei Schritt 9: Verhindere, dass der Nutzer das reguläre "Weiter" Drücken kann, graue dies aus.
--Füge einen Schritt nach 9 ein, der höhere Gewalt erklärt: Manchmal fällt etwas aus, auf das man keinen Einfluss hatte. Wenn das Punktesystem aktiv ist, ist das relevant. Dann kann man durch gedrückhalten der Task "Höhere Gewalt" anschalten. Der Mail-server war down und du konntest daher keine Mail versenden: Halte gedrückt.
--Generell soll der Nutzer nicht in der App auf weiter klicken können bzw. ToDos Übernehmen, sofern es noch nicht Zeit dazu ist - dann desynchronisiert sich Tutorial von Appstatus.
--Füge bei Seite 23 hinzu, dass hier auch neue ToDos angelegt werden können.
--In den Einstellungen: Die Einstellungen sollen deutlich übersichtlicher sein. Im Einstellungsmenüs sollen nur die Titel der Einstellungen liegen, die dann bei Klicken dessen Menüs öffnen. Von Dort aus können die Einstellungen dann verändert werden und es kann zum Hauptmenü der Einstellungen zurückgekehrt werden.
+Change: Der Punktetracker soll standardmäßig doch angeschaltet sein. Er soll in dem Tutorial berücksichtigt werden:
+-Die Punktebox auf dem "Heute" Screen soll beleuchtet werden
+-Der Einfluss der Kategorie auf die Punkteberechnung soll beleuchtet werden
+-Die Ausgabe und das dazulernen von Punkten durch Custom earn Custom spend soll beleuchtet werden
+-Die Punkteabrechnung am Ende des Tages soll beleuchtet werden
+-Es soll erwähnt werden, dass das Punktesystem abgeschaltet werden kann.
+-Am Ende des Tutorials soll außerdem erwähnt werden, dass es weitere Tutorials zu den anderen fortgeschrittenen Features gibt.
+
+-Der "Soziale Interaktion" Reiter im Menü soll entfernt werden, genauso wie jede Erwähnung dessen. Es ist schlicht nicht mehr relevant.
+
+-Es soll Tutorials geben, in denen das Anlegen und Funktionieren der Advanced Features beleuchtet werden (außer Punktetracker, da dieser bereits im Standard Tutorial enthalten sein soll)
+-Sowohl in dem Tutorial Reiter des Menüs, als auch aus dem Advanced Features Reiter soll auf die neuen Tutorials zugegriffen werden können
+-Es soll außerdem ein Tutorial geben, in dem einmal Schritt für Schritt alle Extras erläutert werden.

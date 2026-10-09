@@ -21,8 +21,9 @@ switches: **Punktetracker** (`UserSetup.pointsSystem`, unchanged in what it does
 see *Step 35*), **Growth-Tasks** (`growthTasks`), **Verträge** (`contracts`) and
 **Belohn-o-mat** (`rewards`).
 
-- **All four are off for a new setup**, the points included, so a newcomer finds
-  four tabs. **Every existing row is switched on by the migration** — mine to
+- **For a new setup the points are on and the other three off** — the points
+  were off as well until step 38, when the user turned that round and had the
+  tutorial explain them. A newcomer still finds four tabs. **Every existing row is switched on by the migration** — mine to
   decide: the user asked for "off by default", but nobody with contracts running
   should find the tab gone after an update. Switching them off is one tap each.
 - **A switch hides and stops nothing**, like the points: a growth task goes on
