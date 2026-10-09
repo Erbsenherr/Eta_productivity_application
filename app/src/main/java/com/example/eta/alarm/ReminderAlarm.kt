@@ -57,11 +57,17 @@ class ReminderCoordinator(
     private val taskReminders: TaskReminderService? = null,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /**
+     * False in the tutorial's sandbox: its tasks are examples, and an alarm for
+     * one would ring on the user's real phone — in place of their own.
+     */
+    private val enabled: Boolean = true,
 ) {
 
     private val alarmManager: AlarmManager? = context.getSystemService()
 
     suspend fun reschedule() {
+        if (!enabled) return
         val manager = alarmManager ?: return
         runCatching { taskReminders?.sync() }
         val next = nextReminderAlarm(repository.findPending(), clock.now())

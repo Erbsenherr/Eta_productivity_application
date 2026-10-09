@@ -57,6 +57,11 @@ class TaskStartCoordinator(
     private val setupRepository: SetupRepository,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /**
+     * False in the tutorial's sandbox: its tasks are examples, and an alarm for
+     * one would ring on the user's real phone — in place of their own.
+     */
+    private val enabled: Boolean = true,
 ) {
 
     private val scheduler = TaskStartAlarmScheduler(context)
@@ -69,6 +74,7 @@ class TaskStartCoordinator(
      * Cheap enough to call often — two day queries and one `AlarmManager` call.
      */
     suspend fun reschedule() {
+        if (!enabled) return
         val next = nextTaskEvent(blocksOfInterest(), clock.now(), timeZone, stillActivePerDay())
         if (next == null) scheduler.cancel() else scheduler.schedule(next)
     }

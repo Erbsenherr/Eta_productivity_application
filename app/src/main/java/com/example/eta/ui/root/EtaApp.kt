@@ -68,6 +68,8 @@ import com.example.eta.ui.settings.SettingsScreen
 import com.example.eta.ui.settings.SettingsViewModel
 import com.example.eta.ui.setup.SetupScreen
 import com.example.eta.ui.setup.SetupViewModel
+import com.example.eta.ui.tutorial.TutorialHost
+import com.example.eta.ui.tutorial.TutorialIntroScreen
 import com.example.eta.ui.vacation.VacationScreen
 import com.example.eta.ui.vacation.VacationViewModel
 import com.example.eta.ui.weekplanner.WeekPlannerScreen
@@ -91,6 +93,8 @@ fun EtaApp(
     val rootViewModel: RootViewModel = viewModel(factory = rootViewModelFactory(container))
     val destination by rootViewModel.destination.collectAsStateWithLifecycle()
 
+    val tutorial by container.tutorialStore.state.collectAsStateWithLifecycle()
+
     NotificationPermission()
 
     deferPhase?.let { phase ->
@@ -107,11 +111,25 @@ fun EtaApp(
     when (destination) {
         RootDestination.Loading -> EtaScreen {}
 
-        RootDestination.Setup -> SetupScreen(
-            viewModel = viewModel(factory = setupViewModelFactory(container)),
-        )
+        // The idea of the app comes before the first question about it. Only on
+        // a first run: once read, a second pass goes straight to the questions.
+        RootDestination.Setup -> if (!tutorial.introSeen) {
+            TutorialIntroScreen(
+                onStart = container.tutorialStore::introDone,
+                firstRun = true,
+            )
+        } else {
+            SetupScreen(
+                viewModel = viewModel(factory = setupViewModelFactory(container)),
+            )
+        }
 
-        RootDestination.Dashboard -> {
+        RootDestination.Dashboard -> if (tutorial.active) {
+            // Owed after a first setup, or asked for from the settings. In place
+            // of the scaffold rather than over it: no tab bar, no flow, nothing
+            // to wander off into — and nothing of the user's on screen meanwhile.
+            TutorialHost(container.tutorialStore)
+        } else {
             // Handed down rather than read by each screen: the switch hides
             // figures in a dozen unrelated places. True until the setup arrives,
             // which is what it was before there was a switch.
@@ -367,6 +385,7 @@ private fun MainScaffold(
                     },
                     onDebugReset = rootViewModel::resetEverything,
                     onOpenVacation = { flow = AppFlow.Vacation },
+                    onRepeatTutorial = container.tutorialStore::request,
                 )
             }
         }
@@ -504,6 +523,7 @@ private fun rootViewModelFactory(container: AppContainer): ViewModelProvider.Fac
                 container.reminderCoordinator,
                 container.scheduleMaintenance,
                 container.weekPlanningService,
+                container.tutorialStore,
             )
         }
     }
@@ -513,7 +533,7 @@ private fun setupViewModelFactory(container: AppContainer): ViewModelProvider.Fa
         initializer { SetupViewModel(container.setupRepository) }
     }
 
-private fun dashboardViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun dashboardViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             DashboardViewModel(
@@ -525,11 +545,12 @@ private fun dashboardViewModelFactory(container: AppContainer): ViewModelProvide
                 setupRepository = container.setupRepository,
                 subtaskRepository = container.subtaskRepository,
                 taskStartCoordinator = container.taskStartCoordinator,
+                clock = container.clock,
             )
         }
     }
 
-private fun plannerViewModelFactory(
+internal fun plannerViewModelFactory(
     container: AppContainer,
     day: PlannerDay,
 ): ViewModelProvider.Factory =
@@ -544,11 +565,12 @@ private fun plannerViewModelFactory(
                 scheduleMaintenance = container.scheduleMaintenance,
                 weekPlanningService = container.weekPlanningService,
                 day = day,
+                clock = container.clock,
             )
         }
     }
 
-private fun weekPlannerViewModelFactory(
+internal fun weekPlannerViewModelFactory(
     container: AppContainer,
     scope: WeekScope,
 ): ViewModelProvider.Factory =
@@ -561,17 +583,20 @@ private fun weekPlannerViewModelFactory(
                 planRepository = container.planRepository,
                 setupRepository = container.setupRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
+                clock = container.clock,
             )
         }
     }
 
-private fun concretizeViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun concretizeViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             ConcretizeViewModel(
                 itemRepository = container.itemRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
                 subtaskRepository = container.subtaskRepository,
+                setupRepository = container.setupRepository,
+                clock = container.clock,
             )
         }
     }
@@ -686,7 +711,7 @@ private fun contractsViewModelFactory(container: AppContainer): ViewModelProvide
         initializer { ContractsViewModel(container.contractRepository) }
     }
 
-private fun reevaluationViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun reevaluationViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             ReevaluationViewModel(
@@ -695,6 +720,7 @@ private fun reevaluationViewModelFactory(container: AppContainer): ViewModelProv
                 itemRepository = container.itemRepository,
                 dayClosingService = container.dayClosingService,
                 subtaskRepository = container.subtaskRepository,
+                clock = container.clock,
             )
         }
     }

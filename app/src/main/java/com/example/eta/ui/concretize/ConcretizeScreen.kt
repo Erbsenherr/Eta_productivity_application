@@ -36,6 +36,10 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
+import com.example.eta.ui.components.tutorialSpot
+import com.example.eta.ui.lists.SchemePreview
+import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.ui.subtasks.FoldCandidate
 import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.theme.EtaTheme
@@ -61,6 +65,7 @@ fun ConcretizeScreen(
     val definitions by viewModel.definitions.collectAsStateWithLifecycle()
     val subtasks by viewModel.subtasks.collectAsStateWithLifecycle()
     val foldable by viewModel.foldable.collectAsStateWithLifecycle()
+    val setup by viewModel.setup.collectAsStateWithLifecycle()
 
     EtaScreen(modifier = modifier) {
         Column(
@@ -106,6 +111,7 @@ fun ConcretizeScreen(
                         ConcretizeRecurringCard(
                             item = item,
                             definitions = definitions,
+                            setup = setup,
                             subtasks = subtasks[item.id].orEmpty(),
                             foldCandidates = foldable.foldCandidatesExcept(item.id),
                             onSave = { name, attributes ->
@@ -180,6 +186,7 @@ private fun ConcretizeCard(
 private fun ConcretizeRecurringCard(
     item: Item,
     definitions: List<Item>,
+    setup: UserSetup?,
     subtasks: List<Subtask>,
     foldCandidates: List<FoldCandidate>,
     onSave: (String, RecurringAttributes) -> Unit,
@@ -208,14 +215,23 @@ private fun ConcretizeRecurringCard(
                 ignoreIds = setOf(item.id),
             )
         }
+        // The week without this note, and the note drawn over it as the answers
+        // come in — the same sketch the Listen tab's editor brings along, here
+        // because this is where a standing task is first given its hours.
+        val booked = remember(definitions, setup, item.id) {
+            weekOccupancy(definitions, setup, ignoreIds = setOf(item.id))
+        }
+        SchemePreview(
+            booked = booked,
+            attributes = attributes,
+            overlaps = overlaps,
+            modifier = Modifier.tutorialSpot(TutorialSpot.RECURRING_SCHEME),
+        )
         RecurringAttributeFields(
             value = attributes,
             onChange = { attributes = it },
             overlaps = overlaps,
-            // No setup on this screen, so the night is not an obstacle here.
-            findNextFree = {
-                nextFreeStart(it.slots(), weekOccupancy(definitions, null, setOf(item.id)))
-            },
+            findNextFree = { nextFreeStart(it.slots(), booked) },
             allowGrowth = true,
             growthIssues = growthIssues,
             groupName = name,

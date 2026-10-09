@@ -37,6 +37,8 @@ import com.example.eta.ui.calendar.CalendarEventsSection
 import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.ReportToTutorial
+import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaProgressBar
 import com.example.eta.ui.components.EtaScreen
@@ -66,13 +68,14 @@ private enum class Step { INFLATION, EVALUATION, CALENDAR, PLAN }
  * first and every appointment is a conflict; fill after and most of them are
  * simply part of the week.
  */
-private fun stepsFor(midWeek: Boolean, pointsVisible: Boolean): List<Step> = when {
-    midWeek -> listOf(Step.CALENDAR, Step.PLAN)
-    // The devaluation is booked on its weekday either way; its page is only the
-    // account being shown, and goes out of sight with it.
-    !pointsVisible -> Step.entries - Step.INFLATION
-    else -> Step.entries
-}
+private fun stepsFor(midWeek: Boolean, pointsVisible: Boolean, calendar: Boolean): List<Step> =
+    when {
+        midWeek -> listOf(Step.CALENDAR, Step.PLAN)
+        // The devaluation is booked on its weekday either way; its page is only the
+        // account being shown, and goes out of sight with it.
+        !pointsVisible -> Step.entries - Step.INFLATION
+        else -> Step.entries
+    }.filter { calendar || it != Step.CALENDAR }
 
 /**
  * The weekly planning phase, in the three parts `Planungsphase.md` names:
@@ -81,8 +84,12 @@ private fun stepsFor(midWeek: Boolean, pointsVisible: Boolean): List<Step> = whe
 @Composable
 fun WeekPlannerScreen(
     viewModel: WeekPlannerViewModel,
-    /** The calendar step, over exactly the stretch this phase is laying out. */
-    calendarViewModel: CalendarEventsViewModel,
+    /**
+     * The calendar step, over exactly the stretch this phase is laying out. Null
+     * leaves the step out — the tutorial's practice week has no calendar, and
+     * must not ask for the user's real Google account.
+     */
+    calendarViewModel: CalendarEventsViewModel?,
     modifier: Modifier = Modifier,
     onClose: () -> Unit = {},
 ) {
@@ -90,8 +97,12 @@ fun WeekPlannerScreen(
     val inflation by viewModel.inflation.collectAsStateWithLifecycle()
     val evaluation by viewModel.evaluation.collectAsStateWithLifecycle()
     val banned by viewModel.banned.collectAsStateWithLifecycle()
-    val steps = stepsFor(viewModel.isMidWeek, LocalPointsVisible.current)
+    val steps = stepsFor(viewModel.isMidWeek, LocalPointsVisible.current, calendarViewModel != null)
     val pagerState = rememberPagerState { steps.size }
+    ReportToTutorial(
+        TutorialSignal.WEEK_STEP,
+        steps[pagerState.currentPage.coerceIn(0, steps.lastIndex)].name,
+    )
     val scope = rememberCoroutineScope()
     var adding by remember { mutableStateOf(false) }
 
@@ -147,7 +158,7 @@ fun WeekPlannerScreen(
                     when (steps[page]) {
                         Step.INFLATION -> InflationStep(inflation, banned)
                         Step.EVALUATION -> EvaluationStep(evaluation, viewModel::setEvaluation)
-                        Step.CALENDAR -> CalendarEventsSection(calendarViewModel)
+                        Step.CALENDAR -> calendarViewModel?.let { CalendarEventsSection(it) }
                         Step.PLAN -> PlanStep(state, viewModel, onAdd = { adding = true })
                     }
                     Spacer(Modifier.size(EtaTheme.spacing.xl))

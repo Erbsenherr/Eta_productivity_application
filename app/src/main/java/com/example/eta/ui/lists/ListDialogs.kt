@@ -778,17 +778,24 @@ fun RecurringGroupEditDialog(
  * live, so a time can be moved until the mark sits in the free part of the week.
  */
 @Composable
-private fun SchemePreview(
+internal fun SchemePreview(
     /** The week without the task being edited — also what the free-slot search reads. */
     booked: Map<DayOfWeek, List<IntRange>>,
     attributes: RecurringAttributes,
     /** What the form collides with: on those weekdays the mark is drawn red. */
     overlaps: List<RecurringOverlap>,
     rhythm: Rhythm = Rhythm.Weekly,
+    modifier: Modifier = Modifier,
 ) {
     val draft = remember(attributes, rhythm) { slotOccupancy(attributes.slots(rhythm)) }
     val clashDays = remember(overlaps) { overlaps.flatMapTo(mutableSetOf()) { it.weekdays } }
-    WeekSchemeChart(booked = booked, draft = draft, height = 112.dp, clashDays = clashDays)
+    WeekSchemeChart(
+        booked = booked,
+        modifier = modifier,
+        draft = draft,
+        height = 112.dp,
+        clashDays = clashDays,
+    )
 }
 
 private fun categoryLabel(category: Category): String = when (category) {

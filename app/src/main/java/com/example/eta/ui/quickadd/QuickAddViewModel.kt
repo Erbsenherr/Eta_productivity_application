@@ -91,6 +91,6 @@ class QuickAddViewModel(
 fun quickAddViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
-            QuickAddViewModel(itemRepository = container.itemRepository)
+            QuickAddViewModel(itemRepository = container.itemRepository, clock = container.clock)
         }
     }

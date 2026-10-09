@@ -22,12 +22,18 @@ class PlanningAlarmCoordinator(
     private val phaseService: PlanningPhaseService,
     private val isAppInForeground: () -> Boolean,
     private val clock: Clock = Clock.System,
+    /**
+     * False in the tutorial's sandbox: its tasks are examples, and an alarm for
+     * one would ring on the user's real phone — in place of their own.
+     */
+    private val enabled: Boolean = true,
 ) {
 
     private val scheduler = PlanningAlarmScheduler(context)
 
     /** After the setup, after a boot, and after a phase is finished. */
     suspend fun rescheduleAll() {
+        if (!enabled) return
         PlanningPhase.entries.forEach { phase ->
             PlanningNotifications.dismiss(context, phase)
             val due = phaseService.nextDue(phase)
@@ -61,12 +67,14 @@ class PlanningAlarmCoordinator(
     }
 
     fun snooze(phase: PlanningPhase) {
+        if (!enabled) return
         PlanningNotifications.dismiss(context, phase)
         scheduler.schedule(phase, snoozedFrom(clock.now()))
     }
 
     /** The "NOTFALL": pushed back by a number of hours the user names. */
     fun defer(phase: PlanningPhase, hours: Int) {
+        if (!enabled) return
         PlanningNotifications.dismiss(context, phase)
         scheduler.schedule(phase, deferredFrom(clock.now(), hours))
     }

@@ -20,16 +20,17 @@ import androidx.compose.ui.platform.LocalContext
  */
 @Stable
 class Fold internal constructor(
-    private val prefs: SharedPreferences,
+    /** Null in the tutorial, which neither reads nor changes how the user's screens are arranged. */
+    private val prefs: SharedPreferences?,
     private val key: String,
     initiallyOpen: Boolean,
 ) {
-    var open: Boolean by mutableStateOf(prefs.getBoolean(key, initiallyOpen))
+    var open: Boolean by mutableStateOf(prefs?.getBoolean(key, initiallyOpen) ?: initiallyOpen)
         private set
 
     fun toggle() {
         open = !open
-        prefs.edit().putBoolean(key, open).apply()
+        prefs?.edit()?.putBoolean(key, open)?.apply()
     }
 }
 
@@ -37,7 +38,12 @@ class Fold internal constructor(
 @Composable
 fun rememberFold(key: String, initiallyOpen: Boolean = false): Fold {
     val context = LocalContext.current.applicationContext
-    return remember(key) {
-        Fold(context.getSharedPreferences("folds", Context.MODE_PRIVATE), key, initiallyOpen)
+    // The tutorial shows its screens as a newcomer finds them: a list the user
+    // folded away in their own app would be missing from the walk-through, and
+    // folding one there must not fold theirs.
+    val practice = LocalTutorialGuide.current != null
+    return remember(key, practice) {
+        val prefs = context.getSharedPreferences("folds", Context.MODE_PRIVATE).takeUnless { practice }
+        Fold(prefs, key, initiallyOpen)
     }
 }

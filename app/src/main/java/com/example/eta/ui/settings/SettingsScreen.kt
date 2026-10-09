@@ -95,6 +95,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onDebugReset: (() -> Unit)? = null,
     onOpenVacation: () -> Unit = {},
+    onRepeatTutorial: (() -> Unit)? = null,
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -207,6 +208,12 @@ fun SettingsScreen(
 
             if (onDebugReset != null) {
                 DebugBox(onReset = onDebugReset)
+            }
+
+            // The very last thing on the tab, as asked: it is opened once in a
+            // long while, and by someone who went looking for it.
+            if (onRepeatTutorial != null) {
+                TutorialBox(onRepeat = onRepeatTutorial)
             }
 
             Spacer(Modifier.size(EtaTheme.spacing.xl))
@@ -733,6 +740,34 @@ private fun MorningRoutineBox(
                 color = EtaTheme.colors.textMuted,
             )
             MorningRoutineSteps(steps = steps, onSave = onSave)
+        }
+    }
+}
+
+/**
+ * "Tutorial wiederholen".
+ *
+ * Says before the button what it will and will not touch, because a tutorial
+ * that has the user add and tick off tasks reads like something that might do
+ * so to their own.
+ */
+@Composable
+private fun TutorialBox(onRepeat: () -> Unit) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaText(text = "Tutorial", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Führt dich noch einmal durch einen simulierten Tag. Es arbeitet " +
+                    "nur mit Übungsdaten — deine Aufgaben, Punkte und Einstellungen " +
+                    "bleiben unberührt.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+            EtaButton(
+                text = "Tutorial wiederholen",
+                style = EtaButtonStyle.Secondary,
+                onClick = onRepeat,
+            )
         }
     }
 }

@@ -29,12 +29,18 @@ class WakeAlarmCoordinator(
     private val setupRepository: SetupRepository,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /**
+     * False in the tutorial's sandbox: its tasks are examples, and an alarm for
+     * one would ring on the user's real phone — in place of their own.
+     */
+    private val enabled: Boolean = true,
 ) {
 
     private val scheduler = WakeAlarmScheduler(context)
 
     /** After the setup, after a boot, and after the switch is flipped. */
     suspend fun reschedule() {
+        if (!enabled) return
         val setup = setupRepository.find()
         val due = setup?.let { nextWake(it, clock.now().toLocalDateTime(timeZone)) }
         if (due == null) {

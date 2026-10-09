@@ -30,7 +30,10 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
 import com.example.eta.ui.components.ConfirmDialog
+import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.tutorialSpot
+import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
@@ -44,7 +47,6 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.quickadd.QuickAddPanel
 import com.example.eta.ui.quickadd.QuickAddViewModel
 import com.example.eta.ui.theme.EtaTheme
-import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
@@ -170,6 +172,7 @@ private fun TodayPage(
         val followUp by viewModel.followUp.collectAsStateWithLifecycle()
 
         NowBox(
+            modifier = Modifier.tutorialSpot(TutorialSpot.NOW),
             current = nowAndNext.current,
             next = nowAndNext.next,
             minuteOfDay = minuteOfDay,
@@ -299,9 +302,13 @@ private fun TodayPage(
             DeadlinesBox(deadlines = state.deadlines, now = now)
         }
 
-        QuickAddPanel(viewModel = quickAddViewModel)
+        QuickAddPanel(
+            viewModel = quickAddViewModel,
+            modifier = Modifier.tutorialSpot(TutorialSpot.QUICK_ADD),
+        )
 
         TasksBox(
+            modifier = Modifier.tutorialSpot(TutorialSpot.TODAY_TASKS),
             title = "Heute anstehend",
             blocks = state.todayBlocks,
             foldKey = "today.tasks",
@@ -520,11 +527,13 @@ private fun PageIndicator(currentPage: Int, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun rememberTickingNow(): Instant {
-    var now by remember { mutableStateOf(Clock.System.now()) }
-    LaunchedEffect(Unit) {
+    // The tutorial's simulated day brings a clock of its own.
+    val clock = LocalEtaClock.current
+    var now by remember(clock) { mutableStateOf(clock.now()) }
+    LaunchedEffect(clock) {
         while (true) {
             delay(1_000)
-            now = Clock.System.now()
+            now = clock.now()
         }
     }
     return now

@@ -42,6 +42,8 @@ import com.example.eta.data.repository.RewardOutlook
 import com.example.eta.domain.model.REWARD_EPSILON
 import com.example.eta.domain.model.Reward
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.ReportToTutorial
+import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.LocalFeatures
 import kotlinx.coroutines.delay
 import com.example.eta.domain.model.Contract
@@ -116,6 +118,11 @@ fun ReevaluationScreen(
     val pagerState = rememberPagerState { steps.size }
     val scope = rememberCoroutineScope()
     val currentStep = steps[pagerState.currentPage.coerceIn(0, steps.lastIndex)]
+    ReportToTutorial(TutorialSignal.REEVALUATION_STEP, currentStep.name)
+    ReportToTutorial(
+        TutorialSignal.OPEN_MAKE_UP_OFFERS,
+        state.makeUpOffers.count { it.createdItem == null }.toString(),
+    )
 
     // The settlement rests on every block having been answered: one left open is
     // neither harvest nor forfeit, and costs the points either way. A day with

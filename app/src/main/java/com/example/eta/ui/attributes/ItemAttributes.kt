@@ -58,7 +58,10 @@ import com.example.eta.ui.components.EtaDurationPicker
 import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
 import com.example.eta.ui.components.EtaStepper
+import com.example.eta.domain.tutorial.TutorialSpot
+import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.tutorialSpot
 import com.example.eta.ui.components.LocalFeatures
 import com.example.eta.ui.components.EtaDatePickerDialog
 import com.example.eta.ui.format.formatWithYear
@@ -74,7 +77,6 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.theme.EtaTheme
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -333,14 +335,14 @@ fun TodoAttributeFields(
     /** Tasks that can be folded into this one as steps. */
     foldCandidates: List<FoldCandidate> = emptyList(),
 ) {
-    EtaField(label = "Kategorie") {
+    EtaField(label = "Kategorie", modifier = Modifier.tutorialSpot(TutorialSpot.TODO_CATEGORY)) {
         EtaChoice(
             options = CATEGORY_OPTIONS,
             selected = value.category,
             onSelect = { onChange(value.copy(category = it)) },
         )
     }
-    EtaField(label = "Priorität") {
+    EtaField(label = "Priorität", modifier = Modifier.tutorialSpot(TutorialSpot.TODO_PRIORITY)) {
         EtaChoice(
             options = PRIORITY_OPTIONS,
             selected = value.priority,
@@ -357,6 +359,7 @@ fun TodoAttributeFields(
         val movable = !value.unlockFixed || (ceiling != null && ceiling > today)
         EtaField(
             label = "Freigeschaltet ab",
+            modifier = Modifier.tutorialSpot(TutorialSpot.TODO_UNLOCK),
             hint = when {
                 value.unlockFixed && later ->
                     "Steht fest und lässt sich nur noch vorziehen, nicht mehr nach " +
@@ -400,7 +403,10 @@ fun TodoAttributeFields(
             )
         }
     }
-    EtaField(label = "Geschätzte Dauer") {
+    EtaField(
+        label = "Geschätzte Dauer",
+        modifier = Modifier.tutorialSpot(TutorialSpot.TODO_DURATION),
+    ) {
         EtaDurationPicker(
             value = value.duration,
             onValueChange = { onChange(value.copy(duration = it)) },
@@ -507,6 +513,7 @@ fun RecurringAttributeFields(
     }
     EtaField(
         label = "Wochentage",
+        modifier = Modifier.tutorialSpot(TutorialSpot.RECURRING_DAYS),
         hint = if (value.weekdays.size == WEEK.size) {
             "Jeden Tag."
         } else {
@@ -685,7 +692,8 @@ private const val DEFAULT_REPEAT_DAYS = 28
  */
 @Composable
 private fun RepeatUntilRow(extras: ItemExtras, onExtras: (ItemExtras) -> Unit) {
-    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+    val clock = LocalEtaClock.current
+    val today = remember(clock) { clock.todayIn(TimeZone.currentSystemDefault()) }
     val until = extras.repeatUntil
     val inDays = until?.let { today.daysUntil(it).coerceAtLeast(0) } ?: DEFAULT_REPEAT_DAYS
 
@@ -693,7 +701,10 @@ private fun RepeatUntilRow(extras: ItemExtras, onExtras: (ItemExtras) -> Unit) {
         onExtras(extras.copy(repeatUntil = today.plus(DatePeriod(days = days.coerceAtLeast(0)))))
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+    Column(
+        modifier = Modifier.tutorialSpot(TutorialSpot.RECURRING_UNTIL),
+        verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+    ) {
         CheckRow(
             checked = until != null,
             onCheckedChange = { on ->

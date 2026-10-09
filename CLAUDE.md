@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (531 tests
-as of step 37), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (553 tests
+as of step 38), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -176,7 +176,11 @@ changed; documentation-only sessions push too.
 `domain/` is pure Kotlin and holds the rules worth testing without a database.
 `data/local/` has the Room DAOs, `data/repository/` the repositories, and
 `di/AppContainer.kt` wires them manually — no DI framework, since the graph is
-small and it keeps another annotation processor out of the build. The model
+small and it keeps another annotation processor out of the build. **There can be
+two containers**: the tutorial builds a second one over an in-memory database
+(`sandbox = true`) and runs the app's own screens on it, which is how it never
+touches the user's data — see *Step 38*. Every repository, service and view model
+therefore takes its `clock` from the container rather than reading `Clock.System`. The model
 classes carry Room annotations directly rather than having entity classes plus
 mappers: `Konzept.md` asks for the simplest thing that works, and mappers would
 cost ~250 lines for no current benefit.
@@ -374,6 +378,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
 | `step-35-belohnomat.md` | *Step 35*: the Belohn-o-mat (`Reward`, `pourInto`, Aufgabenbindung, the evening's fill page, placeholder sounds), the points system out of sight (`UserSetup.pointsSystem`, `LocalPointsVisible`), the long press on three list headings |
 | `step-36-advanced-features.md` | *Step 36*: Advanced Features (`LocalFeatures`, the four switches, applied at once), "Freigeschaltet ab" (`targetDate`'s new meaning, `collectionClockStart`, `EtaDatePickerDialog`), Abweichende Uhrzeiten (`rulesWithTimes`), the Sperrliste last, the free-time info button |
+| `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the script (`QUICKSTART`, `TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), and when it is shown (`TutorialStore`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -430,7 +435,8 @@ screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text 
 33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
 and a broken contract's way back · 34. The Routine-Modus, and a morning that
 is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
-36. Advanced Features, "Freigeschaltet ab", and hours of their own · 37. "Flexibel".
+36. Advanced Features, "Freigeschaltet ab", and hours of their own · 37. "Flexibel" ·
+38. The tutorial.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

@@ -1,12 +1,43 @@
-Bugfix:
--Auch wenn das Punktesystem aktiviert ist, wird auf dem Dashboard die Punktestandbox angezeigt. Das soll nicht so.
-Change:
--Zieldatum: Das Zieldatum soll ersetzt werdendurch "Freigeschaltet ab": und standardmäßig auf "Heute" liegen. Der Nutzer soll aber auch über ein Kalender-Menü einen anderen Tag in einem anderen Monat in einem anderen Jahr wählen können. (Der Countdown, bis es gesperrt wird, gilt erst ab diesem Datum!)
--Growth Tasks, Verträge und Belohn-o-mat sollen ähnlich wie das Punktesystem an und aus gestellt werden können, um für neue Nutzer das Menü zu entladen. Die Features sollen standardmäßig ausgeschaltet sein (das Punktesystem auch). --> all das soll sich in einer einzigen Box in den Einstellungen befinden; aktuell heisst die Box "Punktesystem". Zukünftig soll sie "Advanced Features" heißen, der Punktesystem Eintrag soll statt Punkte anzeigen dann Punktetracker heißen (an der Funktionalität soll sich nichts ändern).
--Dem Nutzer soll beim erstmaligen Setup klargemacht werden, dass "Freizeit" ungeplante Zeit ist: Hier kann gemacht werden, worauf der Nutzer gerade lust hat. Es ist nicht zu verwechseln mit Tasks wie zB. "Sport", die zwar gern gemacht werden, aber einer strikten Regelmäßigkeit unterliegen sollen. (Füge bei dem "Freizeit"-Planer einen Info-Button hinzu)
--Die "Sperrliste" soll die unterste der Listen sein.
-Feature 1:
--lege einen neuen Ordner an. In zukunft, leg dort alle veränderungen / updates als patchnotes an, die ich den Nutzern zukommen lassen kann, die aber nicht in den Kontext geladen werden müssen.
-Quality of life:
--Aktuell, wenn man bei Wiederkehrenden Tasks mehrere Tage auswählt, sind für jeden der Tage die selbe Uhrzeit festgelegt. Füge unter den Infotext "Jeder Tag wird eine eigene Aufgabe (...)" eube Checkbox, die standardmäßig deaktiviert ist: Abweichende Uhrzeiten (Text darunter: Wiederkehrende Tasks findet innerhalb einer Woche zu unterschiedlichen Zeiten statt)
+Feature: Tutorial. Wenn die App das erste Mal geöffnet wird, soll, nachdem der Nutzer das erste Setup abgeschlossen hat, der Nutzer durch eine simulierte Woche geleitet werden. Sie soll mit der Sammelliste und der "Quick-Add" Box beginnen. (TEXT: Formatierter Text oder Listen), (Tip->: Nutzer schreitet im Tutorial voran). Im tutorial soll die App den Bildschirm locken. Der Nutzer kann also nicht nach belieben zwischen den Fenstern hin- und her springen.
 
+0. Öffnet sich beim ersten Öffnen noch vor dem Setup. Das Grundkonzept: TEXT:[ Viele wichtige Aufgaben kommen uns im falschen Moment in den Kopf. Eta hilft dir dabei, diese Gedanken zu sortieren und im richtigen Moment einzuordnen. Es im Kern eine Wochen- und Tagesplan App mit einem konkreten Loop: 
+	1. Idee / Task in deinem Kopf
+	2. Schnell aus dem Kopf in die App
+	3. Gib diesen Ideen Form und Dringlichkeit!
+	4. Wochenplanung: Fülle deine nächste Woche
+	5. Tagesplanung: Fülle deinen nächsten Tag]
+Viele deiner Tätigkeiten haben einen strikten Rythmus und Regelmäßigkeit schafft Sicherheit. Lass uns einige der wichtigeren Setups nun vornehmen --> Setup Menü.
+
+Quickstart vs Ausführliches Tutorial (Ausführlich erstmal ausgegraut)
+
+(Unten am Bildschirmrand gibt es einen "Weiter" Knopf. Bei Text kann er immer gedrückt werden, aber wenn der nutzer zu etwas aufgefordert wurde (zB. etwas bestimmtes zu swipen), dann ist er ausgegraut, bis er das getan hat, wozu er aufgefordert wurde.) 
+Quickstart:
+1. "Das hier ist das Dashboard. Hier wirst du über alles kurzfristig anstehende informiert.(Tip.->)
+2. "Es wurden ein paar Beispiel Aufgaben für dich angelegt. Gerade bist du am Arbeiten (Highlight der "Gerade Box"), danach fütterst du deine Katze (scrollen deaktiviert, animation lädt dazu an "gerade" zu "als nächstes zu swipen" (wenn geswiped wurde, weiter möglich.). Einen Überblick über den gesamten Tag siehst du weiter unten (scrollen ermöglichen) Die Tasks "Frühstück", "Arbeiten", "Katze Füttern", "Mail versenden" sind hier aufgeführt.)
+3. "Dir fällt ein, dass du demnächst neues Katzenstreu kaufen solltest. Außerdem würdest du gerne wieder regelmäßig Sport machen. Beides ist zwar wichtig, aber gerade schlicht nicht relevant. Je mehr dir in deinem Kopf schwirrt, desto schlechter konzentrierst du dich auf das wesentliche.(Tip.->)
+Eta möchte dir dabei helfen, deine Gedanken zu sortieren. Füge "Katzenstreu kaufen" in der Quick-Add box ein. Dann swipe rechts und Füge "Regelmäßig Sport" unter "Wiederkehrende Aufgabe" ein.  Eta erinnert sich für dich daran, du kannst es für das Erste vergessen! (Anmerkung für Nutzer: Nur zu Tutorial Zwecken, Tasks werden nicht übernommen) (Interaktive Aufgabe: Füge eine Tasks und eine Wiederkehrende Task hinzu: Ein Name genügt. Falls dir nichts wichtiges Einfällt, kannst du die Aufgabe jederzeit wieder löschen. Dann wird Weiter möglich)
+4. Perfekt! Jetzt kannst du dich wieder dem aktuell Anstehenden widmen, ohne dich sorgen zu müssen, etwas zu vergessen. (Tip.->)
+5. Wir simulieren jetzt den Abschluss des heutigen Tages. Dort wirst du unter anderem deine heutigen Errungenschaften abhaken, deine neuen Aufgaben konkretisieren und den morgigen Tag planen!
+6. (Tagesabschluss öffnet sich für Tutorial. Die Tasks "Frühstück", "Arbeiten", "Katze Füttern", "Mail versenden" sind hier wieder aufgeführt.) Hier hakst du ab, was du von dem, was du dir vorgenommen hast, heute geschafft hast. Setze einen Haken hinter alles, außer "Mail versenden". (User input, dann weiter)
+7. Aus unbekannten Gründen konntest du die Mail nicht versenden. Du willst es allerdings nicht ausfallen lassen, sondern morgen nachholen. (User input: Auf nachholen klicken)
+8. Hervorragend! "Mail versenden" wird nun wieder in die Wochenliste abgelegt. Dazu später mehr.
+9. Optional: Hier kannst du reflektieren, was an deinem Tag gut lief, und was du zukünftig ändern könntest, sofern der Tag wegen deines Plans stressig war. (Tip.->)
+10. Hier findest du alle deine wiederkehrenden Aufgaben. "Katze Füttern" ist wiederkehrend und wird in absehbarer Zukunft auch relevant bleiben. Andere Aufgaben, die dies nicht mehr sind, könntest du hier ausrangieren.
+11. Perfekt! Hiermit kannst du den Tag abschließen (Klicken auf abschließen)
+12. Nun, da du dir die nötige Zeit genommen hast, konkretierst du deine Quick-Adds. Du hast zwei Einträge: "Katzenstreu kaufen" und "regelmäßig Sport".
+13. Beginnen wir mit "Katzenstreu kaufen": (Der Nutzer nach und nach mit den Boxen interagieren können). Du kannst den Namen ändern und hier eine Notiz hinzufügen, wie zB. die Menge an gebrauchtem Katzenstreu.
+14. Du kannst wählen, wie sehr dich die Aufgabe beanspruchen wird (Fokus bedeutet zB. das Lesen oder Verfassen eines Textes, Nebenbei ermlöglicht das Hören von Musik oder eines Hörbuchs und Achtsam bedeutet, das du bewusst auf Beschallung nebenbei verzichten möchtest. Das ist hauptsächlich dann relevant, wenn du das Punktesystem Feature aktiviert hast - dazu später mehr)
+15. Hier kannst du die Priorität festlegen: Eta priorisiert nach den folgenden Stufen: Wenn du eine Woche oder einen Tag auffüllen möchtest, kannst du erst dann Tasks einer niedrigeren Priorität einsortieren, sobald du alle der höheren abgeschlossen hast. So prokrastinierst du nicht versehentlich etwas wichtiges!
+16. Manchmal werden Tasks erst in der Zukunft relevant. Damit sie deine Listen nicht zumüllen, kannst du hier festlegen, ab wann die Task in deine Woche legbar werden soll.
+17. Eta hilft dir dabei, einen realistischen Überblick über deine schaffbaren Angelegenheiten zu bekommen. Daher schätzt du bei jeder Task, wie lange du dafür brauchen könntest. Eta wird dir nicht erlauben, eine Woche mit mehr Aufgaben vollzustopfen, als deine dir zur Verfügung stehenden Stunden erlauben.
+18. Machen wir nun weiter mit der Wiederkehrenden Aufgabe. Vieles ist identisch zu den ToDos:
+19. Der erste  Unterschied ist der grobe Sketch deiner Woche. Er soll die dabei helfen, Überschneidungen zu vermeiden In diesem Tutorial ist die Woche nahezu leer.
+20. Als nächstes wählst du die Wochentage aus. Wähle beliebige Tage aus. Du kannst entweder an allen Tagen die gleiche Uhrzeit angeben, oder wenn du einen Haken an die Checkbox setzt, individuelle Uhrzeiten vergeben.
+21. Manche Wiederkehrenden Tasks haben eine Feste Deadline: Das Lernen für eine Abschlussarbeit zum Beispiel. Du kannst den Abschluss der Aufgabe hier fest einplanen. Für unser Beispiel ist das nicht nötig.
+22. Das wäre das! Als nächstes Simulieren wir die Wochenplanung. (Wochenplanungsanzeige).
+23. Hier siehst du die Tasks, die noch nicht in einer Woche verplant sind. Wiederkehrende Tasks wirst du hier nicht finden, schließlich sind sie in jeder Woche verbucht.
+24. Aktuell hast du nur die "Katzenstreu kaufen" Task. Daran findest du die Dauer der Task. Wenn du sie in die Woche setzt, werden die freien Stunden der Woche um die Dauer der Task reduziert. Probier es aus!
+25. Super, hiermit steht unsere Woche.
+26. Das einzige was jetzt noch fehlt, ist das Planen deines nächsten Tages.
+27. (Öffne den Tagesplaner für morgen) Das ist der Tagesplaner für morgen. Es ist ein interaktives Menü, in dem du dir anstehende ToDos in freie Zeiten ziehen kannst (und mehr!). Probier es aus: Zieh "Katzenstreu kaufen" an eine beliebige Uhrzeit des tages (Warten auf User)
+28. Gut gemacht! Du kannst verplante Tasks wieder zurück in den Container oder an andere Uhrzeiten schieben. Weitere optionen findest du, wenn du die Task gedrückt hältst. 

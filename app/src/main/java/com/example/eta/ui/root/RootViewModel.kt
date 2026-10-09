@@ -8,6 +8,7 @@ import com.example.eta.alarm.TaskStartCoordinator
 import com.example.eta.data.repository.ScheduleMaintenance
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.data.repository.WeekPlanningService
+import com.example.eta.ui.tutorial.TutorialStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,7 @@ class RootViewModel(
     private val reminderCoordinator: ReminderCoordinator,
     private val scheduleMaintenance: ScheduleMaintenance,
     private val weekPlanningService: WeekPlanningService,
+    private val tutorialStore: TutorialStore,
 ) : ViewModel() {
 
     val destination: StateFlow<RootDestination> = setupRepository.observe()
@@ -65,6 +67,10 @@ class RootViewModel(
      */
     fun resetEverything() {
         viewModelScope.launch {
+            // "Before the first start" includes the welcome page and the
+            // tutorial that follows the questionnaire. First, so the page is
+            // already owed when the missing setup row swaps the screen.
+            tutorialStore.reset()
             setupRepository.resetEverything()
             // Without a setup there is nothing to ring for; this clears the alarms.
             planningAlarmCoordinator.rescheduleAll()

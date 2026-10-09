@@ -56,6 +56,8 @@ import com.example.eta.ui.components.EtaStepperButton
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.rememberFold
+import com.example.eta.ui.components.ReportToTutorial
+import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.components.EtaTimePickerDialog
 import com.example.eta.ui.components.ConfirmDialog
@@ -170,6 +172,7 @@ fun NowBox(
     onConfirm: (BlockWithItem) -> Unit = {},
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
+    ReportToTutorial(TutorialSignal.NOW_PAGE, pagerState.currentPage.toString())
 
     EtaSurface(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {

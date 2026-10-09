@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.data.repository.ItemRepository
 import com.example.eta.data.repository.ScheduleMaintenance
+import com.example.eta.data.repository.SetupRepository
+import com.example.eta.domain.setup.UserSetup
 import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
@@ -42,6 +44,7 @@ class ConcretizeViewModel(
     private val itemRepository: ItemRepository,
     private val scheduleMaintenance: ScheduleMaintenance,
     subtaskRepository: SubtaskRepository,
+    setupRepository: SetupRepository,
     private val clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -78,6 +81,14 @@ class ConcretizeViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList(),
+        )
+
+    /** The night, which the Wochenschema on a recurring card shades as taken. */
+    val setup: StateFlow<UserSetup?> = setupRepository.observe()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
         )
 
     /** Turns a jotted line into a plannable ToDo. */
