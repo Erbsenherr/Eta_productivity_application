@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -18,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,11 +28,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.eta.R
+import com.example.eta.alarm.EtaSound
 import com.example.eta.data.local.BlockWithItem
+import com.example.eta.data.repository.RewardOutlook
+import com.example.eta.domain.model.REWARD_EPSILON
+import com.example.eta.domain.model.Reward
+import com.example.eta.ui.components.LocalPointsVisible
+import kotlinx.coroutines.delay
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.planning.cancellationCharged
 import com.example.eta.domain.model.ContractState
@@ -59,6 +72,9 @@ private enum class Step {
     TASKS,
     CONTRACTS,
     REWARD,
+
+    /** The Belohn-o-mat filling up. Only there while a reward is being filled. */
+    REWARD_FILL,
     JOURNAL,
     RECURRING,
 }
@@ -77,15 +93,30 @@ fun ReevaluationScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val journal by viewModel.journal.collectAsStateWithLifecycle()
-    val steps = Step.entries
+    // Two pages come and go. The settlement is points and nothing else, so it
+    // is not shown while the points system is out of sight — it is still booked,
+    // by "Abschließen", exactly as before. And the Belohn-o-mat has a page only
+    // while there is a reward to watch fill.
+    val pointsVisible = LocalPointsVisible.current
+    val filling = state.rewards?.head != null
+    val steps = remember(pointsVisible, filling) {
+        Step.entries.filter { step ->
+            when (step) {
+                Step.REWARD -> pointsVisible
+                Step.REWARD_FILL -> filling
+                else -> true
+            }
+        }
+    }
     val pagerState = rememberPagerState { steps.size }
     val scope = rememberCoroutineScope()
+    val currentStep = steps[pagerState.currentPage.coerceIn(0, steps.lastIndex)]
 
     // The settlement rests on every block having been answered: one left open is
     // neither harvest nor forfeit, and costs the points either way. A day with
     // nothing planned has nothing to answer, so it does not trap anyone.
     val openBlocks = state.blocks.count { it.block.isOpen }
-    val tasksPending = steps[pagerState.currentPage] == Step.TASKS && openBlocks > 0
+    val tasksPending = currentStep == Step.TASKS && openBlocks > 0
 
     EtaScreen(modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
@@ -119,10 +150,19 @@ fun ReevaluationScreen(
                         .padding(EtaTheme.spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
                 ) {
-                    when (steps[page]) {
+                    // `getOrNull`: the list shortens when a page goes, and the pager may
+                    // still compose the old last index for a frame.
+                    when (steps.getOrNull(page)) {
+                        null -> Unit
                         Step.TASKS -> TasksStep(state, viewModel)
                         Step.CONTRACTS -> ContractsStep(state, viewModel)
                         Step.REWARD -> RewardStep(state.preview)
+                        Step.REWARD_FILL -> RewardFillStep(
+                            outlook = state.rewards,
+                            // The bar runs when the page is the one in front,
+                            // not when the pager composes it a page early.
+                            active = currentStep == Step.REWARD_FILL,
+                        )
                         Step.JOURNAL -> JournalStep(journal, viewModel::answer)
                         Step.RECURRING -> RecurringStep(state, viewModel)
                     }
@@ -160,7 +200,7 @@ fun ReevaluationScreen(
                     Spacer(Modifier.weight(1f))
                 }
 
-                if (pagerState.currentPage == steps.lastIndex) {
+                if (pagerState.currentPage >= steps.lastIndex) {
                     EtaButton(
                         text = if (state.settled != null) "Gebucht" else "Abschließen",
                         enabled = state.settled == null,
@@ -338,6 +378,7 @@ private fun BlockRow(
     // only suggest there is one.
     val excusable = entry.cancellationCharged(TimeZone.currentSystemDefault())
     val wash = EtaTheme.colors.warning
+    val pointsVisible = LocalPointsVisible.current
 
     Row(
         modifier = Modifier
@@ -403,7 +444,11 @@ private fun BlockRow(
                 )
             } else if (excusable) {
                 EtaText(
-                    text = "Kostet Punkte. Halten für »höhere Gewalt«.",
+                    text = if (pointsVisible) {
+                        "Kostet Punkte. Halten für »höhere Gewalt«."
+                    } else {
+                        "Halten für »höhere Gewalt«."
+                    },
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.warning,
                 )
@@ -451,8 +496,12 @@ private fun ForceMajeureDialog(
 
     EtaDialog(title = "Höhere Gewalt", onDismiss = onDismiss) {
         EtaText(
-            text = "»$name« ist ausgefallen, ohne dass du es in der Hand hattest. " +
-                "Die Strafpunkte für diese Absage entfallen dann.",
+            text = "»$name« ist ausgefallen, ohne dass du es in der Hand hattest." +
+                if (LocalPointsVisible.current) {
+                    " Die Strafpunkte für diese Absage entfallen dann."
+                } else {
+                    " Die Absage zählt dann nicht gegen dich."
+                },
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )
@@ -524,6 +573,7 @@ private fun ContractQuestion(
     onContinuation: (Boolean) -> Unit,
 ) {
     val onProbation = contract.isOnProbation
+    val pointsVisible = LocalPointsVisible.current
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
         EtaText(
@@ -542,13 +592,17 @@ private fun ContractQuestion(
 
         if (onProbation) {
             EtaText(
-                text = "Weitergeführt nach dem Bruch — die Frage bleibt, die Punkte nicht.",
+                text = if (pointsVisible) {
+                    "Weitergeführt nach dem Bruch — die Frage bleibt, die Punkte nicht."
+                } else {
+                    "Weitergeführt nach dem Bruch — die Frage bleibt."
+                },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.danger,
             )
             EtaChoice(
                 options = listOf(
-                    true to "Gehalten — ohne Punkte",
+                    true to if (pointsVisible) "Gehalten — ohne Punkte" else "Gehalten",
                     false to "Nicht gehalten",
                 ),
                 selected = kept,
@@ -559,7 +613,11 @@ private fun ContractQuestion(
 
         EtaChoice(
             options = listOf(
-                true to "Gehalten — ${formatPoints(contract.dailyPayout)} Punkte",
+                true to if (pointsVisible) {
+                    "Gehalten — ${formatPoints(contract.dailyPayout)} Punkte"
+                } else {
+                    "Gehalten"
+                },
                 false to "Gebrochen",
             ),
             selected = kept,
@@ -577,7 +635,11 @@ private fun ContractQuestion(
         EtaChoice(
             options = listOf(
                 false to "Aufgeben — der Vertrag endet hier",
-                true to "Weiterführen — ohne Punkte, bleibt im Slot",
+                true to if (pointsVisible) {
+                    "Weiterführen — ohne Punkte, bleibt im Slot"
+                } else {
+                    "Weiterführen — bleibt im Slot"
+                },
             ),
             selected = keepServing,
             onSelect = onContinuation,
@@ -670,6 +732,166 @@ private fun RewardStep(settlement: DailySettlement?) {
             )
         }
     }
+}
+
+/**
+ * The Belohn-o-mat's page: the reward at position 1, and tonight's points
+ * running into it.
+ *
+ * A preview, like the settlement before it — "Abschließen" is what books it —
+ * but shown as the thing happening, because watching the bar fill is the point
+ * of the page. When tonight overflows one reward into the next, each gets a bar
+ * of its own, in the order they fill.
+ */
+@Composable
+private fun RewardFillStep(outlook: RewardOutlook?, active: Boolean) {
+    val head = outlook?.head ?: return
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg)) {
+            Column {
+                EtaText(text = "Belohn-o-mat", style = EtaTheme.typography.heading)
+                EtaText(
+                    text = "Was du heute durch erledigte Aufgaben verdient hast, fließt " +
+                        "in deine oberste Belohnung — vor allen Abzügen.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+
+            if (outlook.gains.isEmpty()) {
+                RewardBar(reward = head, added = 0.0, active = active)
+                EtaText(
+                    text = if (outlook.headBound) {
+                        "Heute kam nichts dazu: Diese Belohnung zählt nur ihre " +
+                            "gebundenen Aufgaben, und davon ist keine abgehakt."
+                    } else {
+                        "Heute kam nichts dazu."
+                    },
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+            outlook.gains.forEachIndexed { index, gain ->
+                key(gain.reward.id) {
+                    RewardBar(
+                        reward = gain.reward,
+                        added = gain.added,
+                        active = active,
+                        // One after the other: the second reward starts once
+                        // the first has run full, which is what happened.
+                        delayMillis = index * (REWARD_FILL_MILLIS + REWARD_FILL_PAUSE_MILLIS),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One reward filling: its name, the bar, and the count running with it.
+ *
+ * The bar starts where the reward stands and runs to where tonight puts it, each
+ * time the page comes to the front. `reward_fill` plays as it starts and
+ * `reward_full` when it arrives at the end — placeholders, see [RewardSounds].
+ */
+@Composable
+private fun RewardBar(
+    reward: Reward,
+    added: Double,
+    active: Boolean,
+    delayMillis: Int = 0,
+) {
+    val context = LocalContext.current
+    val from = reward.fraction
+    val to = if (reward.cost <= 0.0) {
+        1f
+    } else {
+        ((reward.progress + added) / reward.cost).toFloat().coerceIn(0f, 1f)
+    }
+    val completes = added > 0.0 && reward.progress + added >= reward.cost - REWARD_EPSILON
+    val fill = remember(reward.id) { Animatable(from) }
+    var arrived by remember(reward.id) { mutableStateOf(false) }
+
+    LaunchedEffect(active, from, to) {
+        arrived = false
+        fill.snapTo(from)
+        if (!active || to <= from) return@LaunchedEffect
+        delay(delayMillis.toLong())
+        EtaSound.play(context, RewardSounds.FILL)
+        fill.animateTo(to, tween(REWARD_FILL_MILLIS, easing = LinearEasing))
+        if (completes) {
+            EtaSound.play(context, RewardSounds.FULL)
+            arrived = true
+        }
+    }
+
+    val shown = reward.cost * fill.value
+    val barColor = if (arrived) EtaTheme.colors.success else EtaTheme.colors.accent
+    val track = EtaTheme.colors.border
+
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            EtaText(
+                text = reward.name,
+                style = EtaTheme.typography.bodyStrong,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.size(EtaTheme.spacing.md))
+            EtaText(
+                text = "${formatPoints(shown)} / ${formatPoints(reward.cost)}",
+                style = EtaTheme.typography.title,
+                color = barColor,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(REWARD_BAR_HEIGHT)
+                .clip(EtaTheme.shapes.pill)
+                .drawBehind {
+                    drawRect(track)
+                    drawRect(barColor, size = size.copy(width = size.width * fill.value))
+                },
+        )
+        if (added > 0.0) {
+            EtaText(
+                text = "+${formatPoints(added)} heute",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+        }
+        if (arrived) {
+            EtaText(
+                text = "🎉 Glückwunsch — »${reward.name}« ist erarbeitet! Nach dem " +
+                    "Abschließen kannst du sie im Belohn-o-mat einlösen.",
+                style = EtaTheme.typography.bodyStrong,
+                color = EtaTheme.colors.success,
+            )
+        }
+    }
+}
+
+/** How long a bar runs, and the breath between two of them. */
+private const val REWARD_FILL_MILLIS = 1800
+private const val REWARD_FILL_PAUSE_MILLIS = 500
+private val REWARD_BAR_HEIGHT = 14.dp
+
+/**
+ * The Belohn-o-mat's two sounds.
+ *
+ * **Placeholders**, as asked: files the app already ships, standing in until
+ * the real ones exist. Swapping one in is a matter of copying it into `res/raw`
+ * and naming it here.
+ */
+private object RewardSounds {
+    /** While the bar runs. */
+    val FILL = R.raw.notification
+
+    /** When a reward is earned in full. */
+    val FULL = R.raw.pom_work_start
 }
 
 @Composable

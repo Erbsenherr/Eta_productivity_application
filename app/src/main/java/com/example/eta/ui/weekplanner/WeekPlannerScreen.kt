@@ -36,6 +36,7 @@ import com.example.eta.domain.planning.costOf
 import com.example.eta.ui.calendar.CalendarEventsSection
 import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaProgressBar
 import com.example.eta.ui.components.EtaScreen
@@ -65,8 +66,13 @@ private enum class Step { INFLATION, EVALUATION, CALENDAR, PLAN }
  * first and every appointment is a conflict; fill after and most of them are
  * simply part of the week.
  */
-private fun stepsFor(midWeek: Boolean): List<Step> =
-    if (midWeek) listOf(Step.CALENDAR, Step.PLAN) else Step.entries
+private fun stepsFor(midWeek: Boolean, pointsVisible: Boolean): List<Step> = when {
+    midWeek -> listOf(Step.CALENDAR, Step.PLAN)
+    // The devaluation is booked on its weekday either way; its page is only the
+    // account being shown, and goes out of sight with it.
+    !pointsVisible -> Step.entries - Step.INFLATION
+    else -> Step.entries
+}
 
 /**
  * The weekly planning phase, in the three parts `Planungsphase.md` names:
@@ -84,7 +90,7 @@ fun WeekPlannerScreen(
     val inflation by viewModel.inflation.collectAsStateWithLifecycle()
     val evaluation by viewModel.evaluation.collectAsStateWithLifecycle()
     val banned by viewModel.banned.collectAsStateWithLifecycle()
-    val steps = stepsFor(viewModel.isMidWeek)
+    val steps = stepsFor(viewModel.isMidWeek, LocalPointsVisible.current)
     val pagerState = rememberPagerState { steps.size }
     val scope = rememberCoroutineScope()
     var adding by remember { mutableStateOf(false) }

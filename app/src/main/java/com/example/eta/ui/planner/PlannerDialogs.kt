@@ -29,6 +29,7 @@ import com.example.eta.ui.attributes.MIN_MARGIN
 import com.example.eta.ui.attributes.TodoAttributeFields
 import com.example.eta.ui.attributes.TodoAttributes
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDurationPicker
@@ -62,6 +63,10 @@ private val CATEGORY_OPTIONS: List<Pair<Category?, String>> = listOf(
     Category.ACHTSAM to "Achtsam",
     null to "Ohne — bringt keine Punkte",
 )
+
+/** The same, for while the points system is out of sight. */
+private val CATEGORY_OPTIONS_PLAIN: List<Pair<Category?, String>> =
+    CATEGORY_OPTIONS.dropLast(1) + (null to "Ohne")
 
 @Composable
 private fun PlannerDialog(
@@ -163,6 +168,7 @@ fun BlockEditDialog(
     val spend = entry.item.type == ItemType.SPEND
     var rate by remember(entry.block.id) { mutableStateOf(entry.item.pointsPerHour ?: 0.0) }
     var building by remember(entry.block.id) { mutableStateOf(false) }
+    val pointsVisible = LocalPointsVisible.current
 
     PlannerDialog(title = "Bearbeiten", onDismiss = onDismiss) {
         EtaField(label = "Name") {
@@ -187,18 +193,20 @@ fun BlockEditDialog(
             // A points entry is priced by its rate, not by a category — a category
             // on one would pay nothing, and offering it hid the one number that
             // does decide what the hour is worth.
-            RateField(
-                rate = rate,
-                onRateChange = { rate = it },
-                hint = "Gilt für diesen Eintrag. Positiv schreibt gut, negativ zehrt vom Konto.",
-            )
+            if (pointsVisible) {
+                RateField(
+                    rate = rate,
+                    onRateChange = { rate = it },
+                    hint = "Gilt für diesen Eintrag. Positiv schreibt gut, negativ zehrt vom Konto.",
+                )
+            }
         } else {
             EtaField(
                 label = "Kategorie",
                 hint = "Gilt für alle künftigen Vorkommen dieser Aufgabe.",
             ) {
                 EtaChoice(
-                    options = CATEGORY_OPTIONS,
+                    options = if (pointsVisible) CATEGORY_OPTIONS else CATEGORY_OPTIONS_PLAIN,
                     selected = category,
                     onSelect = { category = it },
                 )
@@ -313,7 +321,11 @@ fun BlockEditDialog(
                 )
             }
             EtaText(
-                text = if (cancellationCosts) {
+                text = if (!pointsVisible) {
+                    "Abgesagt bleibt der Termin am Tag stehen, und seine Stunden sind " +
+                        "wieder frei." +
+                        if (cancellationCosts) " Gedrückt halten, wenn wegen höherer Gewalt." else ""
+                } else if (cancellationCosts) {
                     "Absagen kostet die abgesagten Stunden an Punkten. " +
                         if (entry.block.isMovable) {
                             "»Vom Tag nehmen« nicht — die Aufgabe wandert zurück in die Woche. "
@@ -503,7 +515,9 @@ fun ClearDayDialog(
             }
         }
         EtaText(
-            text = if (costs && cancelledHours > 0.0) {
+            text = if (!LocalPointsVisible.current) {
+                "Die Stunden sind danach wieder frei."
+            } else if (costs && cancelledHours > 0.0) {
                 "Der Tag läuft bereits: die Absagen kosten rund " +
                     "${"%.1f".format(cancelledHours)} h an Punkten. " +
                     "Der Abendrückblick lässt »höhere Gewalt« gelten."
@@ -671,15 +685,17 @@ fun SpendDialog(
                 placeholder = "Wofür?",
             )
         }
-        RateField(
-            rate = rate,
-            onRateChange = { rate = it },
-            hint = when (kind) {
-                SpendKind.CUSTOM_SPEND -> "Negativ: zehrt vom Konto."
-                SpendKind.CUSTOM_EARN -> "Positiv: schreibt gut."
-                SpendKind.SOCIAL -> "Sozialzeit ist im Setup schon eingerechnet."
-            },
-        )
+        if (LocalPointsVisible.current) {
+            RateField(
+                rate = rate,
+                onRateChange = { rate = it },
+                hint = when (kind) {
+                    SpendKind.CUSTOM_SPEND -> "Negativ: zehrt vom Konto."
+                    SpendKind.CUSTOM_EARN -> "Positiv: schreibt gut."
+                    SpendKind.SOCIAL -> "Sozialzeit ist im Setup schon eingerechnet."
+                },
+            )
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)

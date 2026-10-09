@@ -30,6 +30,7 @@ import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.model.REINSTATEMENT_STREAK
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaExpander
@@ -115,8 +116,12 @@ fun ContractsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
                         EtaText(text = "Legacy-Verträge", style = EtaTheme.typography.heading)
                         EtaText(
-                            text = "Kosten keinen Slot, zahlen ein Fünftel — und müssen trotzdem " +
-                                "gehalten werden. Zusammen höchstens 2 Punkte am Tag.",
+                            text = if (LocalPointsVisible.current) {
+                                "Kosten keinen Slot, zahlen ein Fünftel — und müssen trotzdem " +
+                                    "gehalten werden. Zusammen höchstens 2 Punkte am Tag."
+                            } else {
+                                "Kosten keinen Slot — und müssen trotzdem gehalten werden."
+                            },
                             style = EtaTheme.typography.caption,
                             color = EtaTheme.colors.textMuted,
                         )
@@ -280,7 +285,11 @@ private fun SlotBox(
                     )
                     ContractRow(status.contract, onLongPress = { onLongPress(status.contract) })
                     EtaText(
-                        text = "Wird abends weiterhin abgefragt, bringt aber keine Punkte.",
+                        text = if (LocalPointsVisible.current) {
+                            "Wird abends weiterhin abgefragt, bringt aber keine Punkte."
+                        } else {
+                            "Wird abends weiterhin abgefragt."
+                        },
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
@@ -412,10 +421,12 @@ private fun ContractRow(contract: Contract, onLongPress: () -> Unit = {}) {
                 overflow = TextOverflow.Ellipsis,
             )
             EtaText(
-                text = if (contract.isOnProbation) {
-                    "ohne Punkte"
-                } else {
-                    "${formatPoints(contract.dailyPayout)}/Tag"
+                text = when {
+                    // The payout is the one figure on this row; with the points
+                    // out of sight the row says only which contract it is.
+                    !LocalPointsVisible.current -> ""
+                    contract.isOnProbation -> "ohne Punkte"
+                    else -> "${formatPoints(contract.dailyPayout)}/Tag"
                 },
                 style = EtaTheme.typography.label,
                 color = when (contract.state) {

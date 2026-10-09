@@ -36,6 +36,7 @@ import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.WEEK
 import com.example.eta.domain.streak.CATCH_UP_PHRASE
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaWeekdayPicker
@@ -192,9 +193,14 @@ fun SettingsScreen(
                 StillActiveBox(setup, viewModel::update)
                 TaskAnnouncementBox(setup, viewModel::update)
                 PlanningStep(setup, viewModel::update)
-                InflationBox(setup, viewModel::update)
-
-                CancellationBox(setup, viewModel::update)
+                PointsSystemBox(setup, viewModel::update)
+                // The two levers on the account go out of sight with it. Off the
+                // draft rather than the stored answer, so the box above folds
+                // them away the moment it is unticked.
+                if (setup.pointsSystem) {
+                    InflationBox(setup, viewModel::update)
+                    CancellationBox(setup, viewModel::update)
+                }
 
                 EtaButton(text = "Einrichtung sichern", onClick = viewModel::save)
             }
@@ -387,6 +393,34 @@ private fun TaskAnnouncementBox(setup: UserSetup, onChange: OnSetupChange) {
 }
 
 /**
+ * The points system, on show or not.
+ *
+ * Off takes every figure in points off the screens — the account, the evening's
+ * settlement page, forecasts, what a contract pays, Custom Earn and Custom Spend.
+ * **It stops nothing**: harvest, contracts, charges and the weekly devaluation
+ * are booked exactly as before, which is what lets the switch be flipped back
+ * with the account standing where it would have stood anyway. The Belohn-o-mat
+ * stays either way; it is the one place points are still seen.
+ */
+@Composable
+private fun PointsSystemBox(setup: UserSetup, onChange: OnSetupChange) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Punktesystem", style = EtaTheme.typography.heading)
+            CheckRow(
+                checked = setup.pointsSystem,
+                onCheckedChange = { on -> onChange { it.copy(pointsSystem = on) } },
+                label = "Punkte anzeigen",
+                hint = "Aus: Punktestand, Abrechnung am Abend und alle Punktangaben " +
+                    "verschwinden. Gezählt wird im Hintergrund unverändert weiter — " +
+                    "wieder eingeschaltet steht alles so da, als wäre es nie aus gewesen. " +
+                    "Der Belohn-o-mat bleibt sichtbar.",
+            )
+        }
+    }
+}
+
+/**
  * When the savings lose their 30 %.
  *
  * It hangs off a weekday rather than off visiting the weekly planning, so it
@@ -545,8 +579,9 @@ private fun CatchUpBox(
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Offene Tage", style = EtaTheme.typography.heading)
             EtaText(
-                text = "${openDays.size} Tage wurden nie abgerechnet. Das kostet die Serie " +
-                    "und die Punkte dieser Tage — so ist es gedacht. Nachtragen ist nur " +
+                text = "${openDays.size} Tage wurden nie abgerechnet. Das kostet die Serie" +
+                    (if (LocalPointsVisible.current) " und die Punkte dieser Tage" else "") +
+                    " — so ist es gedacht. Nachtragen ist nur " +
                     "vorgesehen, wenn technische Gründe im Weg standen.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,

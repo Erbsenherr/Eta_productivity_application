@@ -30,6 +30,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
 import com.example.eta.ui.components.ConfirmDialog
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
@@ -183,6 +184,7 @@ private fun TodayPage(
         // Asked by the screen rather than inside the box: what is being agreed to is
         // that the task counts as done, points and all, and a button that did that
         // on one tap would be one slip away from a wrong day.
+        val pointsVisible = LocalPointsVisible.current
         confirming?.let { entry ->
             val steps = state.subtasks[entry.item.id].orEmpty()
             val open = steps.count { it.id !in state.checked[entry.block.id].orEmpty() }
@@ -202,7 +204,7 @@ private fun TodayPage(
                             },
                         )
                     }
-                    append(" Punkte werden erst am Abend verbucht.")
+                    if (pointsVisible) append(" Punkte werden erst am Abend verbucht.")
                 },
                 confirm = "Erledigt",
                 onDismiss = { confirming = null },
@@ -247,15 +249,19 @@ private fun TodayPage(
         // Long press on the account: booking a correction by hand.
         var bookingPoints by remember { mutableStateOf(false) }
 
-        PointsBox(
-            balance = state.balance,
-            pendingHarvest = state.pendingHarvest,
-            plannedYield = state.plannedYield,
-            crowned = state.crowned,
-            onLongPress = { bookingPoints = true },
-        )
+        // Out of sight with the points system — and the correction by hand with
+        // it, since the long press that opens it is on this box.
+        if (pointsVisible) {
+            PointsBox(
+                balance = state.balance,
+                pendingHarvest = state.pendingHarvest,
+                plannedYield = state.plannedYield,
+                crowned = state.crowned,
+                onLongPress = { bookingPoints = true },
+            )
+        }
 
-        if (bookingPoints) {
+        if (bookingPoints && pointsVisible) {
             ManualPointsDialog(
                 balance = state.balance,
                 onDismiss = { bookingPoints = false },

@@ -8,6 +8,7 @@ import com.example.eta.data.repository.ItemRepository
 import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.data.repository.ReevaluationService
+import com.example.eta.data.repository.RewardOutlook
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
@@ -81,6 +82,11 @@ data class ReevaluationUiState(
     /** Groups with steps still open, once their block has been answered. */
     val remainders: List<RemainderOffer> = emptyList(),
     val preview: DailySettlement? = null,
+    /**
+     * What tonight would pour into the Belohn-o-mat. Null until it is known, and
+     * a null head inside it means there is no reward to fill — and no page.
+     */
+    val rewards: RewardOutlook? = null,
     val settled: DailySettlement? = null,
     val loading: Boolean = true,
 ) {
@@ -187,7 +193,12 @@ class ReevaluationViewModel(
         viewModelScope.launch {
             val state = _state.value
             _state.update {
-                it.copy(preview = reevaluationService.preview(date, state.toVerdicts()))
+                it.copy(
+                    preview = reevaluationService.preview(date, state.toVerdicts()),
+                    // Off the same blocks, so a tick taken back on the first
+                    // page takes its points back out of the bar as well.
+                    rewards = reevaluationService.previewRewards(date),
+                )
             }
         }
     }

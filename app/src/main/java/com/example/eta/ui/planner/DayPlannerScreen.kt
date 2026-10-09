@@ -41,6 +41,7 @@ import com.example.eta.domain.planning.coveringMinute
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.snapToGrid
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
@@ -84,6 +85,11 @@ private enum class RevolverKind(val label: String) {
     ;
 
     fun next(): RevolverKind = entries[(ordinal + 1) % entries.size]
+
+    /** [label], or what the second revolver is called while points are out of sight. */
+    @Composable
+    fun shownLabel(): String =
+        if (this == SPEND && !LocalPointsVisible.current) "Spontan" else label
 }
 
 /** The second revolver's first chamber. */
@@ -178,16 +184,20 @@ fun DayPlannerScreen(
     val taskEntries = state.revolver.map { it.toColouredRevolverEntry() }
     // The spontaneous ToDo leads the second revolver: it is the one a stray
     // thought reaches for, and dropping it is how it gets a time.
+    // Custom Earn and Custom Spend are points and nothing else, so they leave
+    // the revolver with the points system. What already stands on a day stays
+    // and is booked as before; Social is neutral and stays offered.
+    val pointsVisible = LocalPointsVisible.current
     val spendEntries = listOf(
         RevolverEntry(id = NEW_TODO_ID, title = "Neues ToDo", subtitle = "spontan", accent = null),
-    ) + SpendKind.entries.map {
-        RevolverEntry(id = it.name, title = it.label, subtitle = "1 h", accent = null)
-    }
+    ) + SpendKind.entries
+        .filter { pointsVisible || it.pointsPerHour == 0.0 }
+        .map { RevolverEntry(id = it.name, title = it.label, subtitle = "1 h", accent = null) }
     val breakEntries = listOf(
         RevolverEntry(
             id = BREAK_ID,
             title = "Pause",
-            subtitle = "${PLANNED_BREAK.formatShort()} · 0 Punkte",
+            subtitle = PLANNED_BREAK.formatShort() + if (pointsVisible) " · 0 Punkte" else "",
             accent = null,
         ),
     )
@@ -671,15 +681,17 @@ private fun PlannerHeader(
             )
             // Here as well as on the dashboard, because this is where a rate is
             // chosen: placing a Custom Spend should visibly cost something.
-            EtaText(
-                text = "Prognose: ${formatSignedPoints(state.plannedYield)} Punkte, " +
-                    "wenn alles erledigt wird",
-                style = EtaTheme.typography.caption,
-                color = when {
-                    state.plannedYield < 0 -> EtaTheme.colors.danger
-                    else -> EtaTheme.colors.textMuted
-                },
-            )
+            if (LocalPointsVisible.current) {
+                EtaText(
+                    text = "Prognose: ${formatSignedPoints(state.plannedYield)} Punkte, " +
+                        "wenn alles erledigt wird",
+                    style = EtaTheme.typography.caption,
+                    color = when {
+                        state.plannedYield < 0 -> EtaTheme.colors.danger
+                        else -> EtaTheme.colors.textMuted
+                    },
+                )
+            }
         }
         EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = onClose)
     }
@@ -713,7 +725,7 @@ private fun PlannerFooter(
             )
             EtaButton(
                 // Names where the button leads, as it always did with two.
-                text = revolverKind.next().label,
+                text = revolverKind.next().shownLabel(),
                 style = EtaButtonStyle.Secondary,
                 onClick = onSwitchRevolver,
             )
@@ -732,7 +744,7 @@ private fun PlannerFooter(
             Spacer(Modifier.weight(1f))
             EtaButton(
                 // Names where the button leads, as it always did with two.
-                text = revolverKind.next().label,
+                text = revolverKind.next().shownLabel(),
                 style = EtaButtonStyle.Secondary,
                 onClick = onSwitchRevolver,
             )

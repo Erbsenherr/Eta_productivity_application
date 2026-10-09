@@ -55,7 +55,7 @@ setup, `MainScaffold` splits everything into **tabs** and **flows**, and that sp
 is the point:
 
 - A **tab** is a place you can always get back to — Heute, Listen, Verträge,
-  Erinnerungen, Growth-Tasks, Einstellungen, in that order since step 34 — so `EtaTabBar` stays put beneath it.
+  Erinnerungen, Growth-Tasks, Belohn-o-mat, Einstellungen, in that order since step 35 — so `EtaTabBar` stays put beneath it.
 - A **flow** is something you are in the middle of: a planning phase, the
   concretizing step, the holiday editor. It covers the bar and leaves by finishing
   or by going back.
@@ -67,7 +67,7 @@ state, `tab` and `flow`, do the whole job, and both are `rememberSaveable` by en
 name so a rotation does not throw the screen away. Reach for a library when deep
 links or a real back stack arrive, not before.
 
-**The bar scrolls sideways and every label is drawn whole.** Six labels sharing one
+**The bar scrolls sideways and every label is drawn whole.** Six labels (seven now) sharing one
 phone width cut "Erinnerungen" and "Einstellungen" off, and a tab whose name is cut
 off is a tab the user has to guess at; each tab is now as wide as its own word
 inside a `horizontalScroll`, which is also the only shape that survives a seventh

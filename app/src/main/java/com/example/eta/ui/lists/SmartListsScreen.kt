@@ -1,9 +1,7 @@
 package com.example.eta.ui.lists
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +35,7 @@ import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
+import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
@@ -86,6 +86,9 @@ fun SmartListsScreen(
     // Standing tasks are opened as a group, one entry per task rather than per weekday.
     var openedGroup by remember { mutableStateOf<RecurringGroup?>(null) }
     var editingGroup by remember { mutableStateOf<RecurringGroup?>(null) }
+    // Holding a list's heading down makes something new for that list.
+    var creating by remember { mutableStateOf<Creating?>(null) }
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
 
     fun toggle(section: ListSection) = folds.getValue(section).toggle()
 
@@ -131,6 +134,8 @@ fun SmartListsScreen(
                 count = state.collection.size,
                 collapsed = ListSection.SAMMELLISTE in collapsed,
                 onToggle = ::toggle,
+                onLongPress = { creating = Creating.TODO },
+                longPressHint = "Überschrift lange drücken: neue Aufgabe.",
                 emptyHint = "Leer — nichts notiert.",
             ) {
                 state.collection.forEach { entry ->
@@ -145,6 +150,8 @@ fun SmartListsScreen(
                 count = state.week.size,
                 collapsed = ListSection.WOCHENLISTE in collapsed,
                 onToggle = ::toggle,
+                onLongPress = { creating = Creating.WEEK_TODO },
+                longPressHint = "Überschrift lange drücken: neue Aufgabe für diese Woche.",
                 emptyHint = "Für diese Woche ist nichts vorgenommen.",
             ) {
                 state.week.forEach { item ->
@@ -174,6 +181,8 @@ fun SmartListsScreen(
                 count = state.recurring.size + state.incompleteRecurring.size,
                 collapsed = ListSection.WIEDERKEHREND in collapsed,
                 onToggle = ::toggle,
+                onLongPress = { creating = Creating.RECURRING },
+                longPressHint = "Überschrift lange drücken: neue wiederkehrende Aufgabe.",
                 emptyHint = "Keine wiederkehrenden Aufgaben.",
             ) {
                 state.incompleteRecurring.forEach { entry ->
@@ -272,6 +281,48 @@ fun SmartListsScreen(
             }
 
             Spacer(Modifier.size(EtaTheme.spacing.xl))
+        }
+    }
+
+    when (creating) {
+        null -> Unit
+        Creating.TODO, Creating.WEEK_TODO -> {
+            val intoWeek = creating == Creating.WEEK_TODO
+            TodoCreateDialog(
+                today = viewModel.today,
+                intoWeek = intoWeek,
+                foldCandidates = state.foldable.foldCandidatesExcept(),
+                onDismiss = { creating = null },
+                onCreate = { name, note, attributes ->
+                    viewModel.createTodo(name, note, attributes, intoWeek)
+                    creating = null
+                },
+            )
+        }
+
+        Creating.RECURRING -> RecurringCreateDialog(
+            definitions = state.definitions,
+            setup = setup,
+            foldCandidates = state.foldable.foldCandidatesExcept(),
+            onDismiss = { creating = null },
+            onCreate = { name, note, attributes ->
+                viewModel.createRecurring(name, note, attributes)
+                creating = null
+            },
+        )
+    }
+
+    notice?.let { text ->
+        EtaDialog(title = "Hinweis", onDismiss = viewModel::dismissNotice) {
+            EtaText(
+                text = text,
+                style = EtaTheme.typography.body,
+                color = EtaTheme.colors.textSecondary,
+            )
+            Row {
+                Spacer(Modifier.weight(1f))
+                EtaButton(text = "Verstanden", onClick = viewModel::dismissNotice)
+            }
         }
     }
 
@@ -422,6 +473,9 @@ private data class OpenedRow(
     val editable: Boolean,
 )
 
+/** What a long press on a list's heading is in the middle of making. */
+private enum class Creating { TODO, WEEK_TODO, RECURRING }
+
 /** A question the popup handed on: what was asked for, and about which card. */
 private sealed interface PendingAction {
     val item: Item
@@ -486,29 +540,32 @@ private fun ListCard(
     onToggle: (ListSection) -> Unit,
     emptyHint: String,
     onLongPress: (() -> Unit)? = null,
+    /** Said at the foot of the open card, so the gesture can be found. */
+    longPressHint: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
+    // One detector for both gestures. A `clickable` with a long-press detector
+    // stacked on it has the inner one take the press and leave the outer one
+    // nothing to click on — tap and long press have to be told apart in one place.
+    val toggle = rememberUpdatedState(onToggle)
+    val longPress = rememberUpdatedState(onLongPress)
+    val holdable = onLongPress != null
 
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = { onToggle(section) },
-                    )
-                    .then(
-                        if (onLongPress != null) {
-                            Modifier.pointerInput(section) {
-                                detectTapGestures(onLongPress = { onLongPress() })
-                            }
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .pointerInput(section, holdable) {
+                        detectTapGestures(
+                            onTap = { toggle.value(section) },
+                            onLongPress = if (holdable) {
+                                { longPress.value?.invoke() }
+                            } else {
+                                null
+                            },
+                        )
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -541,6 +598,13 @@ private fun ListCard(
                     )
                 }
                 content()
+                if (longPressHint != null) {
+                    EtaText(
+                        text = longPressHint,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
             }
         }
     }

@@ -385,6 +385,13 @@ data class UserSetup(
      */
     val taskAnnouncement: TaskAnnouncement = TaskAnnouncement.SOUND,
     val speakNotes: Boolean = false,
+    /**
+     * Whether the points system is **shown**. Off hides the account, the evening's
+     * settlement page and every figure in points — and nothing else: the ledger
+     * is written exactly as before, so switching it back on shows the balance as
+     * if it had never been away. Read by the screens through `LocalPointsVisible`.
+     */
+    val pointsSystem: Boolean = true,
     val completedAt: Instant,
     val updatedAt: Instant,
 ) {

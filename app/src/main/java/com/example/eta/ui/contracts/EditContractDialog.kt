@@ -23,6 +23,7 @@ import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.ContractEffort
 import com.example.eta.domain.model.ContractState
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaCheckbox
 import com.example.eta.ui.components.EtaField
@@ -99,8 +100,11 @@ fun EditContractDialog(
 
                 EtaField(label = "Aufwand", hint = "Bleibt, wie er ist.") {
                     EtaText(
-                        text = "${effortLabel(contract)} — " +
-                            "${formatPoints(contract.effort.pointsPerDay)} Punkte am Tag",
+                        text = effortLabel(contract) + if (LocalPointsVisible.current) {
+                            " — ${formatPoints(contract.effort.pointsPerDay)} Punkte am Tag"
+                        } else {
+                            ""
+                        },
                         style = EtaTheme.typography.body,
                         color = EtaTheme.colors.textSecondary,
                     )

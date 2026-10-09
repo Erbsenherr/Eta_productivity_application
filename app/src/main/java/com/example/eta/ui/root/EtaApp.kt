@@ -57,6 +57,10 @@ import com.example.eta.ui.reevaluation.ReevaluationScreen
 import com.example.eta.ui.reevaluation.ReevaluationViewModel
 import com.example.eta.ui.reminders.RemindersScreen
 import com.example.eta.ui.reminders.RemindersViewModel
+import com.example.eta.ui.rewards.RewardsScreen
+import com.example.eta.ui.rewards.RewardsViewModel
+import com.example.eta.ui.components.LocalPointsVisible
+import androidx.compose.runtime.CompositionLocalProvider
 import com.example.eta.ui.settings.CalendarSettingsViewModel
 import com.example.eta.ui.settings.SettingsScreen
 import com.example.eta.ui.settings.SettingsViewModel
@@ -105,12 +109,21 @@ fun EtaApp(
             viewModel = viewModel(factory = setupViewModelFactory(container)),
         )
 
-        RootDestination.Dashboard -> MainScaffold(
-            container = container,
-            rootViewModel = rootViewModel,
-            openPhase = openPhase,
-            onOpenHandled = onOpenHandled,
-        )
+        RootDestination.Dashboard -> {
+            // Handed down rather than read by each screen: the switch hides
+            // figures in a dozen unrelated places. True until the setup arrives,
+            // which is what it was before there was a switch.
+            val setup by container.setupRepository.observe()
+                .collectAsStateWithLifecycle(initialValue = null)
+            CompositionLocalProvider(LocalPointsVisible provides (setup?.pointsSystem != false)) {
+                MainScaffold(
+                    container = container,
+                    rootViewModel = rootViewModel,
+                    openPhase = openPhase,
+                    onOpenHandled = onOpenHandled,
+                )
+            }
+        }
     }
 }
 
@@ -310,6 +323,13 @@ private fun MainScaffold(
                     ),
                 )
 
+                EtaTab.Rewards -> RewardsScreen(
+                    viewModel = viewModel(
+                        key = "rewards-$dateKey",
+                        factory = rewardsViewModelFactory(container),
+                    ),
+                )
+
                 EtaTab.Settings -> SettingsScreen(
                     viewModel = viewModel(factory = settingsViewModelFactory(container)),
                     calendarViewModel = viewModel(
@@ -377,6 +397,9 @@ private enum class EtaTab(val label: String) {
      * want.
      */
     Growth("Growth-Tasks"),
+
+    /** Long-term rewards, filled by the evening. Before the settings, which stay last. */
+    Rewards("Belohn-o-mat"),
 
     /** Far right, as the user asked: it is the tab opened least. */
     Settings("Einstellungen"),
@@ -592,6 +615,17 @@ private fun smartListsViewModelFactory(container: AppContainer): ViewModelProvid
                 reevaluationService = container.reevaluationService,
                 subtaskRepository = container.subtaskRepository,
                 setupRepository = container.setupRepository,
+                weekPlanningService = container.weekPlanningService,
+            )
+        }
+    }
+
+private fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            RewardsViewModel(
+                rewardRepository = container.rewardRepository,
+                recurringTaskService = container.recurringTaskService,
             )
         }
     }

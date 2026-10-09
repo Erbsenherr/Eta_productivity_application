@@ -32,6 +32,8 @@ abstract class ResetDao {
         clearCalendarSources()
         clearReminders()
         clearConflictDismissals()
+        clearRewardTasks()
+        clearRewards()
         clearSetup()
     }
 
@@ -76,6 +78,12 @@ abstract class ResetDao {
 
     @Query("DELETE FROM conflict_dismissals")
     abstract suspend fun clearConflictDismissals()
+
+    @Query("DELETE FROM reward_tasks")
+    abstract suspend fun clearRewardTasks()
+
+    @Query("DELETE FROM rewards")
+    abstract suspend fun clearRewards()
 
     @Query("DELETE FROM user_setup")
     abstract suspend fun clearSetup()

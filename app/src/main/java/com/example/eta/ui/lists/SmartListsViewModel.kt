@@ -11,6 +11,14 @@ import com.example.eta.data.repository.ReevaluationService
 import com.example.eta.data.repository.ScheduleMaintenance
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.data.repository.SubtaskRepository
+import com.example.eta.data.repository.AddItemResult
+import com.example.eta.data.repository.WeekPlanningService
+import com.example.eta.domain.model.withExtras
+import com.example.eta.ui.attributes.toEdit
+import com.example.eta.ui.format.formatLong
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
@@ -120,6 +128,7 @@ class SmartListsViewModel(
     private val reevaluationService: ReevaluationService,
     private val subtaskRepository: SubtaskRepository,
     private val setupRepository: SetupRepository,
+    private val weekPlanningService: WeekPlanningService,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -207,6 +216,79 @@ class SmartListsViewModel(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SmartListsUiState(today = today, tomorrow = tomorrow),
     )
+
+    private val _notice = MutableStateFlow<String?>(null)
+
+    /** Something a creation has to say back: a ban that vetoed it, or where it landed instead. */
+    val notice: StateFlow<String?> = _notice.asStateFlow()
+
+    fun dismissNotice() {
+        _notice.value = null
+    }
+
+    /**
+     * A ToDo made by holding a list down — the Sammelliste, or with [intoWeek] the
+     * Wochenliste.
+     *
+     * **Not a way round the two rules those lists have.** The Sperrliste can veto
+     * the name, exactly as it can everywhere else a card is made. And a card for
+     * the week is taken on through `takeIntoWeek`, the weekly planning's own
+     * call, under that phase's own gate: while goals of an earlier cycle are
+     * still lying in the week list, nothing new joins them — the card is kept,
+     * in the Sammelliste, and the notice says why. A shortcut to the week that
+     * skipped the gate would make the gate optional.
+     */
+    fun createTodo(name: String, note: String?, attributes: TodoAttributes, intoWeek: Boolean) {
+        viewModelScope.launch {
+            val now = clock.now()
+            val result = itemRepository.add(
+                Item.newTodo(
+                    name = name,
+                    category = attributes.category,
+                    priority = attributes.priority,
+                    targetDate = today.plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                    estimatedDuration = attributes.duration,
+                    now = now,
+                ).copy(
+                    note = note,
+                    travelBefore = attributes.travelBefore,
+                    returnAfter = attributes.returnAfter,
+                    breakAfter = attributes.breakAfter,
+                    endSound = attributes.endSound,
+                ).withExtras(attributes.extras),
+                subtasks = attributes.subtasks,
+                folded = attributes.foldedItemIds,
+            )
+            when (result) {
+                is AddItemResult.BlockedByLock -> {
+                    val until = result.lockedUntil.toLocalDateTime(timeZone).date.formatLong()
+                    _notice.value = "»$name« steht auf der Sperrliste und kann erst ab " +
+                        "$until wieder notiert werden."
+                }
+
+                is AddItemResult.Added -> if (intoWeek) {
+                    val cycleStart = weekPlanningService.cycleStart()
+                    val owed = itemRepository.observeUnfinishedWeekGoals(cycleStart).first()
+                    if (owed.isEmpty()) {
+                        itemRepository.takeIntoWeek(result.item, cycleStart)
+                    } else {
+                        _notice.value = "»$name« liegt in der Sammelliste. In der Wochenliste " +
+                            (if (owed.size == 1) "wartet noch ein Ziel" else "warten noch ${owed.size} Ziele") +
+                            " aus der letzten Woche — erst wenn die abgearbeitet oder " +
+                            "zurückgegeben sind, nimmt die Woche Neues auf."
+                    }
+                }
+            }
+        }
+    }
+
+    /** A standing task made by holding the Wiederkehrend box down; laid down at once. */
+    fun createRecurring(name: String, note: String?, attributes: RecurringAttributes) {
+        if (attributes.weekdays.isEmpty()) return
+        viewModelScope.launch {
+            recurringTaskService.createGroup(attributes.toEdit(name, note))
+        }
+    }
 
     /**
      * Saves a ToDo's attributes.

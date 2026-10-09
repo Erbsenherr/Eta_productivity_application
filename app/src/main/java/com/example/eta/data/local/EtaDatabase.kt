@@ -16,6 +16,8 @@ import com.example.eta.domain.model.JournalEntry
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.model.PointsTransaction
 import com.example.eta.domain.model.Reminder
+import com.example.eta.domain.model.Reward
+import com.example.eta.domain.model.RewardTask
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
 import com.example.eta.domain.model.Vacation
@@ -39,8 +41,10 @@ import com.example.eta.domain.setup.UserSetup
         ConflictDismissal::class,
         Subtask::class,
         SubtaskCheck::class,
+        Reward::class,
+        RewardTask::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -57,6 +61,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun conflictDao(): ConflictDao
     abstract fun subtaskDao(): SubtaskDao
+    abstract fun rewardDao(): RewardDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -728,6 +733,55 @@ val MIGRATION_22_23 = object : Migration(22, 23) {
             WHERE (`id` = 'setup:morning' OR `id` LIKE 'setup:morning-%')
               AND `name` = 'Morgenzeit'
             """.trimIndent(),
+        )
+    }
+}
+
+/**
+ * 23 -> 24: the Belohn-o-mat, and a points system that can be put out of sight.
+ *
+ * - **`rewards`**: what each costs, what it has earned and where it stands in the
+ *   list. The progress is a column of its own, since points poured into a reward
+ *   stay with it whatever the order does afterwards.
+ * - **`reward_tasks`**: the standing tasks a reward is bound to. `rewardId`
+ *   cascades; `itemId` is a plain column, because a retired definition has to go
+ *   on naming the task it stood for.
+ * - **`user_setup.pointsSystem`**: on for everyone who upgrades — it is what the
+ *   app did before there was a switch.
+ */
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `rewards` (
+                `id` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `cost` REAL NOT NULL,
+                `progress` REAL NOT NULL,
+                `position` INTEGER NOT NULL,
+                `redeemedAt` INTEGER,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """,
+        )
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `reward_tasks` (
+                `rewardId` TEXT NOT NULL,
+                `itemId` TEXT NOT NULL,
+                PRIMARY KEY(`rewardId`, `itemId`),
+                FOREIGN KEY(`rewardId`) REFERENCES `rewards`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """,
+        )
+        connection.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_reward_tasks_itemId` ON `reward_tasks` (`itemId`)",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `pointsSystem` INTEGER NOT NULL DEFAULT 1",
         )
     }
 }

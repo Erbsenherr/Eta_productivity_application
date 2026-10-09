@@ -9,6 +9,7 @@ import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDialog
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatShort
@@ -39,7 +40,9 @@ fun FollowUpDialog(
     onPullForward: () -> Unit,
     onBreakThenPull: () -> Unit,
 ) {
-    val billing = question.billing
+    // What a task finished early is billed at is a question about points. Out
+    // of sight with them, it is not put — the block keeps the default it has.
+    val billing = question.billing.takeIf { LocalPointsVisible.current }
     val next = question.next
 
     EtaDialog(

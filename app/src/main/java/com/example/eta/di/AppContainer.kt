@@ -31,6 +31,7 @@ import com.example.eta.data.local.MIGRATION_19_20
 import com.example.eta.data.local.MIGRATION_20_21
 import com.example.eta.data.local.MIGRATION_21_22
 import com.example.eta.data.local.MIGRATION_22_23
+import com.example.eta.data.local.MIGRATION_23_24
 import com.example.eta.data.local.MIGRATION_9_10
 import com.example.eta.data.repository.CalendarImportService
 import com.example.eta.data.repository.CalendarRepository
@@ -47,6 +48,7 @@ import com.example.eta.data.repository.PointsRepository
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.ReevaluationService
 import com.example.eta.data.repository.ReminderRepository
+import com.example.eta.data.repository.RewardRepository
 import com.example.eta.data.repository.ScheduleMaintenance
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.data.repository.SubtaskGroupService
@@ -76,7 +78,7 @@ class AppContainer(
             EtaDatabase::class.java,
             EtaDatabase.NAME,
         )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24)
         .build()
 
     val backupService: BackupService = BackupService(appContext)
@@ -160,6 +162,12 @@ class AppContainer(
         setupRepository = setupRepository,
     )
 
+    /** The Belohn-o-mat: long-term rewards, filled by what the evening harvests. */
+    val rewardRepository: RewardRepository = RewardRepository(
+        rewardDao = database.rewardDao(),
+        itemDao = database.itemDao(),
+    )
+
     val reevaluationService: ReevaluationService = ReevaluationService(
         itemDao = database.itemDao(),
         blockDao = database.plannedBlockDao(),
@@ -170,6 +178,7 @@ class AppContainer(
         pointsRepository = pointsRepository,
         setupRepository = setupRepository,
         growthService = growthService,
+        rewardRepository = rewardRepository,
     )
 
     val catchUpService: CatchUpService = CatchUpService(

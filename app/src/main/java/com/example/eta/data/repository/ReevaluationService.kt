@@ -40,6 +40,7 @@ class ReevaluationService(
     private val pointsRepository: PointsRepository,
     private val setupRepository: SetupRepository,
     private val growthService: GrowthService,
+    private val rewardRepository: RewardRepository,
     private val clock: Clock = Clock.System,
 ) {
 
@@ -92,6 +93,15 @@ class ReevaluationService(
     }
 
     /**
+     * What closing [date] now would pour into the Belohn-o-mat, without writing.
+     *
+     * A null head is also what tells the evening it has no page to show: with
+     * no reward being filled there is nothing to watch fill.
+     */
+    suspend fun previewRewards(date: LocalDate): RewardOutlook =
+        rewardRepository.outlook(blockDao.findForDateWithItems(date))
+
+    /**
      * Books the day: contract verdicts, then every points movement as its own
      * ledger row.
      *
@@ -141,6 +151,11 @@ class ReevaluationService(
                 note = "${settlement.unplannedHours} h unverplant",
             )
         }
+
+        // The Belohn-o-mat fills from the same blocks the harvest was just read
+        // off, and here rather than anywhere else for the same reason HARVEST is
+        // written here: a day is settled once, so a reward is filled once.
+        rewardRepository.pour(blockDao.findForDateWithItems(date))
 
         val answered = journal.filterValues { it.isNotBlank() }
         if (answered.isNotEmpty()) {
@@ -198,6 +213,9 @@ class ReevaluationService(
         val amount = yieldOf(entry.item, entry.block)
         if (amount != 0.0) {
             pointsRepository.record(amount, PointsReason.HARVEST, note = "$date nachgetragen")
+            // The evening that would have poured it into a reward has been and
+            // gone as well, so it is carried there with the same stroke.
+            rewardRepository.pour(listOf(entry))
         }
         return amount
     }

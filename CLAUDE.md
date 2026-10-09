@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (494 tests
-as of step 34), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (510 tests
+as of step 35), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -270,6 +270,12 @@ Checking a task off does **not** credit points. Per `Tägliche Reevaluation.md` 
 harvest happens in the evening, so the dashboard shows the balance alongside
 today's *pending* yield, labelled as not yet credited. **`ReevaluationService` is
 the only thing that writes `HARVEST` rows**, `harvestLate` included — see *Step 22*.
+It is also the only thing that fills a Belohn-o-mat reward, from the same blocks —
+see *Step 35*.
+
+**The points system can be put out of sight** (`UserSetup.pointsSystem`), which
+hides every figure and books everything exactly as before. A screen that shows a
+figure in points reads `LocalPointsVisible` — see *Step 35*.
 
 `yieldOf(item, block)` in `domain/reward/Yield.kt` is the single place points are
 computed. It keys off the block, bills `actualDuration` when the user corrected it
@@ -342,6 +348,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-30-designs.md` | *Step 30*: designs (`AppDesign`: Eta, Legacy) and `Brightness`, `applyDesignToWindow`, the widget's colours · *The launch screen* |
 | `step-33-small-ones.md` | *Step 33*: the long press in "Heute anstehend", holding "Absagen" for höhere Gewalt (`EtaHoldButton`), "Wiederholen bis" (`Item.repeatUntil`) |
 | `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
+| `step-35-belohnomat.md` | *Step 35*: the Belohn-o-mat (`Reward`, `pourInto`, Aufgabenbindung, the evening's fill page, placeholder sounds), the points system out of sight (`UserSetup.pointsSystem`, `LocalPointsVisible`), the long press on three list headings |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -397,7 +404,7 @@ screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text 
 32. The questionnaire reordered, skippable pages and a weekend night ·
 33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
 and a broken contract's way back · 34. The Routine-Modus, and a morning that
-is one.
+is one · 35. The Belohn-o-mat, points out of sight, and three long presses.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

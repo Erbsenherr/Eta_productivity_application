@@ -41,6 +41,7 @@ import com.example.eta.ui.attributes.growthIssuesFor
 import com.example.eta.ui.attributes.TodoAttributeFields
 import com.example.eta.ui.attributes.TodoAttributes
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaDurationPicker
@@ -238,6 +239,7 @@ fun CompleteItemDialog(
         mutableStateOf(item.estimatedDuration ?: DEFAULT_DURATION)
     }
     val points = yieldOf(category, duration)
+    val pointsVisible = LocalPointsVisible.current
 
     ListDialog(title = "Erledigt?", onDismiss = onDismiss) {
         EtaText(
@@ -249,9 +251,14 @@ fun CompleteItemDialog(
 
         if (owesAnswers) {
             EtaText(
-                text = "Diese Karte ist nie ausgefüllt worden. Wofür sie zählt und wie " +
-                    "lange sie gedauert hat, entscheidet die Punkte — also bitte beides " +
-                    "noch nachtragen.",
+                text = if (pointsVisible) {
+                    "Diese Karte ist nie ausgefüllt worden. Wofür sie zählt und wie " +
+                        "lange sie gedauert hat, entscheidet die Punkte — also bitte beides " +
+                        "noch nachtragen."
+                } else {
+                    "Diese Karte ist nie ausgefüllt worden. Bitte noch nachtragen, wofür " +
+                        "sie zählt und wie lange sie gedauert hat."
+                },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.warning,
             )
@@ -265,17 +272,19 @@ fun CompleteItemDialog(
             }
         }
 
-        EtaText(
-            text = if (dayAlreadySettled) {
-                "Das wären ${formatPoints(points)} Punkte — heute ist aber schon " +
-                    "abgerechnet, also werden sie sofort gutgeschrieben."
-            } else {
-                "Das bringt ${formatPoints(points)} Punkte, gebucht heute Abend mit " +
-                    "dem Rest des Tages."
-            },
-            style = EtaTheme.typography.caption,
-            color = EtaTheme.colors.accent,
-        )
+        if (pointsVisible) {
+            EtaText(
+                text = if (dayAlreadySettled) {
+                    "Das wären ${formatPoints(points)} Punkte — heute ist aber schon " +
+                        "abgerechnet, also werden sie sofort gutgeschrieben."
+                } else {
+                    "Das bringt ${formatPoints(points)} Punkte, gebucht heute Abend mit " +
+                        "dem Rest des Tages."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.accent,
+            )
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
@@ -403,6 +412,154 @@ fun ItemEditDialog(
 }
 
 /**
+ * A ToDo made from nothing, by holding down the Sammelliste or the Wochenliste.
+ *
+ * Created **already concretized**, for the reason the weekly planning's own
+ * "Neues ToDo" is: a bare note in the week list would sit there unplannable,
+ * since the revolver only offers finished cards. The form is that dialog's form,
+ * which is the concretizing step's.
+ *
+ * [intoWeek] only changes what the dialog says about where the card will land.
+ */
+@Composable
+fun TodoCreateDialog(
+    today: LocalDate,
+    intoWeek: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, note: String?, attributes: TodoAttributes) -> Unit,
+    foldCandidates: List<FoldCandidate> = emptyList(),
+) {
+    var name by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var attributes by remember { mutableStateOf(TodoAttributes()) }
+
+    ListDialog(title = "Neue Aufgabe", onDismiss = onDismiss) {
+        EtaText(
+            text = if (intoWeek) {
+                "Kommt direkt in die Wochenliste und kann heute Abend eingeplant werden."
+            } else {
+                "Landet in der Sammelliste."
+            },
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.accent,
+        )
+
+        EtaField(label = "Name") {
+            EtaTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = "Was steht an?",
+            )
+        }
+        EtaField(label = "Notiz") {
+            EtaTextField(
+                value = note,
+                onValueChange = { note = it },
+                placeholder = "Was gehört dazu?",
+                singleLine = false,
+            )
+        }
+
+        TodoAttributeFields(
+            value = attributes,
+            onChange = { attributes = it },
+            today = today,
+            groupName = name,
+            onGroupName = { name = it },
+            foldCandidates = foldCandidates,
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            Spacer(Modifier.weight(1f))
+            EtaButton(
+                text = "Anlegen",
+                enabled = name.isNotBlank(),
+                onClick = { onCreate(name.trim(), note.trim().ifBlank { null }, attributes) },
+            )
+        }
+    }
+}
+
+/**
+ * A standing task made from nothing — by holding down the Wiederkehrend box, or
+ * from the Belohn-o-mat's binding menu.
+ *
+ * The ordinary recurring form, Wochenschema and overlap warning included, so the
+ * hour is chosen with the week's free stretches in sight. Finished on the spot
+ * rather than left as a note for the evening: someone who held the box down to
+ * make a standing task has the answers now.
+ */
+@Composable
+fun RecurringCreateDialog(
+    definitions: List<Item>,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, note: String?, attributes: RecurringAttributes) -> Unit,
+    /** The setup, for the night the Wochenschema books. Null draws no night. */
+    setup: UserSetup? = null,
+    foldCandidates: List<FoldCandidate> = emptyList(),
+) {
+    var name by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var attributes by remember { mutableStateOf(RecurringAttributes()) }
+
+    val overlaps = remember(attributes, definitions) {
+        recurringOverlaps(attributes.slots(), definitions)
+    }
+    val growthIssues = remember(attributes, definitions) {
+        growthIssuesFor(attributes = attributes, definitions = definitions, order = null)
+    }
+    val booked = remember(definitions, setup) { weekOccupancy(definitions, setup) }
+
+    ListDialog(title = "Neue wiederkehrende Aufgabe", onDismiss = onDismiss) {
+        EtaText(
+            text = "Kommt in den festen Wochenplan; die Termine werden sofort angelegt.",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.accent,
+        )
+
+        EtaField(label = "Name") {
+            EtaTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = "Was kehrt wieder?",
+            )
+        }
+        EtaField(label = "Notiz") {
+            EtaTextField(
+                value = note,
+                onValueChange = { note = it },
+                placeholder = "Was gehört dazu?",
+                singleLine = false,
+            )
+        }
+
+        SchemePreview(booked = booked, attributes = attributes, overlaps = overlaps)
+        RecurringAttributeFields(
+            value = attributes,
+            onChange = { attributes = it },
+            overlaps = overlaps,
+            findNextFree = { nextFreeStart(it.slots(), booked) },
+            allowGrowth = true,
+            growthIssues = growthIssues,
+            groupName = name,
+            onGroupName = { name = it },
+            foldCandidates = foldCandidates,
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            Spacer(Modifier.weight(1f))
+            EtaButton(
+                text = "Erstellen",
+                enabled = name.isNotBlank() && attributes.weekdays.isNotEmpty(),
+                onClick = { onCreate(name.trim(), note.trim().ifBlank { null }, attributes) },
+            )
+        }
+    }
+}
+
+/**
  * How a standing task repeats, in one line: "Mo–Fr · 09:00 · 3 h 30 min".
  *
  * The rhythm is only named when it is not the ordinary weekly one.
@@ -445,12 +602,14 @@ fun RecurringGroupDialog(
 ) {
     val item = group.representative
     var confirmingEnd by remember(group.ids) { mutableStateOf(false) }
+    val pointsVisible = LocalPointsVisible.current
 
     ListDialog(title = item.name, onDismiss = onDismiss) {
         EtaText(
             text = buildList {
                 add("Wiederkehrend")
-                add(item.category?.let(::categoryLabel) ?: "ohne Punkte")
+                (item.category?.let(::categoryLabel) ?: "ohne Punkte".takeIf { pointsVisible })
+                    ?.let(::add)
                 add(recurringSummary(group))
             }.joinToString(" · "),
             style = EtaTheme.typography.caption,

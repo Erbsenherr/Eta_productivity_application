@@ -58,6 +58,8 @@ import com.example.eta.ui.components.EtaDurationPicker
 import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
 import com.example.eta.ui.components.EtaStepper
+import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.data.repository.RecurringEdit
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.components.EtaTimePicker
@@ -407,7 +409,11 @@ fun RecurringAttributeFields(
 ) {
     EtaField(
         label = "Kategorie",
-        hint = if (value.category == null) "Zählt nicht für Punkte." else null,
+        hint = if (value.category == null && LocalPointsVisible.current) {
+            "Zählt nicht für Punkte."
+        } else {
+            null
+        },
     ) {
         val options: List<Pair<Category?, String>> =
             if (allowNoCategory || value.category == null) {
@@ -1446,3 +1452,26 @@ fun CheckRow(
         }
     }
 }
+
+/**
+ * These answers as the edit `RecurringTaskService` writes.
+ *
+ * For the screens that **create** a standing task from a button — the Listen
+ * tab's long press and the Belohn-o-mat's binding menu.
+ */
+fun RecurringAttributes.toEdit(name: String, note: String?) = RecurringEdit(
+    name = name,
+    note = note,
+    category = category,
+    weekdays = weekdays,
+    startTime = startTime,
+    duration = duration,
+    travelBefore = travelBefore,
+    returnAfter = returnAfter,
+    breakAfter = breakAfter,
+    endSound = endSound,
+    extras = extras,
+    growth = growth,
+    subtasks = subtasks,
+    folded = foldedItemIds,
+)

@@ -6,7 +6,8 @@ paths:
 ### The "Smart toDos" (Listen) tab
 
 `ui/lists/` shows the six lists of `Konzept.md` stacked on one screen, and is
-**read-only about placement**. Every one of these lists is what a phase left behind
+**read-only about placement** — since step 35 with three long presses that *make*
+something new, under the rules of the list it is made for; see *Step 35*. It is read-only because every one of these lists is what a phase left behind
 — the Sperrliste of the weekly sweep, the Wochenliste of the weekly planning, the
 Tagesliste of the day planner — so *moving* a card here would be a second route
 around the rules those phases enforce. The way to move a card is to run the phase

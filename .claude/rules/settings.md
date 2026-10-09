@@ -16,7 +16,8 @@ save by accident.
 
 **Since step 18 only the answers that are configuration are here**: sleep and
 morning, the wake alarm, social time, the still-active question, the planning times,
-inflation and the cancellation rate. Meals, housekeeping, sport, free time,
+whether the points system is on show (`PointsSystemBox` — see *Step 35*; off, it
+folds the next two away), inflation and the cancellation rate. Meals, housekeeping, sport, free time,
 mindfulness and work are standing *tasks* and are edited on the Listen tab. Saving
 goes through `SetupRepository.saveSettings`, which regenerates only bed preparation
 and the morning (`SETTINGS_OWNED_ITEM_IDS`: `setup:bedprep`, `setup:morning`), never `complete` — calling `complete`

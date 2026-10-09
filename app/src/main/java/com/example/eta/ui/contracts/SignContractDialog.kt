@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.eta.domain.contract.Signature
 import com.example.eta.domain.model.ContractEffort
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaCheckbox
 import com.example.eta.ui.components.EtaChoice
@@ -46,6 +47,13 @@ private val EFFORT_OPTIONS = listOf(
     ContractEffort.LEICHT to "Leicht — 0,5 Punkte am Tag",
     ContractEffort.MITTEL to "Mittel — 1 Punkt am Tag",
     ContractEffort.SCHWER to "Schwer — 1,5 Punkte am Tag",
+)
+
+/** The same three, for while the points system is out of sight. */
+private val EFFORT_OPTIONS_PLAIN = listOf(
+    ContractEffort.LEICHT to "Leicht",
+    ContractEffort.MITTEL to "Mittel",
+    ContractEffort.SCHWER to "Schwer",
 )
 
 /**
@@ -158,11 +166,13 @@ fun SignContractDialog(
                     )
                 }
 
-                EtaText(
-                    text = "Ein gehaltener Tag bringt ${formatPoints(effort.pointsPerDay)} Punkte.",
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textMuted,
-                )
+                if (LocalPointsVisible.current) {
+                    EtaText(
+                        text = "Ein gehaltener Tag bringt ${formatPoints(effort.pointsPerDay)} Punkte.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
 
                 if (refusal != null) {
                     EtaText(
