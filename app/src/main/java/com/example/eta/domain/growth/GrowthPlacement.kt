@@ -48,7 +48,11 @@ data class GrowthMove(
  * writes only what changed.
  */
 fun placeDynamicGrowth(blocks: List<BlockWithItem>): List<GrowthMove> {
-    val (movable, rest) = blocks.partition { it.isDynamicGrowth() && it.block.isOpen }
+    // A flexible occurrence was put where it is by hand, on purpose: it is an
+    // obstacle like any static task, not something this pass moves back.
+    val (movable, rest) = blocks.partition {
+        it.isDynamicGrowth() && it.block.isOpen && !it.block.flexible
+    }
     if (movable.isEmpty()) return emptyList()
 
     val obstacles = rest

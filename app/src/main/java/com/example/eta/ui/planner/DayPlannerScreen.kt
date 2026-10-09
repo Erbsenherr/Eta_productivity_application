@@ -472,9 +472,9 @@ fun DayPlannerScreen(
             foldCandidates = state.foldable.foldCandidatesExcept(entry.item.id),
             onSubtasks = { viewModel.saveSubtasks(entry.block.id, it) },
             onDismiss = { editing = null },
-            onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate ->
+            onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex ->
                 viewModel.edit(
-                    entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate,
+                    entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex,
                 )
                 editing = null
             },

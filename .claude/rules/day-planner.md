@@ -32,7 +32,8 @@ snapping, and where a block can actually go.
   real pull, so turning the revolver left the screen holding a drag that never
   ended.
 - Corners carry meaning (`shapes.draggedBlock` vs `shapes.fixedBlock`). Only
-  `BlockOrigin.DRAGGED` blocks move.
+  `BlockOrigin.DRAGGED` blocks move — and, since step 37, a standing occurrence
+  the user made *Flexibel*; see below.
 - **A drag snaps and says where it will land.** The block reports its candidate
   minute upward while the finger is down, the timeline draws the same
   `DropIndicator` a revolver drop draws, and the block's own offset follows the
@@ -140,6 +141,34 @@ those is a place for them to come apart. As columns there is nothing to keep in 
   being what the block is named after. The asymmetry is the user's own and it is
   right: a break belongs to what you are doing now, never to what is coming.
 
+
+### "Flexibel": a standing occurrence that may be dragged (step 37)
+
+`PlannedBlock.flexible`, a checkbox in `BlockEditDialog` shown on a block of
+`BlockOrigin.RECURRING` and on nothing else. Ticked and saved, that one occurrence
+is drawn with rounded corners and dragged like a ToDo. Database **version 26**.
+
+- **On the block, never on the definition**, by the user's rule: the option is
+  granted to an occurrence that already stands on a day. No form that edits a
+  standing task offers it, and the next occurrence is as fixed as ever.
+- **`isMovable` now only answers "may it be dragged"** — hand-placed, or a flexible
+  standing occurrence. **`isHandPlaced`** (`origin == DRAGGED`) is the question the
+  rest used to ask of `isMovable` when the two were the same thing: "Vom Tag
+  nehmen", the drop onto the revolver, "Ganzen Tag absagen", the calendar's
+  conflict relief, and grouping. A flexible occurrence can be moved and cannot be
+  taken off the day — expansion would only lay it down again — and it is neither
+  grouped nor grouped into, on either side of the drop. **A new caller has to pick
+  the right one of the two.**
+- `DayPlannerViewModel.edit` writes the flag and refuses it on anything that is not
+  a recurring block; a calendar import with the flag set still does not move.
+- **A dynamic growth occurrence made flexible stays where it is put**:
+  `placeDynamicGrowth` treats it as an obstacle instead of moving it back, which
+  is the one exception to "a dynamic growth block moved by hand moves back".
+- **Known limit:** an edit to the standing task relays its open occurrences after
+  the confirmed days (`relayOccurrences`), so a flexible block moved on a day
+  beyond those is laid down again at the task's own hour, flag gone. Today, and a
+  confirmed tomorrow, keep it.
+- Pinned in `YieldTest` beside the older movability test.
 
 ### The third revolver: Pause (step 29)
 

@@ -44,7 +44,7 @@ import com.example.eta.domain.setup.UserSetup
         Reward::class,
         RewardTask::class,
     ],
-    version = 25,
+    version = 26,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -819,6 +819,18 @@ val MIGRATION_24_25 = object : Migration(24, 25) {
               AND `type` = 'TODO'
               AND `stage` IN ('COLLECTION', 'WEEK')
             """.trimIndent(),
+        )
+    }
+}
+
+/**
+ * 25 -> 26: **`planned_blocks.flexible`**, off for every block there is — a
+ * standing occurrence is fixed until the user says, of that one, that it is not.
+ */
+val MIGRATION_25_26 = object : Migration(25, 26) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `planned_blocks` ADD COLUMN `flexible` INTEGER NOT NULL DEFAULT 0",
         )
     }
 }

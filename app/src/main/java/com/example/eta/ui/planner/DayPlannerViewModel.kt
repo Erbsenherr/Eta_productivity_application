@@ -443,10 +443,12 @@ class DayPlannerViewModel(
         // which is what keeps a merge from being able to swallow a standing task.
         val landedOn = state.blocks
             .filterNot { it.block.id == blockId }
-            .filter { it.block.isMovable }
+            .filter { it.block.isHandPlaced }
             .coveringMinute(toMinute.coerceIn(0, MINUTES_PER_DAY - 1))
             .firstOrNull()
-        if (landedOn != null) {
+        // Hand-placed on both sides: a flexible occurrence of a standing task
+        // can be dragged, but it is still that task and is not to be grouped.
+        if (landedOn != null && entry.block.isHandPlaced) {
             _mergeRequest.value = MergeRequest(
                 draggedId = blockId,
                 targetId = landedOn.block.id,
@@ -638,7 +640,7 @@ class DayPlannerViewModel(
      */
     fun returnToWeek(blockId: String) {
         val entry = uiState.value.blocks.firstOrNull { it.block.id == blockId } ?: return
-        if (!entry.block.isMovable) return
+        if (!entry.block.isHandPlaced) return
         viewModelScope.launch {
             planRepository.removeBlock(entry.block)
             // A break has no week list to go back to: it was made for this
@@ -671,10 +673,10 @@ class DayPlannerViewModel(
         viewModelScope.launch {
             val entries = uiState.value.blocks.filter { it.block.isOpen }
             entries.forEach { entry ->
-                if (entry.block.isMovable && entry.item.isOneOffBreak) {
+                if (entry.block.isHandPlaced && entry.item.isOneOffBreak) {
                     planRepository.removeBlock(entry.block)
                     itemRepository.delete(entry.item)
-                } else if (entry.block.isMovable && entry.item.type == ItemType.TODO) {
+                } else if (entry.block.isHandPlaced && entry.item.type == ItemType.TODO) {
                     planRepository.removeBlock(entry.block)
                     if (entry.item.stage == Stage.DAY) itemRepository.moveTo(entry.item, Stage.WEEK)
                 } else {
@@ -749,6 +751,7 @@ class DayPlannerViewModel(
         breakAfter: Duration?,
         endSound: Boolean,
         pointsPerHour: Double?,
+        flexible: Boolean = entry.block.flexible,
     ) {
         viewModelScope.launch {
             val now = clock.now()
@@ -779,6 +782,9 @@ class DayPlannerViewModel(
                     travelBefore = travelBefore,
                     returnAfter = returnAfter,
                     breakAfter = breakAfter,
+                    // Only a standing occurrence can be made flexible; anything
+                    // else either moves already or is the calendar's.
+                    flexible = flexible && entry.block.origin == BlockOrigin.RECURRING,
                     updatedAt = now,
                 ),
             )

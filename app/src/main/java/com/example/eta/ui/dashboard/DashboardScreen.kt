@@ -372,9 +372,9 @@ private fun TodayBlockEditor(
         foldCandidates = planner.foldable.foldCandidatesExcept(entry.item.id),
         onSubtasks = { plannerViewModel.saveSubtasks(entry.block.id, it) },
         onDismiss = onDone,
-        onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate ->
+        onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex ->
             plannerViewModel.edit(
-                entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate,
+                entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex,
             )
             onDone()
         },

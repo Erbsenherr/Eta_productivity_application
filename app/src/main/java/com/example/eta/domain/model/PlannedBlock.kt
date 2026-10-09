@@ -114,6 +114,16 @@ data class PlannedBlock(
      * with it; one set up mid-task counts from the minute it was set up.
      */
     val pomodoroAnchor: LocalTime? = null,
+    /**
+     * "Flexibel": this one occurrence of a standing task may be dragged like a
+     * ToDo.
+     *
+     * On the block and nowhere else, by the user's rule: the option is granted
+     * to an occurrence that already stands on a day, never to the task. A
+     * definition cannot carry it, so the next occurrence is as fixed as ever.
+     * Means nothing on a block that is not [BlockOrigin.RECURRING].
+     */
+    val flexible: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
@@ -127,8 +137,29 @@ data class PlannedBlock(
     @get:Ignore
     val isOpen: Boolean get() = completedAt == null && discardedAt == null
 
+    /**
+     * Whether the block may be dragged to another time: one placed by hand, or a
+     * standing occurrence made [flexible].
+     *
+     * **Only that question.** Whether a block can be handed back to the week
+     * list, grouped, or swept up as a ToDo is [isHandPlaced]'s — a flexible
+     * occurrence moves, but it is still an occurrence of a standing task.
+     */
     @get:Ignore
-    val isMovable: Boolean get() = origin == BlockOrigin.DRAGGED
+    val isMovable: Boolean
+        get() = origin == BlockOrigin.DRAGGED || (flexible && origin == BlockOrigin.RECURRING)
+
+    /**
+     * Whether the user put this block on the day themselves, as opposed to the
+     * schedule or the calendar laying it down.
+     *
+     * What "Vom Tag nehmen", the drop onto the revolver, grouping and "Ganzen
+     * Tag absagen" ask. They used to ask [isMovable], when the two were the same
+     * thing; since a standing occurrence can be made flexible they are not, and
+     * taking one of those off the day would only have expansion lay it down again.
+     */
+    @get:Ignore
+    val isHandPlaced: Boolean get() = origin == BlockOrigin.DRAGGED
 
     /** Duration to bill: the corrected one if given, otherwise what was planned. */
     @get:Ignore

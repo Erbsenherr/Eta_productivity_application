@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (529 tests
-as of step 36), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (531 tests
+as of step 37), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -137,6 +137,11 @@ changed; documentation-only sessions push too.
   code uses the plain `(T) -> R` shape. One such parameter in `SettingsScreen`
   made every `onChange { it.copy(…) }` in `SetupSteps.kt` fail with the
   unhelpful "Unresolved reference 'it'", pointing at the innocent file.
+- **A new schema version can fail its first full build** with KSP's
+  `JsonDecodingException: Expected start of the object '{', but had 'EOF'`: the
+  debug and the release KSP task both export `schemas/…/N.json`, and run in one
+  Gradle invocation one can read the file while the other is still writing it.
+  Nothing is wrong with the code — run the tests first and the release build after.
 - **Core library desugaring is required**, not optional: `kotlinx-datetime` resolves
   to `java.time`, which `minSdk 24` does not have. Without it the app compiles fine
   and crashes on Android 7/8 at runtime.
@@ -190,7 +195,10 @@ The central split, and the thing to understand first:
 
 `BlockOrigin` on a block (`RECURRING` / `DRAGGED` / `CALENDAR_IMPORT`) drives the
 day-planner visuals the draft calls for: square corners and immovable for recurring
-and imported blocks, rounded and draggable for ToDos.
+and imported blocks, rounded and draggable for ToDos. One recurring occurrence can
+be made draggable by hand (`PlannedBlock.flexible`); `isMovable` asks whether a block
+can be dragged, `isHandPlaced` whether the user put it there — see *"Flexibel"* in
+`day-planner.md`.
 
 **`ScheduleMaintenance.topUp` keeps the schedule laid down ahead of today**, and
 something has to call it: it runs on every app start, at the top of both planning
@@ -422,7 +430,7 @@ screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text 
 33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
 and a broken contract's way back · 34. The Routine-Modus, and a morning that
 is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
-36. Advanced Features, "Freigeschaltet ab", and hours of their own.
+36. Advanced Features, "Freigeschaltet ab", and hours of their own · 37. "Flexibel".
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

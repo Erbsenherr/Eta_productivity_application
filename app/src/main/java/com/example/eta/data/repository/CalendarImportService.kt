@@ -237,7 +237,7 @@ class CalendarImportService(
     suspend fun carryConflictingIntoWeek(entry: BlockWithItem): Item? {
         val cycle = weekPlanningService.cycleStart()
 
-        if (entry.block.isMovable && entry.item.type == ItemType.TODO) {
+        if (entry.block.isHandPlaced && entry.item.type == ItemType.TODO) {
             planRepository.removeBlock(entry.block)
             itemRepository.takeIntoWeek(entry.item, cycle)
             return entry.item

@@ -30,6 +30,7 @@ import com.example.eta.ui.attributes.TodoAttributeFields
 import com.example.eta.ui.attributes.TodoAttributes
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDurationPicker
@@ -118,6 +119,7 @@ fun BlockEditDialog(
         breakAfter: Duration?,
         endSound: Boolean,
         pointsPerHour: Double?,
+        flexible: Boolean,
     ) -> Unit,
     onRemove: () -> Unit,
     onCancelBlock: () -> Unit = {},
@@ -169,6 +171,10 @@ fun BlockEditDialog(
     var rate by remember(entry.block.id) { mutableStateOf(entry.item.pointsPerHour ?: 0.0) }
     var building by remember(entry.block.id) { mutableStateOf(false) }
     val pointsVisible = LocalPointsVisible.current
+    // "Flexibel" is offered on an occurrence of a standing task and on nothing
+    // else: a ToDo moves already, and an appointment is the calendar's to move.
+    val canBeFlexible = entry.block.origin == BlockOrigin.RECURRING
+    var flexible by remember(entry.block.id) { mutableStateOf(entry.block.flexible) }
 
     PlannerDialog(title = "Bearbeiten", onDismiss = onDismiss) {
         EtaField(label = "Name") {
@@ -227,6 +233,17 @@ fun BlockEditDialog(
         // most blocks do not use should not stand between the duration and the
         // Sichern button. The count in the header says whether there is anything
         // inside worth opening.
+        if (canBeFlexible) {
+            CheckRow(
+                checked = flexible,
+                onCheckedChange = { flexible = it },
+                label = "Flexibel",
+                hint = "Dieser eine Termin lässt sich dann im Tagesplan verschieben wie " +
+                    "ein ToDo. Gilt nur für diesen Tag — die Aufgabe selbst und ihre " +
+                    "anderen Termine bleiben fest.",
+            )
+        }
+
         val activeExtras = listOf(endSound, travel != null, returnAfter != null, breakAfter != null)
             .count { it }
         EtaExpander(
@@ -295,7 +312,7 @@ fun BlockEditDialog(
             // which is what takes its hours out of the day and what the evening
             // charges for. Offered for every card, because a ToDo can be called
             // off as readily as a standing task.
-            if (entry.block.isMovable) {
+            if (entry.block.isHandPlaced) {
                 EtaButton(
                     text = "Vom Tag nehmen",
                     style = EtaButtonStyle.Secondary,
@@ -327,7 +344,7 @@ fun BlockEditDialog(
                         if (cancellationCosts) " Gedrückt halten, wenn wegen höherer Gewalt." else ""
                 } else if (cancellationCosts) {
                     "Absagen kostet die abgesagten Stunden an Punkten. " +
-                        if (entry.block.isMovable) {
+                        if (entry.block.isHandPlaced) {
                             "»Vom Tag nehmen« nicht — die Aufgabe wandert zurück in die Woche. "
                         } else {
                             ""
@@ -409,6 +426,7 @@ fun BlockEditDialog(
                         breakAfter,
                         endSound,
                         if (spend) rate else entry.item.pointsPerHour,
+                        flexible,
                     )
                 },
             )
@@ -484,10 +502,10 @@ fun ClearDayDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val returning = blocks.count { it.block.isMovable && it.item.type == ItemType.TODO }
+    val returning = blocks.count { it.block.isHandPlaced && it.item.type == ItemType.TODO }
     val cancelling = blocks.size - returning
     val cancelledHours = blocks
-        .filter { it.block.isMovable.not() || it.item.type != ItemType.TODO }
+        .filter { it.block.isHandPlaced.not() || it.item.type != ItemType.TODO }
         .sumOf { it.block.effectiveDuration.inWholeMinutes } / 60.0
 
     PlannerDialog(title = "Ganzen Tag absagen", onDismiss = onDismiss) {

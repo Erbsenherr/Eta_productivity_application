@@ -121,4 +121,25 @@ class YieldTest {
         assertFalse(block(item.id, 1.hours, BlockOrigin.CALENDAR_IMPORT).isMovable)
         assertTrue(block(item.id, 1.hours, BlockOrigin.DRAGGED).isMovable)
     }
+
+    @Test
+    fun `a flexible occurrence moves, and is still not a hand-placed card`() {
+        val item = todo(Category.FOKUS)
+        val flexible = block(item.id, 1.hours, BlockOrigin.RECURRING).copy(flexible = true)
+
+        assertTrue(flexible.isMovable)
+        // It can be dragged, but not handed back to the week list or grouped:
+        // it is an occurrence of a standing task, and expansion would only lay
+        // a removed one down again.
+        assertFalse(flexible.isHandPlaced)
+        assertTrue(block(item.id, 1.hours, BlockOrigin.DRAGGED).isHandPlaced)
+    }
+
+    @Test
+    fun `flexible means nothing on an appointment from the calendar`() {
+        val item = todo(Category.FOKUS)
+        val imported = block(item.id, 1.hours, BlockOrigin.CALENDAR_IMPORT).copy(flexible = true)
+
+        assertFalse(imported.isMovable)
+    }
 }
