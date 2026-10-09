@@ -512,6 +512,8 @@ class TutorialTest {
         // And the third revolver after the second.
         assertEquals(titles.indexOf("Punkte verdienen und ausgeben") + 1, titles.indexOf("Der dritte Revolver: Pause"))
         assertTrue(titles.indexOf("Der zweite Revolver") > titles.indexOf("Der Tagesplaner"))
+        // Reading a block too short for its name comes right after placing one.
+        assertEquals(titles.indexOf("Der Tagesplaner") + 1, titles.indexOf("Kurze Blöcke lesen"))
         assertTrue(QUICKSTART_STEPS.last().text(TutorialFacts()).contains("Einstellungen → Tutorial"))
     }
 

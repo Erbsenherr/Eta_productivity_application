@@ -593,6 +593,13 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         kind = StepKind.TASK,
         checks = { listOf(TutorialCheck("Ein ToDo in den Tag ziehen", it.plannedTomorrow)) },
     ),
+    text(
+        TutorialStage.PLANNER,
+        "Kurze Blöcke lesen",
+        "Manche Blöcke sind zu kurz, um ihren Namen zu zeigen — »Katze füttern« " +
+            "etwa dauert nur eine Viertelstunde. Tippe einen Block an, und sein Name " +
+            "erscheint groß über dem Tag, mit Uhrzeit und Notiz.",
+    ),
     TutorialStep(
         stage = TutorialStage.PLANNER,
         title = "Der zweite Revolver",
