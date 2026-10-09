@@ -40,6 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.eta.domain.reward.rolesOf
+import com.example.eta.domain.reward.claimsOf
+import com.example.eta.domain.reward.RewardRole
 import com.example.eta.domain.model.Reward
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
@@ -87,7 +90,8 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
                 EtaText(text = "Belohn-o-mat", style = EtaTheme.typography.title)
                 EtaText(
                     text = "Was du dir erarbeitest. Jeden Abend fließen die Punkte des " +
-                        "Tages in die oberste Belohnung.",
+                        "Tages in die oberste ungebundene Belohnung; gebundene sammeln " +
+                        "aus ihren eigenen Aufgaben.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textSecondary,
                 )
@@ -117,7 +121,9 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
                 )
                 EtaText(
                     text = "Antippen zum Bearbeiten, am ≡ ziehen zum Umsortieren, gedrückt " +
-                        "halten zum Löschen. Erarbeitete Punkte bleiben bei ihrer Belohnung.",
+                        "halten zum Löschen. Erarbeitete Punkte bleiben bei ihrer Belohnung. " +
+                        "Die Reihenfolge zählt für ungebundene Belohnungen; gebundene " +
+                        "sammeln an jeder Stelle.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textMuted,
                 )
@@ -159,6 +165,9 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
 
             EditorStage.BINDING -> BindingDialog(
                 groups = state.groups,
+                // What other rewards already hold: a task is bound to one.
+                taken = claimsOf(state.open.filter { it.reward.id != current.id }.map { it.target })
+                    .mapValues { it.value.name },
                 selected = current.itemIds,
                 onChange = { draft = current.copy(itemIds = it) },
                 onNewTask = { stage = EditorStage.NEW_TASK },
@@ -236,6 +245,9 @@ private fun RewardList(
     val gap = with(LocalDensity.current) { EtaTheme.spacing.sm.toPx() }
 
     val byId = rows.associateBy { it.reward.id }
+    // Off the order **as it is shown**, so the status moves with the card while
+    // it is being dragged rather than catching up once it is let go.
+    val roles = rolesOf(order.mapNotNull { byId[it]?.target })
     val currentOrder = rememberUpdatedState(order)
     val commit = rememberUpdatedState(onReorder)
     val open = rememberUpdatedState(onOpen)
@@ -249,6 +261,7 @@ private fun RewardList(
                 val dragging = draggingId == id
                 RewardCard(
                     row = row,
+                    role = roles[id] ?: RewardRole.WAITING,
                     dragging = dragging,
                     onRedeem = { onRedeem(id) },
                     modifier = Modifier
@@ -342,6 +355,7 @@ private fun Modifier.reorderHandle(
 @Composable
 private fun RewardCard(
     row: RewardRow,
+    role: RewardRole,
     dragging: Boolean,
     onRedeem: () -> Unit,
     modifier: Modifier = Modifier,
@@ -362,7 +376,7 @@ private fun RewardCard(
     val edge = when {
         dragging -> EtaTheme.colors.accent
         full -> EtaTheme.colors.success
-        row.isHead -> EtaTheme.colors.accent
+        role == RewardRole.FILLING || role == RewardRole.COLLECTING -> EtaTheme.colors.accent
         else -> EtaTheme.colors.border
     }
 
@@ -387,13 +401,15 @@ private fun RewardCard(
                     EtaText(
                         text = when {
                             full -> "Erarbeitet — bereit zum Einlösen"
-                            row.isHead -> "Füllt sich gerade"
+                            role == RewardRole.FILLING -> "Füllt sich gerade"
+                            role == RewardRole.COLLECTING -> "Sammelt aus gebundenen Aufgaben"
                             else -> "Wartet"
                         },
                         style = EtaTheme.typography.caption,
                         color = when {
                             full -> EtaTheme.colors.success
-                            row.isHead -> EtaTheme.colors.accent
+                            role == RewardRole.FILLING || role == RewardRole.COLLECTING ->
+                                EtaTheme.colors.accent
                             else -> EtaTheme.colors.textMuted
                         },
                     )

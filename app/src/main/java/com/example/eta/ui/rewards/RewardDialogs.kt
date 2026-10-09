@@ -136,6 +136,8 @@ internal fun RewardEditDialog(
 @Composable
 internal fun BindingDialog(
     groups: List<RecurringGroup>,
+    /** Tasks another reward holds, by normalized name → that reward's name. */
+    taken: Map<String, String> = emptyMap(),
     selected: Set<String>,
     onChange: (Set<String>) -> Unit,
     onNewTask: () -> Unit,
@@ -143,8 +145,10 @@ internal fun BindingDialog(
 ) {
     EtaDialog(title = "Aufgabenbindung", onDismiss = onDone) {
         EtaText(
-            text = "Angehakt füllen nur diese wiederkehrenden Aufgaben die Belohnung. " +
-                "Ohne Haken zählt jede abgehakte Aufgabe.",
+            text = "Angehakt füllen nur diese wiederkehrenden Aufgaben die Belohnung — " +
+                "an jeder Stelle der Liste. Eine Aufgabe gehört zu genau einer " +
+                "Belohnung und zählt dann für keine andere. Ohne Haken zählt jede " +
+                "abgehakte Aufgabe, die nirgends gebunden ist.",
             style = EtaTheme.typography.caption,
             color = EtaTheme.colors.textMuted,
         )
@@ -159,11 +163,17 @@ internal fun BindingDialog(
         groups.forEach { group ->
             key(group.representative.id) {
                 val checked = group.ids.any { it in selected }
+                // Held by another reward: shown, and said whose it is, but not
+                // to be ticked here — it would have to be unticked there first.
+                val heldBy = taken[group.representative.normalizedName].takeUnless { checked }
                 BindingRow(
                     group = group,
                     checked = checked,
+                    heldBy = heldBy,
                     onToggle = {
-                        onChange(if (checked) selected - group.ids else selected + group.ids)
+                        if (heldBy == null) {
+                            onChange(if (checked) selected - group.ids else selected + group.ids)
+                        }
                     },
                 )
             }
@@ -183,7 +193,12 @@ internal fun BindingDialog(
 
 /** One standing task in the menu; the whole line ticks, not only the box. */
 @Composable
-private fun BindingRow(group: RecurringGroup, checked: Boolean, onToggle: () -> Unit) {
+private fun BindingRow(
+    group: RecurringGroup,
+    checked: Boolean,
+    heldBy: String?,
+    onToggle: () -> Unit,
+) {
     val toggle = rememberUpdatedState(onToggle)
 
     Row(
@@ -194,7 +209,7 @@ private fun BindingRow(group: RecurringGroup, checked: Boolean, onToggle: () -> 
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EtaCheckbox(checked = checked, onCheckedChange = { onToggle() })
+        EtaCheckbox(checked = checked, enabled = heldBy == null, onCheckedChange = { onToggle() })
         Spacer(Modifier.size(EtaTheme.spacing.md))
         Column(Modifier.weight(1f)) {
             EtaText(
@@ -204,7 +219,7 @@ private fun BindingRow(group: RecurringGroup, checked: Boolean, onToggle: () -> 
                 overflow = TextOverflow.Ellipsis,
             )
             EtaText(
-                text = recurringSummary(group),
+                text = if (heldBy != null) "Gebunden an »$heldBy«" else recurringSummary(group),
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
                 maxLines = 1,

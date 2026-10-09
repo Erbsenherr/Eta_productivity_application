@@ -775,7 +775,8 @@ private fun RewardFillStep(outlook: RewardOutlook?, active: Boolean) {
                 EtaText(text = "Belohn-o-mat", style = EtaTheme.typography.heading)
                 EtaText(
                     text = "Was du heute durch erledigte Aufgaben verdient hast, fließt " +
-                        "in deine oberste Belohnung — vor allen Abzügen.",
+                        "in deine Belohnungen — vor allen Abzügen. Gebundene Aufgaben " +
+                        "füllen ihre eigene, alles andere die oberste ungebundene.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textMuted,
                 )

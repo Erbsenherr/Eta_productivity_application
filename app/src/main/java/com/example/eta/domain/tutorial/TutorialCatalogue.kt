@@ -386,16 +386,17 @@ val REWARD_STEPS: List<TutorialStep> = listOf(
         TutorialStage.REWARDS,
         "So füllt sie sich",
         "Die Karte ist zugleich der Balken. Jeden Abend fließen die Punkte deiner " +
-            "erledigten Aufgaben in die oberste Belohnung — der Tagesabschluss zeigt " +
-            "das auf einer eigenen Seite. Dein Punktekonto bleibt davon unberührt: " +
+            "erledigten Aufgaben in die oberste Belohnung — sie trägt »Füllt sich " +
+            "gerade«, und der Tagesabschluss zeigt das auf einer eigenen Seite. Dein Punktekonto bleibt davon unberührt: " +
             "Der Belohn-o-mat zählt nebenher mit.",
     ),
     text(
         TutorialStage.REWARDS,
         "Reihenfolge und Bindung",
         "Gefüllt wird immer nur die oberste Belohnung; am ≡ ziehst du eine andere " +
-            "nach oben. Mit der Aufgabenbindung zählen für eine Belohnung nur " +
-            "bestimmte wiederkehrende Aufgaben — etwa nur »Sport«.",
+            "nach oben. Anders mit Aufgabenbindung: Eine Belohnung, die an »Sport« " +
+            "gebunden ist, sammelt dessen Punkte an jeder Stelle der Liste. Eine " +
+            "Aufgabe gehört dabei zu genau einer Belohnung und zählt für keine andere.",
     ),
     text(
         TutorialStage.REWARDS,

@@ -24,16 +24,36 @@ rewards with a name and a price in points, worked off from the top.
   reward stay with it whatever the order does afterwards, and a number on the row
   is the only shape in which that is true by construction. `reorder` writes
   positions and nothing else.
-- **Only position 1 is worked on** — the first reward that is neither full nor
-  redeemed. `pourInto` in `domain/reward/RewardFill.kt` is the whole rule and
-  `RewardFillTest` pins it. What position 1 does not accept goes **nowhere**; it
-  does not run on to the reward below.
-- **Unless position 1 is earned in full.** Then what is left of the points that
-  filled it runs on into the next reward, under *that* reward's binding. The
-  surplus is taken from every contributing task **in proportion**: points have no
-  order within one evening, and a rule that depended on row order would pay the
-  same day differently twice. A full reward waits to be redeemed and is no longer
-  position 1.
+- **Two kinds of reward, and they do not share points** — the rule since the
+  round after step 38, replacing "only position 1 is worked on" (two answers
+  were asked for and are marked). `pourInto` in `domain/reward/RewardFill.kt` is
+  the whole of it and `RewardFillTest` pins it.
+  - **A bound reward collects from its own tasks wherever it stands.** Position
+    means nothing to it.
+  - **A task is bound to one reward, and counts for no other** — not for another
+    bound one, and not for the unbound queue. `claimsOf` is the map; a task two
+    rewards claim (rows from before) belongs to the one further up.
+    `RewardRepository.bind` takes a task away from wherever it was bound, by
+    name, and the binding menu shows a task another reward holds as "Gebunden an
+    »…«", unticked and not to be ticked.
+  - **What a bound reward cannot hold goes nowhere** (asked): the surplus of the
+    evening that fills it, and everything its tasks earn while it stands full.
+    It keeps its tasks **until it is redeemed**; then they are tasks like any
+    other again.
+  - **Everything bound nowhere goes to the first unbound reward still filling**
+    (asked: not "nowhere" when a bound one stands at the top — bound rewards are
+    passed over). Unbound rewards further down see nothing of the day.
+  - **Unless that one is earned in full.** Then what is left runs on into the
+    next *unbound* reward. The surplus is taken from every contributing task **in
+    proportion**: points have no order within one evening, and a rule that
+    depended on row order would pay the same day differently twice.
+- **`rolesOf` says what each card shows**: `FILLING` ("Füllt sich gerade", the
+  first unbound one), `COLLECTING` ("Sammelt aus gebundenen Aufgaben"),
+  `WAITING`, `FULL`. The tab computes it from the order **as shown**, so the
+  status moves with a card while it is dragged — it used to hang off the stored
+  order and only caught up on release, which was the reported bug.
+- `RewardOutlook.head` is the first unbound reward still filling, or the first
+  bound one where there is none; it decides whether the evening has the page.
 - **What counts** (`earningsOf`): the yield of every **completed block**, each on
   its own and **before anything is taken off** — ToDos, standing tasks, growth
   tasks, calendar appointments, Custom Earn. Not contracts, not free time given
@@ -44,8 +64,8 @@ rewards with a name and a price in points, worked off from the top.
   and from the same blocks, so a day settled once fills once. A caught-up day
   (`CatchUpService`) goes through `settle` and fills too.
 
-**Aufgabenbindung.** A reward bound to standing tasks counts only those; unbound,
-it counts everything.
+**Aufgabenbindung.** A reward bound to standing tasks counts only those, at any
+position; unbound, it counts everything that is bound nowhere.
 
 - **Stored as row ids, read as names.** `reward_tasks.itemId` is a plain column
   with no foreign key. A standing task is one row per weekday and editing its

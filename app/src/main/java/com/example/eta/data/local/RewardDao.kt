@@ -45,4 +45,7 @@ interface RewardDao {
 
     @Query("DELETE FROM reward_tasks WHERE rewardId = :rewardId")
     suspend fun clearTasks(rewardId: String)
+
+    @Query("DELETE FROM reward_tasks WHERE rewardId = :rewardId AND itemId = :itemId")
+    suspend fun deleteTask(rewardId: String, itemId: String)
 }

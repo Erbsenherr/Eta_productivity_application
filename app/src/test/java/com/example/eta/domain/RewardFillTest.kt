@@ -11,7 +11,10 @@ import com.example.eta.domain.model.Reward
 import com.example.eta.domain.model.Stage
 import com.example.eta.domain.model.normalizeName
 import com.example.eta.domain.reward.Earning
+import com.example.eta.domain.reward.RewardRole
 import com.example.eta.domain.reward.RewardTarget
+import com.example.eta.domain.reward.claimsOf
+import com.example.eta.domain.reward.rolesOf
 import com.example.eta.domain.reward.earningsOf
 import com.example.eta.domain.reward.pourInto
 import kotlin.time.Duration
@@ -27,9 +30,10 @@ import org.junit.Test
 /**
  * The Belohn-o-mat's arithmetic: what counts as earned, and where it goes.
  *
- * The rules are the user's — only position 1 is worked on, earned points stay
- * where they were poured, a binding narrows what counts — and each is easy to get
- * subtly wrong in a way no screen would show for weeks.
+ * The rules are the user's — the first unbound reward takes what is bound
+ * nowhere, a bound one collects from its own tasks wherever it stands, a task
+ * belongs to one reward — and each is easy to get subtly wrong in a way no
+ * screen would show for weeks.
  */
 class RewardFillTest {
 
@@ -171,7 +175,7 @@ class RewardFillTest {
     }
 
     @Test
-    fun `a bound reward counts its tasks and lets the rest go by`() {
+    fun `a bound reward takes its tasks and the rest goes to the first unbound one`() {
         val bound = reward("Steak", cost = 25.0)
         val next = reward("Urlaub", cost = 100.0, position = 2)
 
@@ -180,10 +184,112 @@ class RewardFillTest {
             listOf(earned("Sport", 1.0, standing = true), earned("Lernen", 4.0)),
         )
 
-        // The four points of Lernen do not run on to the unbound reward below:
-        // only position one is worked on.
-        assertEquals(1, gains.size)
-        assertEquals(1.0, gains.single().added, 0.0)
+        // The bound reward at the top is passed over by what is not its own.
+        assertEquals(listOf(bound.id, next.id), gains.map { it.reward.id })
+        assertEquals(listOf(1.0, 4.0), gains.map { it.added })
+    }
+
+    @Test
+    fun `a bound reward collects wherever it stands in the list`() {
+        val first = reward("Urlaub", cost = 100.0)
+        val second = reward("Kino", cost = 50.0, position = 2)
+        val bound = reward("Steak", cost = 25.0, position = 3)
+
+        val gains = pourInto(
+            listOf(target(first), target(second), target(bound, "Sport")),
+            listOf(earned("Sport", 2.0, standing = true), earned("Lernen", 4.0)),
+        )
+
+        // Third in the list and still filling; the unbound one in between sees nothing.
+        assertEquals(listOf(first.id, bound.id), gains.map { it.reward.id })
+        assertEquals(listOf(4.0, 2.0), gains.map { it.added })
+    }
+
+    @Test
+    fun `a bound task counts for its reward and for no unbound one`() {
+        val unbound = reward("Urlaub", cost = 100.0)
+        val bound = reward("Steak", cost = 25.0, position = 2)
+
+        val gains = pourInto(
+            listOf(target(unbound), target(bound, "Sport")),
+            listOf(earned("Sport", 3.0, standing = true)),
+        )
+
+        assertEquals(bound.id, gains.single().reward.id)
+        assertEquals(3.0, gains.single().added, 0.0)
+    }
+
+    @Test
+    fun `what a bound reward cannot hold goes nowhere`() {
+        val bound = reward("Steak", cost = 5.0, progress = 4.0)
+        val unbound = reward("Urlaub", cost = 100.0, position = 2)
+
+        val gains = pourInto(
+            listOf(target(bound, "Sport"), target(unbound)),
+            listOf(earned("Sport", 3.0, standing = true)),
+        )
+
+        // One point of room, three earned: the other two are not Urlaub's.
+        assertEquals(bound.id, gains.single().reward.id)
+        assertEquals(1.0, gains.single().added, 1e-9)
+        assertTrue(gains.single().completes)
+    }
+
+    @Test
+    fun `a full bound reward keeps its tasks until it is redeemed`() {
+        val full = reward("Steak", cost = 5.0, progress = 5.0)
+        val unbound = reward("Urlaub", cost = 100.0, position = 2)
+        val sport = listOf(earned("Sport", 3.0, standing = true))
+
+        // Waiting to be redeemed: Sport's points go nowhere.
+        assertTrue(pourInto(listOf(target(full, "Sport"), target(unbound)), sport).isEmpty())
+
+        // Redeemed, the binding is over and Sport is a task like any other.
+        val taken = full.copy(redeemedAt = now)
+        val gains = pourInto(listOf(target(taken, "Sport"), target(unbound)), sport)
+        assertEquals(unbound.id, gains.single().reward.id)
+    }
+
+    @Test
+    fun `a task claimed by two rewards belongs to the one further up`() {
+        // Rows from before a task could be bound only once.
+        val upper = reward("Steak", cost = 25.0)
+        val lower = reward("Kino", cost = 25.0, position = 2)
+        val targets = listOf(target(upper, "Sport"), target(lower, "Sport", "Lesen"))
+
+        val gains = pourInto(
+            targets,
+            listOf(earned("Sport", 2.0, standing = true), earned("Lesen", 1.0, standing = true)),
+        )
+
+        assertEquals(listOf(2.0, 1.0), gains.map { it.added })
+        assertEquals(upper.id, claimsOf(targets).getValue(normalizeName("Sport")).id)
+        assertEquals(lower.id, claimsOf(targets).getValue(normalizeName("Lesen")).id)
+    }
+
+    @Test
+    fun `each card says what its reward is doing, by where it stands`() {
+        val bound = reward("Steak", cost = 25.0)
+        val first = reward("Urlaub", cost = 100.0, position = 2)
+        val second = reward("Kino", cost = 50.0, position = 3)
+        val full = reward("Buch", cost = 5.0, progress = 5.0, position = 4)
+        val taken = reward("Eis", cost = 2.0, progress = 2.0, position = 5, redeemedAt = now)
+
+        val roles = rolesOf(
+            listOf(target(bound, "Sport"), target(first), target(second), target(full), target(taken)),
+        )
+
+        assertEquals(RewardRole.COLLECTING, roles[bound.id])
+        assertEquals(RewardRole.FILLING, roles[first.id])
+        assertEquals(RewardRole.WAITING, roles[second.id])
+        assertEquals(RewardRole.FULL, roles[full.id])
+        assertFalse(taken.id in roles)
+
+        // Dragged above it, the other one is what fills.
+        val swapped = rolesOf(listOf(target(second), target(bound, "Sport"), target(first)))
+        assertEquals(RewardRole.FILLING, swapped[second.id])
+        assertEquals(RewardRole.WAITING, swapped[first.id])
+        assertEquals(RewardRole.COLLECTING, swapped[bound.id])
     }
 
     @Test
@@ -199,7 +305,7 @@ class RewardFillTest {
     }
 
     @Test
-    fun `a bound reward that saw none of its tasks holds the queue`() {
+    fun `a bound reward that saw none of its tasks does not hold anything up`() {
         val bound = reward("Steak", cost = 25.0)
         val next = reward("Urlaub", cost = 100.0, position = 2)
 
@@ -208,7 +314,8 @@ class RewardFillTest {
             listOf(earned("Lernen", 4.0)),
         )
 
-        assertTrue(gains.isEmpty())
+        assertEquals(next.id, gains.single().reward.id)
+        assertEquals(4.0, gains.single().added, 0.0)
     }
 
     @Test
@@ -226,19 +333,22 @@ class RewardFillTest {
     }
 
     @Test
-    fun `the overflow passes the next reward's own binding`() {
+    fun `the overflow runs on to the next unbound reward and past a bound one`() {
         val first = reward("Steak", cost = 4.0)
-        val second = reward("Urlaub", cost = 100.0, position = 2)
+        val bound = reward("Kino", cost = 100.0, position = 2)
+        val third = reward("Urlaub", cost = 100.0, position = 3)
 
-        // Eight points offered, four taken: half of each task is left over, and
-        // of that only Sport's half is something the second reward counts.
+        // Six unbound points, four of them taken: the other two run on — not
+        // into the bound reward between, which has Sport's two of its own.
         val gains = pourInto(
-            listOf(target(first), target(second, "Sport")),
+            listOf(target(first), target(bound, "Sport"), target(third)),
             listOf(earned("Sport", 2.0, standing = true), earned("Lernen", 6.0)),
         )
 
+        assertEquals(listOf(first.id, bound.id, third.id), gains.map { it.reward.id })
         assertEquals(4.0, gains[0].added, 1e-9)
-        assertEquals(1.0, gains[1].added, 1e-9)
+        assertEquals(2.0, gains[1].added, 1e-9)
+        assertEquals(2.0, gains[2].added, 1e-9)
     }
 
     @Test

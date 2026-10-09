@@ -23,8 +23,9 @@ data class RewardWithTasks(
 )
 
 /**
- * What an evening would do to the list: the reward at position 1 — the first one
- * still filling, null when there is none — and what would be poured where.
+ * What an evening would do to the list: the reward the unbound points go to —
+ * or, where every reward still filling is bound, the first of those; null when
+ * nothing is filling — and what would be poured where.
  */
 data class RewardOutlook(
     val head: Reward?,
@@ -107,8 +108,20 @@ class RewardRepository(
         bind(id, itemIds)
     }
 
+    /**
+     * **A task is bound to one reward.** Binding it here therefore takes it away
+     * from wherever it was bound before — by name, the identity a binding is
+     * read by, so every weekday's row of the task goes together.
+     */
     private suspend fun bind(rewardId: String, itemIds: Collection<String>) {
         rewardDao.clearTasks(rewardId)
+        val names = itemIds.mapNotNullTo(mutableSetOf()) { itemDao.findById(it)?.normalizedName }
+        if (names.isNotEmpty()) {
+            rewardDao.tasks()
+                .filter { it.rewardId != rewardId }
+                .filter { itemDao.findById(it.itemId)?.normalizedName in names }
+                .forEach { rewardDao.deleteTask(it.rewardId, it.itemId) }
+        }
         if (itemIds.isNotEmpty()) {
             rewardDao.insertTasks(
                 itemIds.distinct().map { RewardTask(rewardId, it) },
@@ -158,7 +171,8 @@ class RewardRepository(
     /** What finishing [blocks] would pour into the list, without writing anything. */
     suspend fun outlook(blocks: List<BlockWithItem>): RewardOutlook {
         val targets = targets()
-        val head = targets.firstOrNull { it.reward.isFilling }
+        val head = targets.firstOrNull { !it.isBound && it.reward.isFilling }
+            ?: targets.firstOrNull { it.reward.isFilling }
         return RewardOutlook(
             head = head?.reward,
             headBound = head?.boundNames?.isNotEmpty() == true,

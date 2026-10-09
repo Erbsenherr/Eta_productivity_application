@@ -1,11 +1,4 @@
-Bugfixes:
--Wenn das Tutorial startet ist "Als Nächstes" aktivert, wobei "Gerade" angekündigt wird.
-Changes:
--Wenn der Punktstand <= 0 ist, kann kein "Custom Spend" verteilt werden.
--In den Einstellungen Advanced features unter dem Punkt "Punkteseystem" soll die Menge an Punkten, die pro unverplanter Stunde (nach Stunde 2) abgezogen werden, eingestellt werden können. Auch soll das gesamte Feature entfernt werden können.
-Changes:
--Wenn man "Katzenstreu kaufen" notiert hat, soll der rot-pulsierende Rahmen verschwinden und stattdessen die Anzeige gehighlighted werden, die die Möglichkeit zum Swipen impliziert. Mit anderen worten, es soll deutlicher gemacht werden, dass das Wiederkehrende toDo erst erreicht werden muss.
--Nach Tutorialseite 14 soll eine zusätzliche Box eingefügt werden, die erklärt, warum leere Zeiten Punktabzu geben: Der Designphilosophie von eta nach sollte es so wenig unverplante Zeitpunkte geben wie möglich. Das bedeutet keinesfalls, dass man daher weniger Freizeit haben muss; allerdings, dass diese Freizeit im geplanten Rahmen stattfindet. Das ist insbesondere dann empfohlen, wenn man Schwierigkeiten mit strukturiertem Alltag hat. Man kann dieses Feature allerdings in den Einstellungen unter "Advanced Features" deaktivieren.
--Tutorial punkt 24: Hier kann erst "Weiter" gedrückt werden, wenn die Task übernommen wurde. Die rot pulsierende Box highlighted jedoch "Wiederholen bis". Hier soll der Nutzer erst einmal Weiter drücken, was dann den roten Rahmen um den "Übernehmen" Knopf legt. Erst dann soll die App auf des Nutzers Drücken des Knopfes warten.
--Tutorial punkt 25: "Weiter zur Tagesplanung" ausgrauen und dadrunter schreiben, dass wir später zu diesem Punkt kommen.
--Tutorial punkt 31: Hiernach soll noch der Pause reiter erwähnt werden. Das ist dafür, wenn ohne viel Komplikation eine kurze Pause nach einer oder mehreren Tasks eingefügt werden soll. Es ist Empfohlen, Pausen mit entspannung zu verbringen und auf seine Bildschirmzeit zu achten.
+Belohn-o-mat:
+Bugfix: Es soll immer nur die erste Aufgabe gefüllt werden. Der "Füllst sich gerade" Status soll sich also mit der Position der Task verändern.
+Wenn eine Aufgabe gebunden ist, dann Sammelt sie auch Punkte, wenn sie nicht auf Priorität 1 ist. Es kann allerdings auch nur jede Aufgabe nur zur genau einer Belohnung gebunden werden.
+Gebundene Aufgaben zählen auch nicht für Belohnungen, die ungebunden sind.

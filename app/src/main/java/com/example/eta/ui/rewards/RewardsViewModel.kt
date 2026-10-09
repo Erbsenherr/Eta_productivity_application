@@ -2,6 +2,7 @@ package com.example.eta.ui.rewards
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.eta.domain.reward.RewardTarget
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.RewardRepository
 import com.example.eta.data.repository.RewardWithTasks
@@ -21,10 +22,11 @@ data class RewardRow(
     val entry: RewardWithTasks,
     /** The standing tasks it is bound to, by name. Empty means every task counts. */
     val boundTo: List<String>,
-    /** The first one still filling: the only one the evening pours into. */
-    val isHead: Boolean,
 ) {
     val reward get() = entry.reward
+
+    /** As the fill rule reads it: the row and the names its binding means. */
+    val target get() = RewardTarget(entry.reward, entry.boundNames)
 }
 
 data class RewardsUiState(
@@ -55,14 +57,12 @@ class RewardsViewModel(
         recurringTaskService.observeDefinitions(),
     ) { rewards, definitions ->
         val groups = groupRecurring(definitions)
-        val headId = rewards.firstOrNull { it.reward.isFilling }?.reward?.id
         val rows = rewards.map { entry ->
             RewardRow(
                 entry = entry,
                 boundTo = groups.filter { it.isBoundBy(entry.boundNames) }
                     .map { it.representative.name }
                     .distinct(),
-                isHead = entry.reward.id == headId,
             )
         }
         RewardsUiState(
