@@ -43,6 +43,8 @@ import com.example.eta.domain.model.REWARD_EPSILON
 import com.example.eta.domain.model.Reward
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.ReportToTutorial
+import com.example.eta.ui.components.tutorialAllows
+import com.example.eta.domain.tutorial.TutorialGate
 import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.LocalFeatures
 import kotlinx.coroutines.delay
@@ -129,6 +131,9 @@ fun ReevaluationScreen(
     // nothing planned has nothing to answer, so it does not trap anyone.
     val openBlocks = state.blocks.count { it.block.isOpen }
     val tasksPending = currentStep == Step.TASKS && openBlocks > 0
+    // In the tutorial the page only turns when its step has come.
+    val mayTurn = tutorialAllows(TutorialGate.REEVALUATION_NEXT)
+    val maySettle = tutorialAllows(TutorialGate.REEVALUATION_SETTLE)
 
     EtaScreen(modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
@@ -152,7 +157,7 @@ fun ReevaluationScreen(
             HorizontalPager(
                 state = pagerState,
                 // Swiping past would make the gate decorative; going back stays free.
-                userScrollEnabled = !tasksPending,
+                userScrollEnabled = !tasksPending && mayTurn,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) { page ->
                 Column(
@@ -215,13 +220,13 @@ fun ReevaluationScreen(
                 if (pagerState.currentPage >= steps.lastIndex) {
                     EtaButton(
                         text = if (state.settled != null) "Gebucht" else "Abschließen",
-                        enabled = state.settled == null,
+                        enabled = state.settled == null && maySettle,
                         onClick = { viewModel.settle(onClose) },
                     )
                 } else {
                     EtaButton(
                         text = "Weiter",
-                        enabled = !tasksPending,
+                        enabled = !tasksPending && mayTurn,
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         },
@@ -256,6 +261,7 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
             state.blocks.forEach { entry ->
                 BlockRow(
                     entry = entry,
+                    mayDiscard = tutorialAllows(TutorialGate.REEVALUATION_DISCARD + entry.item.id),
                     onToggle = { viewModel.toggleCompleted(entry) },
                     onDiscard = { viewModel.discard(entry) },
                     onExcuse = { reason -> viewModel.excuse(entry, reason) },
@@ -345,6 +351,7 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                         EtaButton(
                             text = "Lassen",
                             style = EtaButtonStyle.Secondary,
+                            enabled = tutorialAllows(TutorialGate.REEVALUATION_DISMISS_MAKE_UP),
                             onClick = { viewModel.dismissMakeUp(offer) },
                         )
                     }
@@ -368,6 +375,8 @@ private fun BlockRow(
     onToggle: () -> Unit,
     onDiscard: () -> Unit,
     onExcuse: (String) -> Unit = {},
+    /** False only in the tutorial, before the step that asks for it. */
+    mayDiscard: Boolean = true,
 ) {
     val cancelled = entry.block.isDiscarded
     var asking by remember(entry.block.id) { mutableStateOf(false) }
@@ -470,6 +479,7 @@ private fun BlockRow(
             EtaButton(
                 text = "Fällt aus",
                 style = EtaButtonStyle.Secondary,
+                enabled = mayDiscard,
                 onClick = onDiscard,
             )
         }

@@ -50,9 +50,18 @@ runs on the phone's hour inside the tutorial.
 #### The simulated day
 
 `TutorialClock` (`domain/tutorial/`) runs — a second is a second — but from an hour
-it chooses: **10:30** on the real date, and it is moved to **20:00** when the
-Tagesabschluss opens (`TutorialStep.evening`). The date is fixed at the start, so a
-tutorial begun at 23:58 does not roll into the next day.
+it chooses: **10:30** on the real date, and **20:00** from the step marked
+`TutorialStep.evening` on. The date is fixed at the start, so a tutorial begun at
+23:58 does not roll into the next day. Which half of the day it is, is derived
+from where the current step stands (`eveningFrom`), not set on the way past — a
+step gone back to is at its own hour again.
+
+**The evening is reached on the dashboard, by the user** (second round): the
+step "Planungszeit" says it is 20:00 — the practice setup's own
+`dailyPlanningTime`, so `PhaseBox` turns owed and moves to the top by the app's
+ordinary rule — frames the box, and waits for "Tag abschließen". Before that
+step the button is locked like every other way sideways
+(`TutorialViewModel.closeDayPressed`).
 
 The alternative, laying the examples around the real hour, was worked through and
 dropped: it needs a different day for every hour and has none for the last one
@@ -94,10 +103,16 @@ holds comes in as a **signal** — which page of a pager is in front — through
 `TutorialGuide.report`. `remembering` keeps "a note was made" and its name once
 the note has left the Sammelliste by being filled in.
 
+- **"Zurück" on the coach** goes to the step before, across screens too. Nothing
+  is undone: what was ticked stays ticked, so a task come back to shows as done.
+  A `FOLLOW` step that is already done when it comes up (`arrivedReady`) gets a
+  "Weiter" of its own and does **not** follow by itself — it would throw the
+  user forward again the instant they stepped back onto it.
 - **A step must not be able to hold the tutorial shut.** The mail step is the
-  example: ticked off after all, or answered with "Lassen", the "Nachholen?"
-  question is gone for good, so `ready` lets go on either
-  (`OPEN_MAKE_UP_OFFERS`). A new `TASK` needs the same thought — and "Beenden" is
+  example: should the "Nachholen?" question be gone without an answer, it
+  cannot be put again, so `ready` lets go (`OPEN_MAKE_UP_OFFERS`). A tick on
+  the mail is the opposite case and holds the step shut on purpose — it can be
+  taken back, and the coach asks for exactly that. A new `TASK` needs the same thought — and "Beenden" is
   on every step regardless.
 - **The screens' own ways out are kept and counted** (`exitTarget`): "Woche
   steht", "Zurück", "Rest später", the system back inside a phase. Pressed with
@@ -116,9 +131,32 @@ lands in the **Sammelliste**, not the week list; filling in a Quick-Add asks for
 its **Rückblick** page; the Tagesabschluss's steps are not locked one by one. The
 texts say what the screens do.
 
+#### Gates: the screens' own buttons wait for their step
+
+Asked for after the first round on a phone: a screen's "Weiter" or "Übernehmen"
+pressed early left the screen a page ahead of the coach. `TutorialStep.allow`
+names the buttons a step opens (`TutorialGate`), `TutorialGuide.allowed` carries
+them, and a button asks `tutorialAllows(gate)` — **true outside the tutorial**.
+Everything not named is grey:
+
+- Tagesabschluss: "Weiter" and the pager swipe (`REEVALUATION_NEXT`, only once
+  every block is answered and excused), "Abschließen", "Fällt aus" **per row**
+  (the gate carries the item id, and only the mail's is ever opened), and
+  "Lassen" under "Nachholen?", which no step opens.
+- Quick-Adds: "Übernehmen" per kind of card, "Löschen" never, and the button
+  under the cards.
+- "Woche steht", and "Bestätigen" in the planner — confirming puts the revolver
+  away, which would leave the drag the step asks for impossible.
+
+`TutorialTest` pins which step opens which gate. **A new button that moves a
+tutorial screen on needs a gate**, or it is the old desynchronisation again.
+
+The step after the mail is **höhere Gewalt**: hold the cancelled row, give a
+reason; done is `forceMajeure` on the block.
+
 #### The hooks in the real screens
 
-Kept to three kinds, all no-ops outside the tutorial (`LocalTutorialGuide` is
+Kept to four kinds (the gates above being the fourth), all no-ops outside the tutorial (`LocalTutorialGuide` is
 null):
 
 - **`Modifier.tutorialSpot(id)`** frames the part a step points at and scrolls it
@@ -151,13 +189,13 @@ there is a setup row, and it is a fact about this install. Not in a backup.
   "Überspringen".
 - **Someone updating an app they already use is not marched through it** — they
   have a setup and no flag — and finds it in the settings.
-- **"Tutorial wiederholen"** is the last box on the settings tab, under Debug.
+- **"Tutorial wiederholen"** is the last row of the settings menu, under Debug.
   `requested` is not persisted; it shows the idea page again first.
 - **The debug reset re-arms all of it**, welcome page included.
 - **A process death mid-run starts over** at the choice (first run) or returns to
   the app (repeat): the practice database lived in memory.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (553, 22 new in
+**Verified by the compiler (`--rerun-tasks`), the suite (557, 26 in
 `TutorialTest`), `assembleRelease` and `lint`.** Nobody has seen it, and more than
 usual rests on that here: whether an in-memory Room database opens on a phone,
 whether the frame and the scroll-into-view land where they should, how much of a

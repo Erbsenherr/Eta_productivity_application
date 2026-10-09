@@ -1,5 +1,10 @@
 package com.example.eta.ui.settings
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.key
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -113,110 +118,247 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(viewModel::import) }
 
+    val dirty by viewModel.dirty.collectAsStateWithLifecycle()
+
+    // Which page is open, null being the menu. Saved by name, like the tabs.
+    var pageName by rememberSaveable { mutableStateOf<String?>(null) }
+    val page = SettingsPage.entries.firstOrNull { it.name == pageName }
+    val setup = draft
+
+    // Back leaves a page for the menu before it leaves the tab.
+    BackHandler(enabled = page != null) { pageName = null }
+
     EtaScreen(modifier = modifier, bottomInset = false) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(EtaTheme.spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
-        ) {
-            Column {
-                EtaText(text = "Einstellungen", style = EtaTheme.typography.display)
-                EtaText(
-                    text = "Was dauerhaft gilt.",
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textSecondary,
-                )
+        // Keyed by the page, so each opens at its top rather than wherever the
+        // menu happened to be scrolled to.
+        key(page) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(EtaTheme.spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
+            ) {
+                if (page == null) {
+                    Column {
+                        EtaText(text = "Einstellungen", style = EtaTheme.typography.display)
+                        EtaText(
+                            text = "Was dauerhaft gilt.",
+                            style = EtaTheme.typography.caption,
+                            color = EtaTheme.colors.textSecondary,
+                        )
+                    }
+                } else {
+                    Row {
+                        EtaButton(
+                            text = "‹ Einstellungen",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { pageName = null },
+                        )
+                    }
+                    EtaText(text = page.title, style = EtaTheme.typography.title)
+                }
+
+                message?.let { MessageBox(it, viewModel::dismissMessage) }
+
+                when (page) {
+                    null -> SettingsMenu(
+                        // The two levers on the account are out of sight with it.
+                        pages = SettingsPage.entries.filter { entry ->
+                            when (entry) {
+                                SettingsPage.INFLATION, SettingsPage.CANCELLATION ->
+                                    setup?.pointsSystem == true
+                                SettingsPage.DEBUG -> onDebugReset != null
+                                SettingsPage.TUTORIAL -> onRepeatTutorial != null
+                                else -> true
+                            }
+                        },
+                        dirty = dirty,
+                        onOpen = { pageName = it.name },
+                        onOpenVacation = onOpenVacation,
+                        onSave = viewModel::save,
+                        onDiscard = viewModel::discard,
+                    )
+
+                    SettingsPage.DESIGN -> DesignBox(design, onDesignChange, onBrightnessChange)
+                    SettingsPage.ALARMS -> AlarmBox(alarms)
+                    SettingsPage.CALENDAR -> CalendarSettingsBox(calendarViewModel)
+                    SettingsPage.DATA -> DataBox(
+                        onExport = { exportLauncher.launch(BACKUP_FILE_NAME) },
+                        onImport = { importLauncher.launch(arrayOf("application/zip", "*/*")) },
+                    )
+
+                    SettingsPage.CATCH_UP -> CatchUpBox(
+                        openDays = openDays,
+                        phrase = phrase,
+                        unlocked = phraseAccepted,
+                        onPhraseChange = viewModel::setPhrase,
+                        onCatchUp = viewModel::catchUp,
+                    )
+
+                    SettingsPage.TUTORIAL -> onRepeatTutorial?.let { TutorialBox(onRepeat = it) }
+                    SettingsPage.DEBUG -> onDebugReset?.let { DebugBox(onReset = it) }
+
+                    // Everything below edits the draft of the stored answers.
+                    else -> if (setup == null) {
+                        EtaSurface(modifier = Modifier.fillMaxWidth()) {
+                            EtaText(
+                                text = "Einrichtung wird geladen …",
+                                style = EtaTheme.typography.body,
+                                color = EtaTheme.colors.textMuted,
+                            )
+                        }
+                    } else {
+                        when (page) {
+                            SettingsPage.SLEEP -> {
+                                EtaText(
+                                    text = "Essen, Hausputz, Sport, Freizeit, Achtsamkeit und " +
+                                        "Arbeit sind wiederkehrende Aufgaben und werden im " +
+                                        "Reiter Listen bearbeitet. Hier bleibt, was an deiner " +
+                                        "Nacht hängt.",
+                                    style = EtaTheme.typography.caption,
+                                    color = EtaTheme.colors.textMuted,
+                                )
+                                SleepStep(setup, viewModel::update)
+                                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
+                            }
+
+                            SettingsPage.WAKE -> WakeAlarmBox(setup, viewModel::update)
+                            SettingsPage.SOCIAL -> SocialTimeBox(setup, viewModel::update)
+                            SettingsPage.STILL_ACTIVE -> StillActiveBox(setup, viewModel::update)
+                            SettingsPage.ANNOUNCEMENT -> TaskAnnouncementBox(setup, viewModel::update)
+                            SettingsPage.PLANNING -> PlanningStep(setup, viewModel::update)
+                            SettingsPage.FEATURES -> AdvancedFeaturesBox(setup, viewModel::setFeature)
+                            SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
+                            SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
+                            else -> Unit
+                        }
+
+                        // The switches of the Advanced Features apply at once and
+                        // have nothing to save.
+                        if (page != SettingsPage.FEATURES) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                                EtaButton(text = "Sichern", enabled = dirty, onClick = viewModel::save)
+                                if (dirty) {
+                                    EtaButton(
+                                        text = "Verwerfen",
+                                        style = EtaButtonStyle.Secondary,
+                                        onClick = viewModel::discard,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.size(EtaTheme.spacing.xl))
             }
+        }
+    }
+}
 
-            message?.let { MessageBox(it, viewModel::dismissMessage) }
+/**
+ * The pages of the settings, in the order the menu lists them.
+ *
+ * One page per subject, and the menu shows their titles and nothing else: the
+ * tab used to be every box under every other, and finding one meant scrolling
+ * past all the rest.
+ */
+private enum class SettingsPage(val title: String, val section: SettingsSection) {
+    DESIGN("Design", SettingsSection.APP),
+    ALARMS("Alarme", SettingsSection.APP),
+    CALENDAR("Google Kalender", SettingsSection.APP),
+    DATA("Deine Daten", SettingsSection.APP),
+    CATCH_UP("Offene Tage", SettingsSection.APP),
 
-            DesignBox(design, onDesignChange, onBrightnessChange)
+    SLEEP("Schlaf und Morgen", SettingsSection.SETUP),
+    WAKE("Weckruf", SettingsSection.SETUP),
+    PLANNING("Planungsphasen", SettingsSection.SETUP),
+    SOCIAL("Soziale Interaktion", SettingsSection.SETUP),
+    STILL_ACTIVE("Bin ich noch bei der Sache?", SettingsSection.SETUP),
+    ANNOUNCEMENT("Ansagen", SettingsSection.SETUP),
+    FEATURES("Advanced Features", SettingsSection.SETUP),
+    INFLATION("Wertverfall", SettingsSection.SETUP),
+    CANCELLATION("Absagen", SettingsSection.SETUP),
 
-            AlarmBox(alarms)
+    /** Last, as asked: opened once in a long while, by someone looking for it. */
+    DEBUG("Debug", SettingsSection.MORE),
+    TUTORIAL("Tutorial", SettingsSection.MORE),
+}
 
-            CalendarSettingsBox(calendarViewModel)
+private enum class SettingsSection(val label: String) {
+    APP("App"),
+    SETUP("Deine Einrichtung"),
+    MORE("Sonstiges"),
+}
 
-            DataBox(
-                onExport = { exportLauncher.launch(BACKUP_FILE_NAME) },
-                onImport = { importLauncher.launch(arrayOf("application/zip", "*/*")) },
+/**
+ * The menu: titles, and the way into each.
+ *
+ * The holiday editor is a flow of its own rather than a page, so its row leads
+ * straight there. Answers changed on a page and not yet saved are said here as
+ * well — a page can be left by the tab bar, and the draft would otherwise sit
+ * changed and unsaved with nothing on screen to show it.
+ */
+@Composable
+private fun SettingsMenu(
+    pages: List<SettingsPage>,
+    dirty: Boolean,
+    onOpen: (SettingsPage) -> Unit,
+    onOpenVacation: () -> Unit,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    if (dirty) {
+        EtaSurface(modifier = Modifier.fillMaxWidth(), borderColor = EtaTheme.colors.warning) {
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                EtaText(text = "Ungesicherte Änderungen", style = EtaTheme.typography.bodyStrong)
+                Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaButton(text = "Sichern", onClick = onSave)
+                    EtaButton(text = "Verwerfen", style = EtaButtonStyle.Secondary, onClick = onDiscard)
+                }
+            }
+        }
+    }
+
+    SettingsSection.entries.forEach { section ->
+        val rows = pages.filter { it.section == section }
+        if (rows.isEmpty()) return@forEach
+
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaText(
+                text = section.label,
+                style = EtaTheme.typography.label,
+                color = EtaTheme.colors.textMuted,
             )
-
-            EtaSurface(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
-                    EtaText(text = "Urlaubsmodus", style = EtaTheme.typography.heading)
-                    EtaText(
-                        text = "Für einen Zeitraum wiederkehrende Aufgaben aussetzen oder " +
-                            "verschieben. Danach gilt wieder der gewohnte Plan.",
-                        style = EtaTheme.typography.caption,
-                        color = EtaTheme.colors.textMuted,
-                    )
-                    EtaButton(
-                        text = "Urlaub planen",
-                        style = EtaButtonStyle.Secondary,
-                        onClick = onOpenVacation,
-                    )
+            rows.forEach { entry ->
+                MenuRow(title = entry.title, onClick = { onOpen(entry) })
+                // Beside the other thing that is about days rather than answers.
+                if (entry == SettingsPage.CATCH_UP) {
+                    MenuRow(title = "Urlaubsmodus", onClick = onOpenVacation)
                 }
             }
+        }
+    }
+}
 
-            CatchUpBox(
-                openDays = openDays,
-                phrase = phrase,
-                unlocked = phraseAccepted,
-                onPhraseChange = viewModel::setPhrase,
-                onCatchUp = viewModel::catchUp,
+@Composable
+private fun MenuRow(title: String, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    EtaSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        contentPadding = EtaTheme.spacing.md,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EtaText(
+                text = title,
+                style = EtaTheme.typography.bodyStrong,
+                modifier = Modifier.weight(1f),
             )
-
-            val setup = draft
-            if (setup == null) {
-                EtaSurface(modifier = Modifier.fillMaxWidth()) {
-                    EtaText(
-                        text = "Einrichtung wird geladen …",
-                        style = EtaTheme.typography.body,
-                        color = EtaTheme.colors.textMuted,
-                    )
-                }
-            } else {
-                EtaText(text = "Deine Einrichtung", style = EtaTheme.typography.title)
-                EtaText(
-                    text = "Essen, Hausputz, Sport, Freizeit, Achtsamkeit und Arbeit sind " +
-                        "wiederkehrende Aufgaben und werden im Reiter Listen bearbeitet. " +
-                        "Hier bleibt, was an deiner Nacht hängt, und was dauerhaft gilt.",
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textMuted,
-                )
-
-                SleepStep(setup, viewModel::update)
-                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
-                WakeAlarmBox(setup, viewModel::update)
-                SocialTimeBox(setup, viewModel::update)
-                StillActiveBox(setup, viewModel::update)
-                TaskAnnouncementBox(setup, viewModel::update)
-                PlanningStep(setup, viewModel::update)
-                AdvancedFeaturesBox(setup, viewModel::setFeature)
-                // The two levers on the account go out of sight with it. Off the
-                // draft rather than the stored answer, so the box above folds
-                // them away the moment it is unticked.
-                if (setup.pointsSystem) {
-                    InflationBox(setup, viewModel::update)
-                    CancellationBox(setup, viewModel::update)
-                }
-
-                EtaButton(text = "Einrichtung sichern", onClick = viewModel::save)
-            }
-
-            if (onDebugReset != null) {
-                DebugBox(onReset = onDebugReset)
-            }
-
-            // The very last thing on the tab, as asked: it is opened once in a
-            // long while, and by someone who went looking for it.
-            if (onRepeatTutorial != null) {
-                TutorialBox(onRepeat = onRepeatTutorial)
-            }
-
-            Spacer(Modifier.size(EtaTheme.spacing.xl))
+            EtaText(text = "›", style = EtaTheme.typography.heading, color = EtaTheme.colors.textMuted)
         }
     }
 }

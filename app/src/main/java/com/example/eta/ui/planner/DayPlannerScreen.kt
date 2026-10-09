@@ -42,6 +42,8 @@ import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.snapToGrid
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.tutorialAllows
+import com.example.eta.domain.tutorial.TutorialGate
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
@@ -748,7 +750,13 @@ private fun PlannerFooter(
                 style = EtaButtonStyle.Secondary,
                 onClick = onSwitchRevolver,
             )
-            EtaButton(text = "Bestätigen", onClick = onConfirm)
+            EtaButton(
+                text = "Bestätigen",
+                // Confirming puts the revolver away; in the tutorial that waits
+                // until the card it asks for has been placed.
+                enabled = tutorialAllows(TutorialGate.PLANNER_CONFIRM),
+                onClick = onConfirm,
+            )
         }
     }
 }

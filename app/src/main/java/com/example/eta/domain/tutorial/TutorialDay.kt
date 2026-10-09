@@ -85,9 +85,10 @@ fun tutorialItems(today: DayOfWeek, now: Instant): List<Item> = listOf(
 fun tutorialSetup(now: Instant): UserSetup = UserSetup.draft(now)
     .skipping(SetupPart.entries.toSet())
     .copy(
-        // Late enough that the dashboard's planning box stays a quiet countdown
-        // at the foot of the screen for the whole simulated morning.
-        dailyPlanningTime = LocalTime(21, 0),
+        // The hour the simulated day jumps to: a quiet countdown at the foot of
+        // the dashboard all morning, and owed — at the top — the moment the
+        // tutorial says it is evening.
+        dailyPlanningTime = TUTORIAL_EVENING,
         pointsSystem = false,
         growthTasks = false,
         contracts = false,

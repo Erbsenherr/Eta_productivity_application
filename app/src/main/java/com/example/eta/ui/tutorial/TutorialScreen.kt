@@ -101,6 +101,7 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
     val index by tutorial.index.collectAsStateWithLifecycle()
     val facts by tutorial.facts.collectAsStateWithLifecycle()
     val hint by tutorial.hint.collectAsStateWithLifecycle()
+    val arrivedReady by tutorial.arrivedReady.collectAsStateWithLifecycle()
     val step = tutorial.steps[index.coerceIn(0, tutorial.steps.lastIndex)]
 
     Column(
@@ -135,6 +136,8 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
             total = tutorial.steps.size,
             facts = facts,
             hint = hint,
+            arrivedReady = arrivedReady,
+            onBack = tutorial::back,
             onNext = tutorial::next,
             onQuit = tutorial::finish,
         )
@@ -160,7 +163,7 @@ private fun StageScreen(
             onPlanTomorrow = tutorial::locked,
             onReplanToday = tutorial::locked,
             onPlanWeek = tutorial::locked,
-            onCloseDay = tutorial::locked,
+            onCloseDay = tutorial::closeDayPressed,
         )
 
         TutorialStage.REEVALUATION -> ReevaluationScreen(

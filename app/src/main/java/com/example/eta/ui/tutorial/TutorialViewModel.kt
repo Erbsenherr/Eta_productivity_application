@@ -13,6 +13,7 @@ import com.example.eta.domain.model.Stage
 import com.example.eta.domain.tutorial.QUICKSTART
 import com.example.eta.domain.tutorial.StepKind
 import com.example.eta.domain.tutorial.TUTORIAL_EVENING
+import com.example.eta.domain.tutorial.TUTORIAL_MORNING
 import com.example.eta.domain.tutorial.TutorialClock
 import com.example.eta.domain.tutorial.TutorialFacts
 import com.example.eta.domain.tutorial.TutorialStage
@@ -122,6 +123,19 @@ class TutorialViewModel(
 
     private val signals = MutableStateFlow(Signals())
 
+    /**
+     * Whether the step in front had already been done when it came up — which
+     * happens on the way **back**. A [StepKind.FOLLOW] step then gets a "Weiter"
+     * of its own instead of following by itself: it would otherwise throw the
+     * user forward again the instant they stepped back onto it.
+     */
+    private val _arrivedReady = MutableStateFlow(false)
+    val arrivedReady: StateFlow<Boolean> = _arrivedReady.asStateFlow()
+
+    /** Which half of the simulated day the clock stands in. */
+    private var evening = false
+    private val eveningFrom = steps.indexOfFirst { it.evening }
+
     val guide = TutorialGuide { key, value ->
         signals.update {
             Signals(latest = it.latest + (key to value), seen = it.seen + "$key=$value")
@@ -144,6 +158,7 @@ class TutorialViewModel(
                     val step = steps.getOrNull(index) ?: return@collect
                     if (phase == TutorialPhase.RUNNING &&
                         step.kind == StepKind.FOLLOW &&
+                        !_arrivedReady.value &&
                         step.ready(facts)
                     ) {
                         advanceFrom(index)
@@ -193,6 +208,7 @@ class TutorialViewModel(
             val session = TutorialSession(appContext)
             session.container.tutorialSeed?.lay()
             signals.value = Signals()
+            evening = false
             _session.value = session
             show(0)
             _phase.value = TutorialPhase.RUNNING
@@ -203,8 +219,36 @@ class TutorialViewModel(
     fun next() {
         val index = _index.value
         val step = steps.getOrNull(index) ?: return
-        if (step.kind == StepKind.FOLLOW || !step.passable(facts.value)) return
-        advanceFrom(index)
+        val open = when (step.kind) {
+            StepKind.FOLLOW -> _arrivedReady.value
+            else -> step.passable(facts.value)
+        }
+        if (open) advanceFrom(index)
+    }
+
+    /**
+     * "Zurück" on the tutorial's bar: the step before, to read it again.
+     *
+     * Nothing is undone — what was ticked stays ticked, what was noted stays
+     * noted — so a task come back to shows as done, and the clock goes back to
+     * the morning only if the step belongs there.
+     */
+    fun back() {
+        val index = _index.value
+        if (_phase.value == TutorialPhase.RUNNING && index > 0) show(index - 1)
+    }
+
+    /**
+     * "Tag abschließen" on the dashboard. The way into the evening, but only at
+     * the step that asks for it; before that it is a way sideways like any other.
+     */
+    fun closeDayPressed() {
+        val step = steps.getOrNull(_index.value) ?: return
+        if (step.stage == TutorialStage.DASHBOARD && step.kind == StepKind.FOLLOW) {
+            exitPressed(TutorialStage.DASHBOARD)
+        } else {
+            locked()
+        }
     }
 
     /**
@@ -233,6 +277,7 @@ class TutorialViewModel(
         _index.value = 0
         _hint.value = null
         guide.spot = null
+        guide.allowed = emptySet()
         signals.value = Signals()
         if (session != null) {
             // Not on the view model's scope: the screens are leaving and this has
@@ -251,10 +296,18 @@ class TutorialViewModel(
 
     private fun show(index: Int) {
         val step = steps[index]
-        // Before the screen that reads the hour is built, not after.
-        if (step.evening) _session.value?.clock?.jumpTo(TUTORIAL_EVENING)
+        // Before the screen that reads the hour is built, not after. Derived
+        // from where the step stands rather than set on the way past, so a
+        // stage skipped into, or a step gone back to, is at the right hour.
+        val late = eveningFrom in 0..index
+        if (late != evening) {
+            evening = late
+            _session.value?.clock?.jumpTo(if (late) TUTORIAL_EVENING else TUTORIAL_MORNING)
+        }
         guide.spot = step.spot
+        guide.allowed = step.allow
         _hint.value = null
+        _arrivedReady.value = step.kind == StepKind.FOLLOW && step.ready(facts.value)
         _index.value = index
     }
 

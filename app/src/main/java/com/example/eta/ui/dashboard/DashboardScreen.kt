@@ -284,6 +284,7 @@ private fun TodayPage(
         if (phaseOwed == true) {
             state.phase?.let { phase ->
                 PhaseBox(
+                    modifier = Modifier.tutorialSpot(TutorialSpot.PHASE),
                     phase = phase,
                     streak = state.streak,
                     // Off the ticking clock, so the box lights up at the minute itself.
@@ -338,6 +339,7 @@ private fun TodayPage(
         if (phaseOwed == false) {
             state.phase?.let { phase ->
                 PhaseBox(
+                    modifier = Modifier.tutorialSpot(TutorialSpot.PHASE),
                     phase = phase,
                     streak = state.streak,
                     owed = false,

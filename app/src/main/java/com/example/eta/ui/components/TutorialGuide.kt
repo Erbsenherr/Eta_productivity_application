@@ -43,7 +43,27 @@ class TutorialGuide(private val onReport: (key: String, value: String) -> Unit) 
     /** The part of the screen the current step points at, by its id. */
     var spot: String? by mutableStateOf(null)
 
+    /**
+     * The buttons of a screen the current step lets through, by their gate.
+     *
+     * A screen's own "Weiter", "Übernehmen" or "Abschließen" pressed before the
+     * tutorial has got there leaves the two out of step: the screen a page on,
+     * the coach still explaining the last one. So in the tutorial such a button
+     * is grey until its step — see [tutorialAllows].
+     */
+    var allowed: Set<String> by mutableStateOf(emptySet())
+
     fun report(key: String, value: String) = onReport(key, value)
+}
+
+/**
+ * Whether a button may be pressed right now. Always, outside the tutorial;
+ * inside it, only while the current step names [gate].
+ */
+@Composable
+fun tutorialAllows(gate: String): Boolean {
+    val guide = LocalTutorialGuide.current ?: return true
+    return gate in guide.allowed
 }
 
 val LocalTutorialGuide = staticCompositionLocalOf<TutorialGuide?> { null }

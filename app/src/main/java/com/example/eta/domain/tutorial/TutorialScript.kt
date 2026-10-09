@@ -37,9 +37,36 @@ object TutorialSignal {
     const val WEEK_STEP = "week.step"
 }
 
+/**
+ * The buttons a step has to open before they can be pressed — see
+ * `tutorialAllows`. Anything not named by the current step is grey.
+ */
+object TutorialGate {
+    /** The Tagesabschluss's own "Weiter", and the swipe that does the same. */
+    const val REEVALUATION_NEXT = "reevaluation.next"
+    const val REEVALUATION_SETTLE = "reevaluation.settle"
+
+    /** "Fällt aus" on one row; the item's id is appended. */
+    const val REEVALUATION_DISCARD = "reevaluation.discard:"
+
+    /** "Lassen" under "Nachholen?". No step opens it. */
+    const val REEVALUATION_DISMISS_MAKE_UP = "reevaluation.dismissMakeUp"
+    const val CONCRETIZE_TODO = "concretize.todo"
+    const val CONCRETIZE_RECURRING = "concretize.recurring"
+
+    /** "Löschen" on a note. No step opens it. */
+    const val CONCRETIZE_DELETE = "concretize.delete"
+
+    /** The button under the notes that leaves the step. */
+    const val CONCRETIZE_DONE = "concretize.done"
+    const val WEEK_FINISH = "week.finish"
+    const val PLANNER_CONFIRM = "planner.confirm"
+}
+
 /** The parts of a screen a step can point at. */
 object TutorialSpot {
     const val NOW = "dashboard.now"
+    const val PHASE = "dashboard.phase"
     const val QUICK_ADD = "dashboard.quickAdd"
     const val TODAY_TASKS = "dashboard.tasks"
     const val TODO_CATEGORY = "todo.category"
@@ -75,6 +102,8 @@ data class TutorialFacts(
     val mailCompleted: Boolean = false,
     val mailDiscarded: Boolean = false,
     val mailMadeUp: Boolean = false,
+    /** The mail's cancellation was put down to höhere Gewalt. */
+    val mailExcused: Boolean = false,
     val daySettled: Boolean = false,
     /** ToDos lying in the week list. */
     val weekGoals: Int = 0,
@@ -108,8 +137,10 @@ class TutorialStep(
     val ready: (TutorialFacts) -> Boolean = { facts -> checks(facts).all { it.done } },
     /** Shows the little swipe hint — the step asks for a sideways wipe. */
     val swipeHint: Boolean = false,
-    /** Entering this step moves the simulated day on to the evening. */
+    /** From this step on the simulated day stands in the evening. */
     val evening: Boolean = false,
+    /** The screen's own buttons this step opens — see [TutorialGate]. */
+    val allow: Set<String> = emptySet(),
 ) {
     /** Whether the tutorial can move past it right now, however it is left. */
     fun passable(facts: TutorialFacts): Boolean = kind != StepKind.TASK || ready(facts)
@@ -187,8 +218,23 @@ val QUICKSTART: List<TutorialStep> = listOf(
     text(
         TutorialStage.DASHBOARD,
         "Wir spulen vor",
-        "Es wird Abend. Im Tagesabschluss hakst du ab, was du geschafft hast, gibst " +
-            "deinen Notizen Form und planst den morgigen Tag.",
+        "Der Tag geht weiter, und irgendwann ist es Abend. Dann hakst du ab, was du " +
+            "geschafft hast, gibst deinen Notizen Form und planst den morgigen Tag.",
+    ),
+    TutorialStep(
+        stage = TutorialStage.DASHBOARD,
+        title = "Planungszeit",
+        text = {
+            "Es ist 20 Uhr — die Zeit, die du für deine Tagesplanung festgelegt hast. " +
+                "Eta erinnert dich daran, und die Box rückt nach ganz oben. " +
+                "Tippe auf »Tag abschließen«."
+        },
+        kind = StepKind.FOLLOW,
+        spot = TutorialSpot.PHASE,
+        // Come back to after the day was closed, the button is gone from the
+        // box; the coach's own "Weiter" then stands in for it.
+        ready = { it.daySettled },
+        evening = true,
     ),
 
     // --- The evening --------------------------------------------------------
@@ -200,15 +246,18 @@ val QUICKSTART: List<TutorialStep> = listOf(
                 "geschafft hast — alles außer »Mail versenden«."
         },
         kind = StepKind.TASK,
+        // The mail ticked off as well is not what happened today, and the next
+        // step needs it open: asked to be taken back rather than waved through.
         checks = { facts ->
-            listOf(
+            listOfNotNull(
                 TutorialCheck(
                     "Frühstück, Arbeiten und Katze füttern abhaken",
                     facts.completedToday.containsAll(TUTORIAL_DONE_IDS),
                 ),
+                TutorialCheck("Haken bei »Mail versenden« wieder entfernen", false)
+                    .takeIf { facts.mailCompleted },
             )
         },
-        evening = true,
     ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
@@ -225,12 +274,26 @@ val QUICKSTART: List<TutorialStep> = listOf(
                 TutorialCheck("»Nachholen« antippen", facts.mailMadeUp),
             )
         },
-        // Ticked off after all, or answered with "Lassen": the question is gone
-        // and cannot be put again, so the step lets go rather than wait for it.
+        // "Lassen" is shut in the tutorial, so the question cannot normally be
+        // lost. Should it be gone all the same, it cannot be put again, and the
+        // step lets go rather than wait for an answer that cannot come.
         ready = { facts ->
-            facts.mailMadeUp || facts.mailCompleted ||
+            facts.mailMadeUp ||
                 (facts.mailDiscarded && facts.signals[TutorialSignal.OPEN_MAKE_UP_OFFERS] == "0")
         },
+        allow = setOf(TutorialGate.REEVALUATION_DISCARD + TUTORIAL_MAIL_ID),
+    ),
+    TutorialStep(
+        stage = TutorialStage.REEVALUATION,
+        title = "Höhere Gewalt",
+        text = {
+            "Manchmal fällt etwas aus, ohne dass du etwas dafür kannst. Mit dem " +
+                "Punktetracker kostet eine Absage Punkte — außer bei höherer Gewalt. " +
+                "Heute war der Mailserver ausgefallen: Halte die Zeile »Mail versenden« " +
+                "gedrückt, bis sie sich füllt, und gib den Grund an."
+        },
+        kind = StepKind.TASK,
+        checks = { listOf(TutorialCheck("»Mail versenden« gedrückt halten und begründen", it.mailExcused)) },
     ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
@@ -247,6 +310,7 @@ val QUICKSTART: List<TutorialStep> = listOf(
         ready = { facts ->
             facts.signals[TutorialSignal.REEVALUATION_STEP].let { it != null && it != "TASKS" }
         },
+        allow = setOf(TutorialGate.REEVALUATION_NEXT),
     ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
@@ -257,6 +321,7 @@ val QUICKSTART: List<TutorialStep> = listOf(
         },
         kind = StepKind.FOLLOW,
         ready = { it.signals[TutorialSignal.REEVALUATION_STEP] == "RECURRING" },
+        allow = setOf(TutorialGate.REEVALUATION_NEXT),
     ),
     TutorialStep(
         stage = TutorialStage.REEVALUATION,
@@ -268,6 +333,8 @@ val QUICKSTART: List<TutorialStep> = listOf(
         },
         kind = StepKind.FOLLOW,
         ready = { it.daySettled },
+        // "Weiter" as well: gone back a page, it is the way to this one again.
+        allow = setOf(TutorialGate.REEVALUATION_NEXT, TutorialGate.REEVALUATION_SETTLE),
     ),
 
     // --- The notes get their answers ----------------------------------------
@@ -314,6 +381,7 @@ val QUICKSTART: List<TutorialStep> = listOf(
         kind = StepKind.TASK,
         spot = TutorialSpot.TODO_DURATION,
         checks = { listOf(TutorialCheck("ToDo übernehmen", it.todoNoted && it.openTodoNotes == 0)) },
+        allow = setOf(TutorialGate.CONCRETIZE_TODO),
     ),
     text(
         TutorialStage.CONCRETIZE,
@@ -348,11 +416,13 @@ val QUICKSTART: List<TutorialStep> = listOf(
                 ),
             )
         },
+        allow = setOf(TutorialGate.CONCRETIZE_RECURRING),
     ),
-    text(
-        TutorialStage.CONCRETIZE,
-        "Geschafft",
-        "Alle Notizen sind ausgefüllt. Als Nächstes simulieren wir die Wochenplanung.",
+    TutorialStep(
+        stage = TutorialStage.CONCRETIZE,
+        title = "Geschafft",
+        text = { "Alle Notizen sind ausgefüllt. Als Nächstes simulieren wir die Wochenplanung." },
+        allow = setOf(TutorialGate.CONCRETIZE_DONE),
     ),
 
     // --- The week -----------------------------------------------------------
@@ -373,7 +443,8 @@ val QUICKSTART: List<TutorialStep> = listOf(
             "Links liegen die ToDos, die noch in keiner Woche stecken. Wiederkehrende " +
                 "Aufgaben fehlen hier: Sie sind ohnehin jede Woche eingeplant. An jeder " +
                 "Karte steht ihre Dauer. Tippe auf ${facts.todoLabel} und beobachte " +
-                "die freien Stunden."
+                "die freien Stunden. Fällt dir beim Planen noch etwas ein, legst du " +
+                "es mit »ToDo anlegen« gleich hier an."
         },
         kind = StepKind.TASK,
         checks = { listOf(TutorialCheck("Ein ToDo in »Diese Woche« schieben", it.weekGoals > 0)) },
@@ -385,6 +456,7 @@ val QUICKSTART: List<TutorialStep> = listOf(
         kind = StepKind.FOLLOW,
         // Nothing to read off: leaving the screen is the step.
         ready = { false },
+        allow = setOf(TutorialGate.WEEK_FINISH),
     ),
 
     // --- Tomorrow -----------------------------------------------------------
@@ -399,12 +471,15 @@ val QUICKSTART: List<TutorialStep> = listOf(
         kind = StepKind.TASK,
         checks = { listOf(TutorialCheck("Ein ToDo in den Tag ziehen", it.plannedTomorrow)) },
     ),
-    text(
-        TutorialStage.PLANNER,
-        "Gut gemacht!",
-        "Verplante Karten kannst du verschieben oder zurück auf den Revolver ziehen. " +
-            "Gedrückt halten zeigt weitere Optionen. Das war der Quickstart — " +
-            "viel Erfolg mit Eta!",
+    TutorialStep(
+        stage = TutorialStage.PLANNER,
+        title = "Gut gemacht!",
+        text = {
+            "Verplante Karten kannst du verschieben oder zurück auf den Revolver " +
+                "ziehen. Gedrückt halten zeigt weitere Optionen. Das war der " +
+                "Quickstart — viel Erfolg mit Eta!"
+        },
+        allow = setOf(TutorialGate.PLANNER_CONFIRM),
     ),
 )
 
@@ -461,6 +536,7 @@ fun tutorialFacts(
         mailCompleted = mail?.isCompleted == true,
         mailDiscarded = mail?.isDiscarded == true,
         mailMadeUp = mail?.makeUpItemId != null,
+        mailExcused = mail?.isExcused == true,
         daySettled = daySettled,
         weekGoals = week.count { it.type == ItemType.TODO },
         plannedTomorrow = tomorrow.any { it.block.isHandPlaced },

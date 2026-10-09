@@ -38,6 +38,8 @@ import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.ReportToTutorial
+import com.example.eta.ui.components.tutorialAllows
+import com.example.eta.domain.tutorial.TutorialGate
 import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaProgressBar
@@ -182,7 +184,11 @@ fun WeekPlannerScreen(
                 }
                 Spacer(Modifier.weight(1f))
                 if (pagerState.currentPage == steps.lastIndex) {
-                    EtaButton(text = "Woche steht", onClick = { viewModel.finish(onClose) })
+                    EtaButton(
+                        text = "Woche steht",
+                        enabled = tutorialAllows(TutorialGate.WEEK_FINISH),
+                        onClick = { viewModel.finish(onClose) },
+                    )
                 } else {
                     EtaButton(
                         text = "Weiter",

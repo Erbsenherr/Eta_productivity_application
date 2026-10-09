@@ -21,6 +21,7 @@ import com.example.eta.domain.planning.nextWake
 import com.example.eta.domain.streak.CATCH_UP_PHRASE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.subtask.drafts
 import kotlinx.coroutines.flow.StateFlow
@@ -81,6 +82,25 @@ class SettingsViewModel(
     private val _draft = MutableStateFlow<UserSetup?>(null)
     val draft: StateFlow<UserSetup?> = _draft.asStateFlow()
 
+    /** The answers as they are stored, to tell a changed draft from an untouched one. */
+    private val stored = MutableStateFlow<UserSetup?>(null)
+
+    /**
+     * Whether the draft holds answers that have not been saved.
+     *
+     * The settings are pages now, and a page can be left with its answers
+     * changed; this is what lets the page offer "Sichern" only when there is
+     * something to save, and the menu say so when there still is.
+     */
+    val dirty: StateFlow<Boolean> = combine(_draft, stored) { draft, stored ->
+        draft != null && draft != stored
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Throws the unsaved answers away: the draft is the stored setup again. */
+    fun discard() {
+        _draft.value = stored.value
+    }
+
     /**
      * The morning routine's steps. Not part of the draft and not waiting for
      * "Einrichtung sichern": they are rows of their own, and the builder's
@@ -109,7 +129,8 @@ class SettingsViewModel(
 
     init {
         viewModelScope.launch {
-            _draft.value = setupRepository.find()
+            stored.value = setupRepository.find()
+            _draft.value = stored.value
             _openDays.value = catchUpService.openDays()
             refreshAlarms()
         }
@@ -150,6 +171,8 @@ class SettingsViewModel(
      */
     fun setFeature(transform: (UserSetup) -> UserSetup) {
         _draft.update { it?.let(transform) }
+        // The same change on both sides, so a switch flipped is not "unsaved".
+        stored.update { it?.let(transform) }
         viewModelScope.launch { setupRepository.update(transform) }
     }
 
@@ -164,6 +187,7 @@ class SettingsViewModel(
         val setup = _draft.value ?: return
         viewModelScope.launch {
             setupRepository.saveSettings(setup)
+            stored.value = setup
             // The wake alarm hangs off two of these answers, so saving them is
             // the moment it has to be re-armed or taken down.
             wakeAlarmCoordinator.reschedule()

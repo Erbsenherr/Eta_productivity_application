@@ -36,7 +36,9 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
+import com.example.eta.ui.components.tutorialAllows
 import com.example.eta.ui.components.tutorialSpot
+import com.example.eta.domain.tutorial.TutorialGate
 import com.example.eta.ui.lists.SchemePreview
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.tutorial.TutorialSpot
@@ -136,6 +138,7 @@ fun ConcretizeScreen(
 
             EtaButton(
                 text = if (pending.isEmpty()) "Weiter zur Tagesplanung" else "Rest später",
+                enabled = tutorialAllows(TutorialGate.CONCRETIZE_DONE),
                 onClick = onDone,
             )
 
@@ -162,6 +165,7 @@ private fun ConcretizeCard(
         onNameChange = { name = it },
         onDiscard = onDiscard,
         onSave = { onSave(name, attributes) },
+        saveEnabled = tutorialAllows(TutorialGate.CONCRETIZE_TODO),
     ) {
         TodoAttributeFields(
             value = attributes,
@@ -201,7 +205,8 @@ private fun ConcretizeRecurringCard(
         onNameChange = { name = it },
         onDiscard = onDiscard,
         onSave = { onSave(name, attributes) },
-        saveEnabled = attributes.weekdays.isNotEmpty(),
+        saveEnabled = attributes.weekdays.isNotEmpty() &&
+            tutorialAllows(TutorialGate.CONCRETIZE_RECURRING),
     ) {
         // Against the standing schedule as it is now, so a Tuesday evening that
         // is already taken says so before the note becomes a second one.
@@ -275,6 +280,8 @@ private fun CardFrame(
                 EtaButton(
                     text = if (confirmingDelete) "Wirklich?" else "Löschen",
                     style = EtaButtonStyle.Secondary,
+                    // A note thrown away mid-tutorial leaves it nothing to plan.
+                    enabled = tutorialAllows(TutorialGate.CONCRETIZE_DELETE),
                     onClick = { if (confirmingDelete) onDiscard() else confirmingDelete = true },
                 )
                 Spacer(Modifier.weight(1f))

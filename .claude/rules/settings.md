@@ -7,6 +7,24 @@ paths:
 
 ### The settings tab
 
+**A menu of titles, and a page behind each** (step 38's second round — the tab
+had become every box under every other). `SettingsPage` lists the pages in menu
+order under three section labels; the menu shows titles and nothing else, a tap
+opens the page, "‹ Einstellungen" or the system back returns. The page is held
+by name in `rememberSaveable`. Urlaubsmodus is a row that leads straight to its
+flow, Wertverfall and Absagen are listed only while the points are on, and
+Tutorial is the last row, under Debug.
+
+- **Saving stays explicit, per page.** `SettingsViewModel.dirty` compares the
+  draft with the stored row: a page offers "Sichern" (grey while there is
+  nothing to save) and "Verwerfen". A page can be left with its answers changed
+  — by the tab bar as well — so **the menu says "Ungesicherte Änderungen"**
+  with the same two buttons; the draft is one for all pages, and so is the
+  save. `setFeature` applies its change to both sides, so a switch flipped is
+  never "unsaved".
+- The boxes themselves are unchanged and still carry their own headings; what
+  follows describes them.
+
 `ui/settings/` holds the standing configuration, away from planning a day. **The
 questionnaire's own step composables are reused**, not reimplemented: they are
 already `(draft, onChange)` pairs, so every answer is asked for in exactly one place

@@ -42,6 +42,7 @@ import com.example.eta.domain.tutorial.StepKind
 import com.example.eta.domain.tutorial.TutorialFacts
 import com.example.eta.domain.tutorial.TutorialStep
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaProgressBar
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
@@ -71,6 +72,9 @@ fun TutorialCoach(
     total: Int,
     facts: TutorialFacts,
     hint: String?,
+    /** A step come back to that had already been done — see the view model. */
+    arrivedReady: Boolean,
+    onBack: () -> Unit,
     onNext: () -> Unit,
     onQuit: () -> Unit,
 ) {
@@ -150,12 +154,17 @@ fun TutorialCoach(
                 .fillMaxWidth()
                 .padding(horizontal = EtaTheme.spacing.lg, vertical = EtaTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
         ) {
-            if (step.kind == StepKind.FOLLOW) {
+            if (number > 1) {
+                EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = onBack)
+            }
+            if (step.kind == StepKind.FOLLOW && !arrivedReady) {
                 EtaText(
                     text = "Weiter geht es oben im Fenster.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textMuted,
+                    modifier = Modifier.weight(1f),
                 )
             } else {
                 Spacer(Modifier.weight(1f))

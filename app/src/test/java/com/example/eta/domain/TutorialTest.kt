@@ -16,6 +16,8 @@ import com.example.eta.domain.tutorial.TUTORIAL_MORNING
 import com.example.eta.domain.tutorial.TUTORIAL_WORK_ID
 import com.example.eta.domain.tutorial.TutorialClock
 import com.example.eta.domain.tutorial.TutorialFacts
+import com.example.eta.domain.tutorial.TutorialGate
+import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.domain.tutorial.TutorialStage
 import com.example.eta.domain.tutorial.exitTarget
@@ -233,11 +235,66 @@ class TutorialTest {
     }
 
     @Test
-    fun `the evening begins with the Tagesabschluss and nowhere else`() {
+    fun `the evening falls on the dashboard and its own button leads out of it`() {
         val evening = QUICKSTART.filter { it.evening }
 
+        // One step, the last of the dashboard: the user is told it is time and
+        // presses "Tag abschließen" themselves.
         assertEquals(1, evening.size)
-        assertEquals(QUICKSTART.first { it.stage == TutorialStage.REEVALUATION }, evening.single())
+        assertEquals(QUICKSTART.last { it.stage == TutorialStage.DASHBOARD }, evening.single())
+        assertEquals(StepKind.FOLLOW, evening.single().kind)
+        assertEquals(TutorialSpot.PHASE, evening.single().spot)
+
+        val index = QUICKSTART.indexOf(evening.single())
+        assertEquals(
+            QUICKSTART.indexOfFirst { it.stage == TutorialStage.REEVALUATION },
+            exitTarget(QUICKSTART, index, TutorialStage.DASHBOARD, TutorialFacts()),
+        )
+    }
+
+    @Test
+    fun `the planning hour of the practice setup is the hour the day jumps to`() {
+        assertEquals(TUTORIAL_EVENING, tutorialSetup(now).dailyPlanningTime)
+    }
+
+    @Test
+    fun `the mail ticked off holds the first evening step shut`() {
+        val step = QUICKSTART.first { it.title == "Tagesabschluss" }
+        val three = exampleDay().completing(TUTORIAL_DONE_IDS)
+        val four = exampleDay().completing(TUTORIAL_DONE_IDS + TUTORIAL_MAIL_ID)
+
+        assertTrue(step.ready(tutorialFacts(emptyList(), emptyList(), three, emptyList(), false)))
+        val facts = tutorialFacts(emptyList(), emptyList(), four, emptyList(), false)
+        assertFalse(step.ready(facts))
+        assertEquals(2, step.checks(facts).size)
+    }
+
+    @Test
+    fun `a screen's own buttons are opened by the step that asks for them and by no other`() {
+        fun opening(gate: String) = QUICKSTART.filter { gate in it.allow }.map { it.title }
+
+        assertEquals(listOf("Was nicht geklappt hat"), opening(TutorialGate.REEVALUATION_DISCARD + TUTORIAL_MAIL_ID))
+        assertEquals(listOf("Passt das noch?"), opening(TutorialGate.REEVALUATION_SETTLE))
+        assertEquals(listOf("Dauer"), opening(TutorialGate.CONCRETIZE_TODO))
+        assertEquals(listOf("Wiederholen bis"), opening(TutorialGate.CONCRETIZE_RECURRING))
+        assertEquals(listOf(QUICKSTART.last().title), opening(TutorialGate.PLANNER_CONFIRM))
+        assertEquals(listOf("Geschafft"), opening(TutorialGate.CONCRETIZE_DONE))
+        assertEquals(listOf("Die Woche steht"), opening(TutorialGate.WEEK_FINISH))
+        assertTrue(opening(TutorialGate.CONCRETIZE_DELETE).isEmpty())
+        assertTrue(opening(TutorialGate.REEVALUATION_DISMISS_MAKE_UP).isEmpty())
+        // The page of the Tagesabschluss turns only once every block is answered.
+        val firstTurn = QUICKSTART.indexOfFirst { TutorialGate.REEVALUATION_NEXT in it.allow }
+        assertTrue(firstTurn > QUICKSTART.indexOfFirst { it.title == "Höhere Gewalt" })
+    }
+
+    @Test
+    fun `höhere Gewalt is asked for after the mail was called off`() {
+        val step = QUICKSTART.first { it.title == "Höhere Gewalt" }
+        val called = exampleDay().changing(TUTORIAL_MAIL_ID) { it.copy(discardedAt = now, makeUpItemId = "x") }
+        val excused = called.changing(TUTORIAL_MAIL_ID) { it.copy(forceMajeure = "Der Mailserver war ausgefallen.") }
+
+        assertFalse(step.ready(tutorialFacts(emptyList(), emptyList(), called, emptyList(), false)))
+        assertTrue(step.ready(tutorialFacts(emptyList(), emptyList(), excused, emptyList(), false)))
     }
 
     @Test
@@ -254,7 +311,9 @@ class TutorialTest {
     fun `a day played through as asked leaves no task open`() {
         val todo = Item.newTodo("Katzenstreu kaufen", Category.NEBENBEI, Priority.WANT, null, 1.hours, now)
         val day = exampleDay().completing(TUTORIAL_DONE_IDS)
-            .changing(TUTORIAL_MAIL_ID) { it.copy(discardedAt = now, makeUpItemId = "x") }
+            .changing(TUTORIAL_MAIL_ID) {
+                it.copy(discardedAt = now, makeUpItemId = "x", forceMajeure = "Server")
+            }
         val dragged = BlockWithItem(
             PlannedBlock(
                 itemId = todo.id,
@@ -287,11 +346,11 @@ class TutorialTest {
 
         // "Fällt aus" tapped, the question still standing: wait for the answer.
         assertFalse(step.ready(facts.copy(signals = mapOf(TutorialSignal.OPEN_MAKE_UP_OFFERS to "1"))))
-        // Answered with "Lassen": it will not be asked again.
+        // The question gone without an answer: it will not be asked again.
         assertTrue(step.ready(facts.copy(signals = mapOf(TutorialSignal.OPEN_MAKE_UP_OFFERS to "0"))))
-        // Ticked off after all.
+        // Ticked off instead: not what the day was, and the tick can be taken back.
         val done = exampleDay().completing(setOf(TUTORIAL_MAIL_ID))
-        assertTrue(step.ready(tutorialFacts(emptyList(), emptyList(), done, emptyList(), false)))
+        assertFalse(step.ready(tutorialFacts(emptyList(), emptyList(), done, emptyList(), false)))
     }
 
     // --- the screens' own ways out ------------------------------------------
