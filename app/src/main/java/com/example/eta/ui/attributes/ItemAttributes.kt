@@ -59,6 +59,11 @@ import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
 import com.example.eta.ui.components.EtaStepper
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.LocalFeatures
+import com.example.eta.ui.components.EtaDatePickerDialog
+import com.example.eta.ui.format.formatWithYear
+import com.example.eta.domain.recurrence.rulesWithTimes
+import androidx.compose.runtime.key
 import com.example.eta.data.repository.RecurringEdit
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
@@ -126,8 +131,12 @@ private val PRIORITY_OPTIONS = listOf(
 data class TodoAttributes(
     val category: Category = Category.FOKUS,
     val priority: Priority = Priority.MUST,
-    /** Days from today. The stepper counts in days; the caller makes the date. */
-    val inDays: Int = 7,
+    /**
+     * "Freigeschaltet ab": the first day the card may be planned for. Null is
+     * "Heute" — free at once — and is stored as no date at all, so finishing a
+     * note that has waited three weeks does not move its one-month clock.
+     */
+    val unlockFrom: LocalDate? = null,
     val duration: Duration = DEFAULT_DURATION,
     val travelBefore: Duration? = null,
     val returnAfter: Duration? = null,
@@ -160,7 +169,9 @@ data class TodoAttributes(
         fun of(item: Item, today: LocalDate, subtasks: List<Subtask> = emptyList()) = TodoAttributes(
             category = item.category ?: Category.FOKUS,
             priority = item.priority ?: Priority.MUST,
-            inDays = item.targetDate?.let { today.daysUntil(it).coerceAtLeast(0) } ?: 7,
+            // Kept even when it has passed: the clock to the Sperrliste counts
+            // from it, and an edit that dropped it would wind that clock back.
+            unlockFrom = item.targetDate,
             duration = item.estimatedDuration ?: DEFAULT_DURATION,
             travelBefore = item.travelBefore,
             returnAfter = item.returnAfter,
@@ -194,6 +205,12 @@ data class RecurringAttributes(
     val endSound: Boolean = true,
     val extras: ItemExtras = ItemExtras(),
     val growth: GrowthSetting? = null,
+    /**
+     * "Abweichende Uhrzeiten": an hour of its own per weekday, or null while the
+     * box is unticked and every weekday starts at [startTime]. A weekday missing
+     * from the map — one ticked after the box was — starts at [startTime] too.
+     */
+    val startTimes: Map<DayOfWeek, LocalTime>? = null,
     /** The steps inside this task — see [TodoAttributes.subtasks]. */
     val subtasks: List<SubtaskDraft> = emptyList(),
     /** Tasks swallowed by the builder — see [TodoAttributes.foldedItemIds]. */
@@ -228,10 +245,23 @@ data class RecurringAttributes(
         )
     }
 
+    /** The hour [day] starts at. */
+    fun timeOn(day: DayOfWeek): LocalTime = ownStartTimes[day] ?: startTime
+
+    /**
+     * The hours that are really asked for: none while the box is unticked, and
+     * none for a single weekday, which has only the one hour to differ from.
+     */
+    val ownStartTimes: Map<DayOfWeek, LocalTime>
+        get() = startTimes?.takeIf { weekdays.size > 1 }?.filterKeys { it in weekdays }.orEmpty()
+
+    /** Whether the weekdays start at more than one hour. */
+    val hasOwnTimes: Boolean get() = weekdays.map(::timeOn).distinct().size > 1
+
     /** The slots these answers would lay down, for the overlap check. */
     fun slots(rhythm: Rhythm = Rhythm.Weekly): List<RecurringSlot> =
-        rhythm.rulesFor(weekdays).map { rule ->
-            RecurringSlot(rule, startTime, duration, travelBefore, returnAfter, breakAfter)
+        rulesWithTimes(rhythm, weekdays, startTime, ownStartTimes).map { (rule, start) ->
+            RecurringSlot(rule, start, duration, travelBefore, returnAfter, breakAfter)
         }
 }
 
@@ -308,21 +338,35 @@ fun TodoAttributeFields(
         )
     }
     if (showTargetDate) {
+        var picking by remember { mutableStateOf(false) }
+        val unlock = value.unlockFrom
+        val later = unlock != null && unlock > today
         EtaField(
-            label = "Zieldatum",
-            // The card unlocks a week early, which is worth saying out loud.
-            hint = "Am ${today.plus(DatePeriod(days = value.inDays)).formatLong()}. " +
-                "Planbar wird es eine Woche vorher.",
+            label = "Freigeschaltet ab",
+            hint = if (later) {
+                "Vorher lässt sich die Aufgabe nicht einplanen. Die Monatsfrist bis zur " +
+                    "Sperrliste läuft erst ab diesem Tag."
+            } else {
+                "Sofort planbar. Antippen, um einen späteren Tag zu wählen."
+            },
         ) {
-            EtaStepper(
-                value = when (value.inDays) {
-                    0 -> "heute"
-                    1 -> "morgen"
-                    else -> "in ${value.inDays} Tagen"
+            EtaButton(
+                text = if (unlock == null || unlock == today) "Heute" else unlock.formatWithYear(),
+                style = EtaButtonStyle.Secondary,
+                onClick = { picking = true },
+            )
+        }
+        if (picking) {
+            EtaDatePickerDialog(
+                title = "Freigeschaltet ab",
+                value = unlock ?: today,
+                today = today,
+                onDismiss = { picking = false },
+                onConfirm = { day ->
+                    // Today is "at once", and at once is no date.
+                    onChange(value.copy(unlockFrom = day.takeIf { it > today }))
+                    picking = false
                 },
-                valueWidth = 104.dp,
-                onDecrement = { onChange(value.copy(inDays = (value.inDays - 1).coerceAtLeast(0))) },
-                onIncrement = { onChange(value.copy(inDays = value.inDays + 1)) },
             )
         }
     }
@@ -407,6 +451,10 @@ fun RecurringAttributeFields(
     /** Tasks that can be folded into this one as steps. */
     foldCandidates: List<FoldCandidate> = emptyList(),
 ) {
+    // Out of sight with the Growth-Tasks feature — except on a task that already
+    // grows, which has to stay reachable so the growing can be switched off.
+    val offerGrowth = allowGrowth && (LocalFeatures.current.growthTasks || value.growth != null)
+
     EtaField(
         label = "Kategorie",
         hint = if (value.category == null && LocalPointsVisible.current) {
@@ -449,19 +497,61 @@ fun RecurringAttributeFields(
             days = WEEK,
         )
     }
-    EtaField(
-        label = if (value.growth?.dynamic == true) "Frühster Beginn" else "Beginn",
-        hint = if (value.growth?.dynamic == true) {
-            "Bei dynamischer Zeitsetzung die früheste Uhrzeit — ist sie belegt, " +
-                "beginnt die Aufgabe direkt danach."
-        } else {
-            null
-        },
-    ) {
-        EtaTimePicker(
-            value = value.startTime,
-            onValueChange = { onChange(value.copy(startTime = it)) },
+    // Only where there is more than one day to differ: with a single weekday
+    // the box would switch on a second picker for the same hour.
+    if (value.weekdays.size > 1) {
+        CheckRow(
+            checked = value.startTimes != null,
+            onCheckedChange = { on ->
+                onChange(
+                    value.copy(
+                        // Every day opens on the hour the form already had, so
+                        // ticking the box changes nothing until an hour is moved.
+                        startTimes = if (on) value.weekdays.associateWith { value.startTime } else null,
+                    ),
+                )
+            },
+            label = "Abweichende Uhrzeiten",
+            hint = "Wiederkehrende Tasks finden innerhalb einer Woche zu " +
+                "unterschiedlichen Zeiten statt.",
         )
+    }
+    val beginLabel = if (value.growth?.dynamic == true) "Frühster Beginn" else "Beginn"
+    val ownTimes = value.startTimes?.takeIf { value.weekdays.size > 1 }
+    if (ownTimes == null) {
+        EtaField(
+            label = beginLabel,
+            hint = if (value.growth?.dynamic == true) {
+                "Bei dynamischer Zeitsetzung die früheste Uhrzeit — ist sie belegt, " +
+                    "beginnt die Aufgabe direkt danach."
+            } else {
+                null
+            },
+        ) {
+            EtaTimePicker(
+                value = value.startTime,
+                onValueChange = { onChange(value.copy(startTime = it)) },
+            )
+        }
+    } else {
+        WEEK.filter { it in value.weekdays }.forEach { day ->
+            key(day) {
+                EtaField(label = "$beginLabel am ${day.formatLong()}") {
+                    EtaTimePicker(
+                        value = value.timeOn(day),
+                        onValueChange = { onChange(value.copy(startTimes = ownTimes + (day to it))) },
+                    )
+                }
+            }
+        }
+        if (value.hasOwnTimes) {
+            EtaText(
+                text = "Tage mit eigener Uhrzeit stehen danach als eigene Einträge in der " +
+                    "Liste und werden einzeln bearbeitet.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
     }
     if (value.growth == null) {
         EtaField(label = "Dauer") {
@@ -497,7 +587,9 @@ fun RecurringAttributeFields(
     // can cause it too but are read after.
     OverlapWarning(
         overlaps = overlaps,
-        findNextFree = findNextFree?.let { find -> { find(value) } },
+        // One free hour for every weekday is not an answer to a form that has
+        // just asked for several different ones.
+        findNextFree = findNextFree?.takeIf { !value.hasOwnTimes }?.let { find -> { find(value) } },
         onMoveTo = { onChange(value.copy(startTime = it)) },
     )
 
@@ -512,8 +604,8 @@ fun RecurringAttributeFields(
         onBreakAfter = { onChange(value.copy(breakAfter = it)) },
         extras = value.extras,
         onExtras = { onChange(value.copy(extras = it)) },
-        growth = if (allowGrowth) value.growth else null,
-        onGrowth = if (allowGrowth) {
+        growth = if (offerGrowth) value.growth else null,
+        onGrowth = if (offerGrowth) {
             { setting ->
                 onChange(
                     value.copy(
@@ -1465,6 +1557,7 @@ fun RecurringAttributes.toEdit(name: String, note: String?) = RecurringEdit(
     category = category,
     weekdays = weekdays,
     startTime = startTime,
+    startTimes = ownStartTimes,
     duration = duration,
     travelBefore = travelBefore,
     returnAfter = returnAfter,

@@ -143,6 +143,35 @@ sealed interface Rhythm {
 }
 
 /**
+ * The definitions a form asks for, each with the hour it starts at.
+ *
+ * Ordinarily every chosen weekday starts at [startTime] and [Rhythm.rulesFor]
+ * decides the rules — seven days collapsing into one daily definition. With
+ * **"Abweichende Uhrzeiten"** a weekday may carry an hour of its own in
+ * [startTimes], and then there is one rule per weekday even for all seven: a
+ * daily definition has one start time and could not hold two.
+ *
+ * Hours that turn out to be all the same are the ordinary case again, so ticking
+ * the box and changing nothing writes what leaving it unticked would have.
+ */
+fun rulesWithTimes(
+    rhythm: Rhythm,
+    weekdays: Set<DayOfWeek>,
+    startTime: LocalTime,
+    startTimes: Map<DayOfWeek, LocalTime> = emptyMap(),
+): List<Pair<RecurrenceRule, LocalTime>> {
+    val days = WEEK.filter { it in weekdays }
+    val times = days.map { startTimes[it] ?: startTime }
+    if (times.distinct().size <= 1) {
+        val common = times.firstOrNull() ?: startTime
+        return rhythm.rulesFor(weekdays).map { it to common }
+    }
+    return days.flatMapIndexed { index, day ->
+        rhythm.rulesFor(setOf(day)).map { it to times[index] }
+    }
+}
+
+/**
  * One standing task as the user thinks of it: "Arbeit, Mo–Fr, 9 bis 12:30".
  *
  * The model stores one definition per weekday, so that moving the Tuesday one

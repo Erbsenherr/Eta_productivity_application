@@ -87,7 +87,7 @@ class ConcretizeViewModel(
                 item = renamedIfNeeded(item, name),
                 category = attributes.category,
                 priority = attributes.priority,
-                targetDate = today.plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                targetDate = attributes.unlockFrom,
                 estimatedDuration = attributes.duration,
                 travelBefore = attributes.travelBefore,
                 returnAfter = attributes.returnAfter,
@@ -129,6 +129,7 @@ class ConcretizeViewModel(
                 growth = attributes.growth,
                 subtasks = attributes.subtasks,
                 folded = attributes.foldedItemIds,
+                startTimes = attributes.ownStartTimes,
             )
             scheduleMaintenance.topUp()
         }

@@ -44,7 +44,7 @@ import com.example.eta.domain.setup.UserSetup
         Reward::class,
         RewardTask::class,
     ],
-    version = 24,
+    version = 25,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -782,6 +782,43 @@ val MIGRATION_23_24 = object : Migration(23, 24) {
         )
         connection.execSQL(
             "ALTER TABLE `user_setup` ADD COLUMN `pointsSystem` INTEGER NOT NULL DEFAULT 1",
+        )
+    }
+}
+
+/**
+ * 24 -> 25: three more features that can be put out of sight, and a date that
+ * changed its meaning.
+ *
+ * - **`user_setup.growthTasks` / `contracts` / `rewards`**: `1` for every existing
+ *   row. A new setup starts with all of them off, but nobody who has contracts
+ *   running should find the tab gone after an update. `pointsSystem` is left as
+ *   it stands for the same reason.
+ * - **`items.targetDate`** used to be the day a ToDo was aimed at, unlocking a
+ *   week before; it is now the unlock day itself. Every ToDo still waiting to be
+ *   planned is moved a week earlier, so each unlocks on exactly the day it would
+ *   have — and, the one-month clock no longer starting before that day, none is
+ *   suddenly older than it was. Rows already on a day or finished are left alone:
+ *   nothing reads the date off them.
+ */
+val MIGRATION_24_25 = object : Migration(24, 25) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `growthTasks` INTEGER NOT NULL DEFAULT 1",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `contracts` INTEGER NOT NULL DEFAULT 1",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `rewards` INTEGER NOT NULL DEFAULT 1",
+        )
+        connection.execSQL(
+            """
+            UPDATE `items` SET `targetDate` = date(`targetDate`, '-7 days')
+            WHERE `targetDate` IS NOT NULL
+              AND `type` = 'TODO'
+              AND `stage` IN ('COLLECTION', 'WEEK')
+            """.trimIndent(),
         )
     }
 }

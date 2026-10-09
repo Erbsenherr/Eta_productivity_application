@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.data.repository.GrowthService
 import com.example.eta.data.repository.ItemRepository
-import com.example.eta.data.repository.RecurringEdit
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.domain.model.Item
@@ -12,6 +11,7 @@ import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.groupRecurring
 import com.example.eta.ui.attributes.RecurringAttributes
+import com.example.eta.ui.attributes.toEdit
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -88,22 +88,7 @@ class GrowthTasksViewModel(
         if (attributes.weekdays.isEmpty()) return
         viewModelScope.launch {
             recurringTaskService.createGroup(
-                edit = RecurringEdit(
-                    name = name,
-                    note = note,
-                    category = attributes.category,
-                    weekdays = attributes.weekdays,
-                    startTime = attributes.startTime,
-                    duration = attributes.duration,
-                    travelBefore = attributes.travelBefore,
-                    returnAfter = attributes.returnAfter,
-                    breakAfter = attributes.breakAfter,
-                    endSound = attributes.endSound,
-                    extras = attributes.extras,
-                    growth = attributes.growth,
-                    subtasks = attributes.subtasks,
-                    folded = attributes.foldedItemIds,
-                ),
+                edit = attributes.toEdit(name, note),
                 growthOrder = growthService.nextOrder(),
             )
         }
@@ -121,22 +106,7 @@ class GrowthTasksViewModel(
         viewModelScope.launch {
             recurringTaskService.saveGroup(
                 ids = group.ids,
-                edit = RecurringEdit(
-                    name = name,
-                    note = note,
-                    category = attributes.category,
-                    weekdays = attributes.weekdays,
-                    startTime = attributes.startTime,
-                    duration = attributes.duration,
-                    travelBefore = attributes.travelBefore,
-                    returnAfter = attributes.returnAfter,
-                    breakAfter = attributes.breakAfter,
-                    endSound = attributes.endSound,
-                    extras = attributes.extras,
-                    growth = attributes.growth,
-                    subtasks = attributes.subtasks,
-                    folded = attributes.foldedItemIds,
-                ),
+                edit = attributes.toEdit(name, note),
             )
         }
     }

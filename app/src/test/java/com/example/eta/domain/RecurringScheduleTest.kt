@@ -10,6 +10,7 @@ import com.example.eta.domain.recurrence.Rhythm
 import com.example.eta.domain.recurrence.groupRecurring
 import com.example.eta.domain.recurrence.reassignRows
 import com.example.eta.domain.recurrence.recurringOverlaps
+import com.example.eta.domain.recurrence.rulesWithTimes
 import com.example.eta.domain.recurrence.sharedWeekdays
 import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.domain.setup.UserSetup
@@ -31,6 +32,92 @@ import org.junit.Test
 class RecurringScheduleTest {
 
     private val now = Instant.parse("2026-09-01T06:00:00Z")
+
+    @Test
+    fun `without hours of their own every weekday starts at the one hour`() {
+        val timed = rulesWithTimes(Rhythm.Weekly, setOf(TUESDAY, THURSDAY), LocalTime(18, 0))
+
+        assertEquals(
+            listOf(
+                RecurrenceRule.Weekly(TUESDAY) to LocalTime(18, 0),
+                RecurrenceRule.Weekly(THURSDAY) to LocalTime(18, 0),
+            ),
+            timed,
+        )
+    }
+
+    @Test
+    fun `a weekday with an hour of its own gets it, the others keep the common one`() {
+        val timed = rulesWithTimes(
+            rhythm = Rhythm.Weekly,
+            weekdays = setOf(MONDAY, WEDNESDAY, FRIDAY),
+            startTime = LocalTime(18, 0),
+            startTimes = mapOf(WEDNESDAY to LocalTime(7, 30)),
+        )
+
+        assertEquals(
+            listOf(LocalTime(18, 0), LocalTime(7, 30), LocalTime(18, 0)),
+            timed.map { it.second },
+        )
+        assertEquals(
+            listOf(MONDAY, WEDNESDAY, FRIDAY).map { RecurrenceRule.Weekly(it) },
+            timed.map { it.first },
+        )
+    }
+
+    @Test
+    fun `all seven days stay one daily rule until one of them differs`() {
+        val week = kotlinx.datetime.DayOfWeek.entries.toSet()
+
+        val same = rulesWithTimes(Rhythm.Weekly, week, LocalTime(8, 0))
+        assertEquals(listOf(RecurrenceRule.Daily to LocalTime(8, 0)), same)
+
+        // A daily definition has one start time and could not hold two.
+        val differing = rulesWithTimes(
+            Rhythm.Weekly, week, LocalTime(8, 0), mapOf(MONDAY to LocalTime(6, 0)),
+        )
+        assertEquals(7, differing.size)
+        assertTrue(differing.none { it.first == RecurrenceRule.Daily })
+        assertEquals(LocalTime(6, 0), differing.first().second)
+    }
+
+    @Test
+    fun `hours that are all the same are the ordinary case again`() {
+        val week = kotlinx.datetime.DayOfWeek.entries.toSet()
+
+        val timed = rulesWithTimes(
+            Rhythm.Weekly, week, LocalTime(8, 0), week.associateWith { LocalTime(9, 0) },
+        )
+
+        assertEquals(listOf(RecurrenceRule.Daily to LocalTime(9, 0)), timed)
+    }
+
+    @Test
+    fun `a fortnightly rhythm keeps its parity on every weekday with its own hour`() {
+        val timed = rulesWithTimes(
+            rhythm = Rhythm.Biweekly(WeekParity.EVEN),
+            weekdays = setOf(TUESDAY, THURSDAY),
+            startTime = LocalTime(18, 0),
+            startTimes = mapOf(THURSDAY to LocalTime(20, 0)),
+        )
+
+        assertEquals(
+            listOf(
+                RecurrenceRule.Biweekly(TUESDAY, WeekParity.EVEN) to LocalTime(18, 0),
+                RecurrenceRule.Biweekly(THURSDAY, WeekParity.EVEN) to LocalTime(20, 0),
+            ),
+            timed,
+        )
+    }
+
+    @Test
+    fun `an hour for a weekday that is not chosen is ignored`() {
+        val timed = rulesWithTimes(
+            Rhythm.Weekly, setOf(TUESDAY), LocalTime(18, 0), mapOf(FRIDAY to LocalTime(6, 0)),
+        )
+
+        assertEquals(listOf(RecurrenceRule.Weekly(TUESDAY) to LocalTime(18, 0)), timed)
+    }
 
     private fun def(
         id: String,

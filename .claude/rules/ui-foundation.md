@@ -29,8 +29,9 @@ drawn — so hit testing and drawing share one coordinate system. In hour mode i
 carries two rings, 1–12 outside and 13–24 inside, chosen by distance from the
 centre; minutes snap to five. `EtaTimePickerDialog` was extracted from it so a list
 row can offer a clock without a full picker field swamping the list. Durations keep
-the `EtaStepper`, since a length is not a point on a clock face. There is **no date
-picker**, which is why a date is always a day stepper with ±1-week buttons.
+the `EtaStepper`, since a length is not a point on a clock face. There was **no date
+picker** until step 36, which is why most dates are still a day stepper with ±1-week
+buttons; `EtaDatePickerDialog` is the calendar, used for "Freigeschaltet ab".
 
 Four tokens carry meaning, not taste: `shapes.draggedBlock` (rounded) versus
 `shapes.fixedBlock` (square) is how the planner shows whether a block was placed by
@@ -55,7 +56,8 @@ setup, `MainScaffold` splits everything into **tabs** and **flows**, and that sp
 is the point:
 
 - A **tab** is a place you can always get back to — Heute, Listen, Verträge,
-  Erinnerungen, Growth-Tasks, Belohn-o-mat, Einstellungen, in that order since step 35 — so `EtaTabBar` stays put beneath it.
+  Erinnerungen, Growth-Tasks, Belohn-o-mat, Einstellungen, in that order since step 35;
+  Verträge, Growth-Tasks and Belohn-o-mat only while their feature is switched on (*Step 36*) — so `EtaTabBar` stays put beneath it.
 - A **flow** is something you are in the middle of: a planning phase, the
   concretizing step, the holiday editor. It covers the bar and leaves by finishing
   or by going back.

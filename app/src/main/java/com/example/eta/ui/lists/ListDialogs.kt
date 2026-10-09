@@ -159,7 +159,7 @@ fun ItemDetailDialog(
             item.priority?.let { add(it.formatLong()) }
             item.estimatedDuration?.let { add(it.formatShort()) }
             item.startTime?.let { add("ab ${it.formatClock()}") }
-            item.targetDate?.let { add("Ziel: ${it.formatLong()}") }
+            item.targetDate?.let { add("Frei ab: ${it.formatLong()}") }
             item.deadlineAt?.let {
                 val at = it.toLocalDateTime(TimeZone.currentSystemDefault())
                 add("Deadline: ${at.date.formatLong()} ${at.time.formatClock()}")

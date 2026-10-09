@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.eta.domain.model.WeekParity
@@ -26,6 +30,7 @@ import com.example.eta.domain.setup.sleepDuration
 import com.example.eta.domain.setup.suggestedWeekendNight
 import com.example.eta.domain.setup.weekdayNight
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDurationPicker
@@ -470,14 +475,57 @@ fun SportStep(draft: UserSetup, onChange: OnSetupChange) {
     }
 }
 
+/**
+ * What "Freizeit" means here, said once, on the page that asks for it.
+ *
+ * The word invites the wrong answer: someone who likes their sport books it as
+ * free time, and then the one stretch of the day that was meant to be left open
+ * is the first thing with an appointment in it.
+ */
+@Composable
+private fun FreeTimeInfoDialog(onDismiss: () -> Unit) {
+    EtaDialog(title = "Was ist Freizeit?", onDismiss = onDismiss) {
+        EtaText(
+            text = "Freizeit ist ungeplante Zeit. Hier machst du, worauf du gerade Lust " +
+                "hast — ohne dass es vorher feststeht.",
+            style = EtaTheme.typography.body,
+        )
+        EtaText(
+            text = "Nicht zu verwechseln mit Aufgaben wie Sport: Die machst du vielleicht " +
+                "gern, sie sollen aber regelmäßig stattfinden und bekommen deshalb ihren " +
+                "eigenen festen Platz im Plan. Freizeit ist das, was übrig bleiben darf.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        Row {
+            Spacer(Modifier.weight(1f))
+            EtaButton(text = "Verstanden", onClick = onDismiss)
+        }
+    }
+}
+
 @Composable
 fun FreeTimeStep(draft: UserSetup, onChange: OnSetupChange) {
     StepCard(
         title = "Freie Zeit",
-        description = "Die Mindestzeit pro Tag, die dir außerhalb der Pausen gehört. " +
-            "Verzichtest du später darauf, schreibt dir das Punkte gut.",
+        // The sentence about points only where there are points: the tracker is
+        // off for a new setup, and a reward nobody has heard of explains nothing.
+        description = "Die Mindestzeit pro Tag, die dir außerhalb der Pausen gehört." +
+            if (draft.pointsSystem) {
+                " Verzichtest du später darauf, schreibt dir das Punkte gut."
+            } else {
+                ""
+            },
     ) {
+        var explaining by remember { mutableStateOf(false) }
+        if (explaining) FreeTimeInfoDialog(onDismiss = { explaining = false })
+
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg)) {
+            EtaButton(
+                text = "ⓘ Was zählt als Freizeit?",
+                style = EtaButtonStyle.Secondary,
+                onClick = { explaining = true },
+            )
             EtaField(label = "Ab wann") {
                 EtaTimePicker(
                     value = draft.freeTime.start,

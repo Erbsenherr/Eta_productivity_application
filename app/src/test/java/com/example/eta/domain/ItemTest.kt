@@ -20,7 +20,7 @@ class ItemTest {
     private val now = Instant.fromEpochSeconds(0)
 
     @Test
-    fun `a todo unlocks one week before its target date`() {
+    fun `a todo unlocks on the day it says, not a week before`() {
         val item = Item.newTodo(
             name = "Steuererklärung",
             category = Category.FOKUS,
@@ -29,7 +29,9 @@ class ItemTest {
             estimatedDuration = 3.hours,
             now = now,
         )
-        assertEquals(LocalDate(2026, 8, 14), item.availableFrom)
+        assertEquals(LocalDate(2026, 8, 21), item.availableFrom)
+        assertEquals(false, item.isAvailableOn(LocalDate(2026, 8, 20)))
+        assertEquals(true, item.isAvailableOn(LocalDate(2026, 8, 21)))
     }
 
     @Test

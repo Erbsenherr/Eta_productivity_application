@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (510 tests
-as of step 35), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (525 tests
+as of step 36), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -81,6 +81,19 @@ $out = "dist\eta-release-$(Get-Date -Format 'yyyy-MM-dd-HHmm').apk"
   apksigner's and can be ignored. Old APKs stay — `dist/` is the history.
 - Say in the closing message which file it is. A session that only touched
   documentation builds none.
+
+### …and patch notes
+
+**Every session that changed something a user can see also writes a file into
+`patchnotes/`**, without being asked: `patchnotes/<date>-<time>.md`, the same stamp
+the APK carries, written after signing so the two match. It is **for the people
+using the app** — the user hands it to their testers — so it is in German, says what
+changed and where to find it, and leaves out everything about how it was built.
+Sections as they apply: *Neu*, *Geändert*, *Behoben*, *Gut zu wissen*.
+
+**Do not read `patchnotes/` for context.** Nothing in it is a source of truth: the
+rules live in `Eta_doc/` and `.claude/rules/`, and the notes are a retelling for
+another audience. Write the new file and leave the old ones alone.
 
 ### …and a push
 
@@ -238,7 +251,8 @@ reevaluation would keep re-asking about occurrences the user already dismissed.
 - **Deadline / Spend** → nothing further.
 
 A null `targetDate` means "available immediately" — use `Item.isAvailableOn(date)`
-rather than comparing against `availableFrom` directly.
+rather than comparing against `availableFrom` directly. Since step 36 `targetDate`
+*is* the unlock day ("Freigeschaltet ab"), no longer a day aimed at — see *Step 36*.
 
 ### Erfolgsliste comes from blocks, not from `Stage.DONE`
 
@@ -275,7 +289,9 @@ see *Step 35*.
 
 **The points system can be put out of sight** (`UserSetup.pointsSystem`), which
 hides every figure and books everything exactly as before. A screen that shows a
-figure in points reads `LocalPointsVisible` — see *Step 35*.
+figure in points reads `LocalPointsVisible` — see *Step 35*. It is one of four
+"Advanced Features", **all off for a new setup**; Growth-Tasks, Verträge and the
+Belohn-o-mat are the others and are read through `LocalFeatures` — see *Step 36*.
 
 `yieldOf(item, block)` in `domain/reward/Yield.kt` is the single place points are
 computed. It keys off the block, bills `actualDuration` when the user corrected it
@@ -349,6 +365,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-33-small-ones.md` | *Step 33*: the long press in "Heute anstehend", holding "Absagen" for höhere Gewalt (`EtaHoldButton`), "Wiederholen bis" (`Item.repeatUntil`) |
 | `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
 | `step-35-belohnomat.md` | *Step 35*: the Belohn-o-mat (`Reward`, `pourInto`, Aufgabenbindung, the evening's fill page, placeholder sounds), the points system out of sight (`UserSetup.pointsSystem`, `LocalPointsVisible`), the long press on three list headings |
+| `step-36-advanced-features.md` | *Step 36*: Advanced Features (`LocalFeatures`, the four switches, applied at once), "Freigeschaltet ab" (`targetDate`'s new meaning, `collectionClockStart`, `EtaDatePickerDialog`), Abweichende Uhrzeiten (`rulesWithTimes`), the Sperrliste last, the free-time info button |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -404,7 +421,8 @@ screen · 31. Folds that are remembered, and a "Gerade" box as tall as its text 
 32. The questionnaire reordered, skippable pages and a weekend night ·
 33. A weekend of one's own choosing, "Wiederholen bis", höhere Gewalt by holding,
 and a broken contract's way back · 34. The Routine-Modus, and a morning that
-is one · 35. The Belohn-o-mat, points out of sight, and three long presses.
+is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
+36. Advanced Features, "Freigeschaltet ab", and hours of their own.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 24.** When changing an entity, diff the hand-written SQL against the
+**Version 25.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -36,6 +36,7 @@ Room stores enums by name in a TEXT column.
 | 21→22 | `user_setup.weekendDays` (`TEXT NOT NULL DEFAULT 'SATURDAY,SUNDAY'`, weekday names in week order), `items.repeatUntil` and `contracts.probationKeptSince` (both `TEXT`, nullable, ISO dates) — see *Step 33* |
 | 22→23 | `items.routineMode` (`INTEGER NOT NULL DEFAULT 0`); the questionnaire's morning rows get it switched on, and those still named "Morgenzeit" are renamed "Morgenroutine" — see *Step 34* |
 | 23→24 | `rewards` and `reward_tasks` (`rewardId` cascades, `itemId` is a plain column on purpose), `user_setup.pointsSystem` (`INTEGER NOT NULL DEFAULT 1`) — see *Step 35* |
+| 24→25 | `user_setup.growthTasks` / `contracts` / `rewards` (`INTEGER NOT NULL DEFAULT 1` — on for whoever upgrades, off for a new setup), and every waiting ToDo's `targetDate` moved a week earlier, the column having become the unlock day — see *Step 36* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

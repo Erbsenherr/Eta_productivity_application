@@ -6,6 +6,7 @@ import kotlin.time.Instant
 import kotlinx.datetime.DateTimePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.daysUntil
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -28,15 +29,29 @@ fun collectionTimeoutThreshold(now: Instant, timeZone: TimeZone): Instant =
     now.minus(DateTimePeriod(months = COLLECTION_TIMEOUT_MONTHS), timeZone)
 
 /**
- * True once the item has sat in the Sammelliste past the timeout.
+ * When the one-month clock starts for this item, or null when it has none.
  *
- * Measured from [Item.enteredCollectionAt], not [Item.updatedAt] — editing a ToDo
- * must not buy it another month.
+ * [Item.enteredCollectionAt] — not [Item.updatedAt]: editing a ToDo must not buy
+ * it another month — **or the day it is unlocked from, where that is later**. A
+ * card that says "not before March" cannot be planned before March, and banning
+ * it in February for not having been planned would punish the user for the app's
+ * own rule. So the month is counted from the first day it could have been used.
+ *
+ * The two queries that look for old entries still filter on `enteredCollectionAt`
+ * alone. That is a superset — this is never earlier — and each caller narrows it
+ * here, so the calendar-aware rule stays in one place.
  */
+fun Item.collectionClockStart(timeZone: TimeZone): Instant? {
+    val entered = enteredCollectionAt ?: return null
+    val unlocked = availableFrom?.atStartOfDayIn(timeZone) ?: return entered
+    return maxOf(entered, unlocked)
+}
+
+/** True once the item has sat in the Sammelliste past the timeout. */
 fun Item.isStaleInCollection(now: Instant, timeZone: TimeZone): Boolean {
     if (stage != Stage.COLLECTION) return false
-    val entered = enteredCollectionAt ?: return false
-    val deadline = entered.plus(DateTimePeriod(months = COLLECTION_TIMEOUT_MONTHS), timeZone)
+    val start = collectionClockStart(timeZone) ?: return false
+    val deadline = start.plus(DateTimePeriod(months = COLLECTION_TIMEOUT_MONTHS), timeZone)
     return now >= deadline
 }
 
@@ -46,8 +61,8 @@ fun Item.isStaleInCollection(now: Instant, timeZone: TimeZone): Boolean {
  */
 fun Item.banDate(timeZone: TimeZone): LocalDate? {
     if (stage != Stage.COLLECTION) return null
-    val entered = enteredCollectionAt ?: return null
-    return entered
+    val start = collectionClockStart(timeZone) ?: return null
+    return start
         .plus(DateTimePeriod(months = COLLECTION_TIMEOUT_MONTHS), timeZone)
         .toLocalDateTime(timeZone)
         .date

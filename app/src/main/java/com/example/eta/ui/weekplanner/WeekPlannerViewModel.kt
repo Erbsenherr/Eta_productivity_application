@@ -188,8 +188,7 @@ class WeekPlannerViewModel(
                     name = name,
                     category = attributes.category,
                     priority = attributes.priority,
-                    targetDate = weekPlanningService.today()
-                        .plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                    targetDate = attributes.unlockFrom,
                     estimatedDuration = attributes.duration,
                     now = now,
                 ).copy(

@@ -11,7 +11,8 @@ import com.example.eta.domain.model.Priority
 import com.example.eta.domain.model.Stage
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.model.normalizeName
-import com.example.eta.domain.recurrence.rulesForWeekdays
+import com.example.eta.domain.recurrence.Rhythm
+import com.example.eta.domain.recurrence.rulesWithTimes
 import com.example.eta.domain.staging.collectionTimeoutThreshold
 import com.example.eta.domain.staging.criticalThreshold
 import com.example.eta.domain.staging.isCriticalInCollection
@@ -150,7 +151,7 @@ class ItemRepository(
         item: Item,
         category: Category,
         priority: Priority,
-        targetDate: LocalDate,
+        targetDate: LocalDate?,
         estimatedDuration: Duration,
         travelBefore: Duration? = null,
         returnAfter: Duration? = null,
@@ -202,9 +203,11 @@ class ItemRepository(
         growth: GrowthSetting? = null,
         subtasks: List<SubtaskDraft>? = null,
         folded: Collection<String> = emptyList(),
+        /** Hours of their own for single weekdays; see `rulesWithTimes`. */
+        startTimes: Map<DayOfWeek, LocalTime> = emptyMap(),
     ) {
-        val rules = rulesForWeekdays(weekdays)
-        if (rules.isEmpty()) return
+        val timed = rulesWithTimes(Rhythm.Weekly, weekdays, startTime, startTimes)
+        if (timed.isEmpty()) return
 
         val now = clock.now()
         val base = item.copy(
@@ -223,11 +226,13 @@ class ItemRepository(
             // Last, because for a growth task the length belongs to growing
             // rather than to the form above it.
             .withGrowth(growth)
-        val written = listOf(base.copy(recurrenceRule = rules.first())) +
-            rules.drop(1).map { rule ->
+        val (firstRule, firstStart) = timed.first()
+        val written = listOf(base.copy(recurrenceRule = firstRule, startTime = firstStart)) +
+            timed.drop(1).map { (rule, start) ->
                 base.copy(
                     id = UUID.randomUUID().toString(),
                     recurrenceRule = rule,
+                    startTime = start,
                     createdAt = now,
                 )
             }

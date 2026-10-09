@@ -51,7 +51,15 @@ data class Item(
      */
     val note: String? = null,
     val priority: Priority? = null,
-    /** TODO only: the date the user is aiming for. Unlocks a week earlier, see [availableFrom]. */
+    /**
+     * TODO only: "Freigeschaltet ab" — the first day this may be planned for.
+     * Null is "at once".
+     *
+     * The column is still called `targetDate`, from when it was the day the user
+     * was aiming for and the card unlocked a week before it. Since step 36 it is
+     * the unlock day itself — see [availableFrom] — and the one-month clock to
+     * the Sperrliste does not start before it.
+     */
     val targetDate: LocalDate? = null,
     /** Planning estimate for TODO/RECURRING. The value actually earned comes from the block. */
     val estimatedDuration: Duration? = null,
@@ -176,9 +184,9 @@ data class Item(
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
-    /** ToDos become draggable in the weekly planner one week before their target date. */
+    /** The first day a ToDo may be planned for; null when it is free at once. */
     @get:Ignore
-    val availableFrom: LocalDate? get() = targetDate?.minus(DatePeriod(days = 7))
+    val availableFrom: LocalDate? get() = targetDate
 
     /**
      * Whether this may be pulled into a plan for [date]. A ToDo without a target
@@ -220,7 +228,7 @@ data class Item(
     fun concretized(
         category: Category,
         priority: Priority,
-        targetDate: LocalDate,
+        targetDate: LocalDate?,
         estimatedDuration: Duration,
         travelBefore: Duration? = this.travelBefore,
         returnAfter: Duration? = this.returnAfter,
@@ -365,7 +373,7 @@ data class Item(
             name: String,
             category: Category,
             priority: Priority,
-            targetDate: LocalDate,
+            targetDate: LocalDate?,
             estimatedDuration: Duration,
             now: Instant,
         ) = Item(

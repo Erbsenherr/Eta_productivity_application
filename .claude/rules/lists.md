@@ -5,6 +5,9 @@ paths:
 
 ### The "Smart toDos" (Listen) tab
 
+**The Sperrliste is the last box** since step 36, after Termine, at the user's
+request; the order of the others is `Konzept.md`'s.
+
 `ui/lists/` shows the six lists of `Konzept.md` stacked on one screen, and is
 **read-only about placement** — since step 35 with three long presses that *make*
 something new, under the rules of the list it is made for; see *Step 35*. It is read-only because every one of these lists is what a phase left behind

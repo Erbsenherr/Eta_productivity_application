@@ -141,6 +141,19 @@ class SettingsViewModel(
     }
 
     /**
+     * Flips an "Advanced Features" switch, at once.
+     *
+     * Written straight to the stored setup rather than waiting for "Einrichtung
+     * sichern": the switch that hid the account used to do nothing until that
+     * button was found and pressed, which read as a switch that did not work.
+     * The draft is changed too, or the next save would write the old answer back.
+     */
+    fun setFeature(transform: (UserSetup) -> UserSetup) {
+        _draft.update { it?.let(transform) }
+        viewModelScope.launch { setupRepository.update(transform) }
+    }
+
+    /**
      * Saves the standing configuration.
      *
      * Not through `complete`, the questionnaire's path: that regenerates every

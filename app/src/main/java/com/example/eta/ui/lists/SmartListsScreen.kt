@@ -110,26 +110,6 @@ fun SmartListsScreen(
             }
 
             ListCard(
-                section = ListSection.SPERRLISTE,
-                count = state.locked.size,
-                collapsed = ListSection.SPERRLISTE in collapsed,
-                onToggle = ::toggle,
-                emptyHint = "Nichts gesperrt.",
-            ) {
-                state.locked.forEach { entry ->
-                    val detail = entry.until?.let { "bis ${it.formatLong()}" } ?: "gesperrt"
-                    ItemLine(
-                        item = entry.item,
-                        detail = detail,
-                        detailColor = EtaTheme.colors.danger,
-                        // Read-only: the ban is a rule with a date on it, not a
-                        // card whose attributes are up for correction.
-                        onOpen = { opened = OpenedRow(entry.item, detail, editable = false) },
-                    )
-                }
-            }
-
-            ListCard(
                 section = ListSection.SAMMELLISTE,
                 count = state.collection.size,
                 collapsed = ListSection.SAMMELLISTE in collapsed,
@@ -275,6 +255,27 @@ fun SmartListsScreen(
                         detailColor = EtaTheme.colors.calendar,
                         // A block, like the Tagesliste's: the planner owns when it
                         // happens, so there is nothing to correct from here.
+                        onOpen = { opened = OpenedRow(entry.item, detail, editable = false) },
+                    )
+                }
+            }
+
+            // Last, as asked: a ban is the list least often looked at.
+            ListCard(
+                section = ListSection.SPERRLISTE,
+                count = state.locked.size,
+                collapsed = ListSection.SPERRLISTE in collapsed,
+                onToggle = ::toggle,
+                emptyHint = "Nichts gesperrt.",
+            ) {
+                state.locked.forEach { entry ->
+                    val detail = entry.until?.let { "bis ${it.formatLong()}" } ?: "gesperrt"
+                    ItemLine(
+                        item = entry.item,
+                        detail = detail,
+                        detailColor = EtaTheme.colors.danger,
+                        // Read-only: the ban is a rule with a date on it, not a
+                        // card whose attributes are up for correction.
                         onOpen = { opened = OpenedRow(entry.item, detail, editable = false) },
                     )
                 }
@@ -522,7 +523,6 @@ private fun blockDetail(entry: BlockWithItem): String = buildString {
  * nowhere. Last in the order because it is the one that looks furthest ahead.
  */
 private enum class ListSection(val title: String, val subtitle: String) {
-    SPERRLISTE("Sperrliste", "Ein halbes Jahr gesperrt"),
     SAMMELLISTE("Sammelliste", "Alles Notierte"),
     WOCHENLISTE("Wochenliste", "Für diese Woche vorgenommen"),
     WIEDERKEHREND("Wiederkehrende Aufgaben", "Der feste Wochenplan"),
@@ -530,6 +530,7 @@ private enum class ListSection(val title: String, val subtitle: String) {
     MORGEN("Liste für Morgen", "Bestätigte Planung"),
     ERFOLG("Erfolgsliste", "Abgehakt, mit Datum und Uhrzeit"),
     TERMINE("Termine", "Aus dem Kalender, für spätere Tage"),
+    SPERRLISTE("Sperrliste", "Ein halbes Jahr gesperrt"),
 }
 
 @Composable

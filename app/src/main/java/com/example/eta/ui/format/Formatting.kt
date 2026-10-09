@@ -122,3 +122,9 @@ fun formatPoints(value: Double): String {
 /** A change of points: "+1.5", "-5", "0". The minus comes from [formatPoints]. */
 fun formatSignedPoints(value: Double): String =
     formatPoints(value).let { if (value > 0 && it != "0") "+$it" else it }
+
+/** "Sa, 22. August 2027" — for a date that may lie in another year. */
+fun LocalDate.formatWithYear(): String = "${formatLong()} $year"
+
+/** "August 2027" */
+fun LocalDate.formatMonthYear(): String = "${MONTHS[month.ordinal]} $year"

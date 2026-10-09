@@ -42,6 +42,7 @@ import com.example.eta.data.repository.RewardOutlook
 import com.example.eta.domain.model.REWARD_EPSILON
 import com.example.eta.domain.model.Reward
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.LocalFeatures
 import kotlinx.coroutines.delay
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.planning.cancellationCharged
@@ -98,10 +99,14 @@ fun ReevaluationScreen(
     // by "Abschließen", exactly as before. And the Belohn-o-mat has a page only
     // while there is a reward to watch fill.
     val pointsVisible = LocalPointsVisible.current
-    val filling = state.rewards?.head != null
-    val steps = remember(pointsVisible, filling) {
+    val features = LocalFeatures.current
+    val filling = state.rewards?.head != null && features.rewards
+    val steps = remember(pointsVisible, filling, features.contracts) {
         Step.entries.filter { step ->
             when (step) {
+                // Not asked while the contracts are out of sight; an unanswered
+                // contract counts as kept, which is the default it always had.
+                Step.CONTRACTS -> features.contracts
                 Step.REWARD -> pointsVisible
                 Step.REWARD_FILL -> filling
                 else -> true

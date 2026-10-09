@@ -6,6 +6,7 @@ import com.example.eta.domain.staging.banDate
 import com.example.eta.domain.staging.criticalThreshold
 import com.example.eta.domain.staging.daysUntilBan
 import com.example.eta.domain.staging.isCriticalInCollection
+import com.example.eta.domain.staging.isStaleInCollection
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -24,6 +25,24 @@ class CriticalTodoTest {
     @Test
     fun `the ban date sits one month after entering the Sammelliste`() {
         assertEquals(LocalDate(2026, 2, 10), item.banDate(tz))
+    }
+
+    @Test
+    fun `the month counts from the unlock day where that is later`() {
+        // Written down on the tenth of January, not to be touched before March:
+        // it could not have been planned in February, so it is not banned then.
+        val later = item.copy(targetDate = LocalDate(2026, 3, 1))
+
+        assertEquals(LocalDate(2026, 4, 1), later.banDate(tz))
+        assertFalse(later.isStaleInCollection(Instant.parse("2026-03-20T12:00:00Z"), tz))
+        assertTrue(later.isStaleInCollection(Instant.parse("2026-04-01T12:00:00Z"), tz))
+    }
+
+    @Test
+    fun `an unlock day before the card was written down changes nothing`() {
+        val earlier = item.copy(targetDate = LocalDate(2025, 12, 1))
+
+        assertEquals(LocalDate(2026, 2, 10), earlier.banDate(tz))
     }
 
     @Test

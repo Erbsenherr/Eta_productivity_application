@@ -390,8 +390,26 @@ data class UserSetup(
      * settlement page and every figure in points — and nothing else: the ledger
      * is written exactly as before, so switching it back on shows the balance as
      * if it had never been away. Read by the screens through `LocalPointsVisible`.
+     *
+     * The first of the four "Advanced Features". All four are **off for a new
+     * setup**, so someone meeting the app for the first time finds three tabs
+     * and no account to puzzle over; whoever was already using them keeps them,
+     * the migration having switched every existing row on.
      */
-    val pointsSystem: Boolean = true,
+    val pointsSystem: Boolean = false,
+    /**
+     * Whether the Growth-Tasks tab and the Growth-Task extra are on show. Off
+     * hides them; a task that already grows goes on growing.
+     */
+    val growthTasks: Boolean = false,
+    /**
+     * Whether the Verträge tab and the evening's contract question are on show.
+     * Off hides both; a running contract then counts as kept, which is what a
+     * question left unanswered always meant.
+     */
+    val contracts: Boolean = false,
+    /** Whether the Belohn-o-mat tab and its evening page are on show. Rewards fill either way. */
+    val rewards: Boolean = false,
     val completedAt: Instant,
     val updatedAt: Instant,
 ) {

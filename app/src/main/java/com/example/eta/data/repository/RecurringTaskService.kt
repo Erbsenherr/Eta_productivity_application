@@ -12,6 +12,7 @@ import com.example.eta.domain.model.withExtras
 import com.example.eta.domain.recurrence.Rhythm
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.recurrence.reassignRows
+import com.example.eta.domain.recurrence.rulesWithTimes
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,11 @@ data class RecurringEdit(
     val category: Category?,
     val weekdays: Set<DayOfWeek>,
     val startTime: LocalTime,
+    /**
+     * Hours of their own for single weekdays — "Abweichende Uhrzeiten". Empty is
+     * the ordinary case, every weekday at [startTime]. See `rulesWithTimes`.
+     */
+    val startTimes: Map<DayOfWeek, LocalTime> = emptyMap(),
     val duration: Duration,
     val travelBefore: Duration?,
     val returnAfter: Duration?,
@@ -107,7 +113,8 @@ class RecurringTaskService(
         val existing = ids.mapNotNull { itemDao.findById(it) }.filter { it.completedAt == null }
         val representative = existing.firstOrNull() ?: return
         val rhythm = Rhythm.of(representative.recurrenceRule ?: return)
-        val rules = rhythm.rulesFor(edit.weekdays)
+        val timed = rulesWithTimes(rhythm, edit.weekdays, edit.startTime, edit.startTimes)
+        val rules = timed.map { it.first }
         if (rules.isEmpty()) return
 
         val now = clock.now()
@@ -119,7 +126,9 @@ class RecurringTaskService(
         } else {
             representative
         }
-        val written = assigned.map { (id, rule) ->
+        // `reassignRows` answers in the order of the rules it was given, which is
+        // the order of their hours.
+        val written = assigned.mapIndexed { index, (id, rule) ->
             val row = byId[id]
             renamed.copy(
                 id = id,
@@ -131,7 +140,7 @@ class RecurringTaskService(
                 note = edit.note,
                 category = edit.category,
                 recurrenceRule = rule,
-                startTime = edit.startTime,
+                startTime = timed[index].second,
                 estimatedDuration = edit.duration,
                 travelBefore = edit.travelBefore,
                 returnAfter = edit.returnAfter,
@@ -168,8 +177,8 @@ class RecurringTaskService(
         rhythm: Rhythm = Rhythm.Weekly,
         growthOrder: Int? = null,
     ): List<String> {
-        val rules = rhythm.rulesFor(edit.weekdays)
-        if (rules.isEmpty()) return emptyList()
+        val timed = rulesWithTimes(rhythm, edit.weekdays, edit.startTime, edit.startTimes)
+        if (timed.isEmpty()) return emptyList()
 
         val now = clock.now()
         val base = Item(
@@ -191,8 +200,8 @@ class RecurringTaskService(
             .withExtras(edit.extras)
             .withGrowth(edit.growth)
 
-        val rows = rules.map { rule ->
-            base.copy(id = UUID.randomUUID().toString(), recurrenceRule = rule)
+        val rows = timed.map { (rule, start) ->
+            base.copy(id = UUID.randomUUID().toString(), recurrenceRule = rule, startTime = start)
         }
         itemDao.upsertAll(rows)
         edit.subtasks?.let { drafts -> rows.forEach { subtaskRepository.save(it.id, drafts) } }

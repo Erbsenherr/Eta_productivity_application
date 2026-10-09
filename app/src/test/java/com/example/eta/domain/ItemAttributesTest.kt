@@ -75,7 +75,7 @@ class ItemAttributesTest {
 
         assertEquals(Category.NEBENBEI, attributes.category)
         assertEquals(Priority.WANT, attributes.priority)
-        assertEquals(3, attributes.inDays)
+        assertEquals(LocalDate(2026, 9, 4), attributes.unlockFrom)
         assertEquals(90.minutes, attributes.duration)
         assertEquals(15.minutes, attributes.travelBefore)
         assertEquals(20.minutes, attributes.breakAfter)
@@ -83,7 +83,7 @@ class ItemAttributesTest {
     }
 
     @Test
-    fun `a target date already past reads as today rather than as a negative`() {
+    fun `an unlock day already past is kept, because the ban clock counts from it`() {
         val overdue = Item.newTodo(
             name = "Steuer",
             category = Category.FOKUS,
@@ -93,7 +93,14 @@ class ItemAttributesTest {
             now = now,
         )
 
-        assertEquals(0, TodoAttributes.of(overdue, today).inDays)
+        // Dropping it on an edit would wind the one-month clock back to the day
+        // the card was written down.
+        assertEquals(LocalDate(2026, 8, 20), TodoAttributes.of(overdue, today).unlockFrom)
+    }
+
+    @Test
+    fun `a new card is free at once and carries no unlock day`() {
+        assertEquals(null, TodoAttributes().unlockFrom)
     }
 
     @Test

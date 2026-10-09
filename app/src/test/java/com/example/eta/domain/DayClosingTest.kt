@@ -124,9 +124,9 @@ class DayClosingTest {
     }
 
     @Test
-    fun `a todo with a target date stays unavailable until a week before it`() {
+    fun `a todo with an unlock day stays unavailable until that day`() {
         val item = todo()
-        assertTrue(item.isAvailableOn(LocalDate(2026, 9, 23)))
-        assertEquals(false, item.isAvailableOn(LocalDate(2026, 9, 22)))
+        assertTrue(item.isAvailableOn(LocalDate(2026, 9, 30)))
+        assertEquals(false, item.isAvailableOn(LocalDate(2026, 9, 29)))
     }
 }

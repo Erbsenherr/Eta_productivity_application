@@ -60,6 +60,8 @@ import com.example.eta.ui.reminders.RemindersViewModel
 import com.example.eta.ui.rewards.RewardsScreen
 import com.example.eta.ui.rewards.RewardsViewModel
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.Features
+import com.example.eta.ui.components.LocalFeatures
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.eta.ui.settings.CalendarSettingsViewModel
 import com.example.eta.ui.settings.SettingsScreen
@@ -115,13 +117,27 @@ fun EtaApp(
             // which is what it was before there was a switch.
             val setup by container.setupRepository.observe()
                 .collectAsStateWithLifecycle(initialValue = null)
-            CompositionLocalProvider(LocalPointsVisible provides (setup?.pointsSystem != false)) {
-                MainScaffold(
-                    container = container,
-                    rootViewModel = rootViewModel,
-                    openPhase = openPhase,
-                    onOpenHandled = onOpenHandled,
-                )
+            val stored = setup
+            if (stored == null) {
+                // A frame or two until the row arrives. Drawing the tabs before
+                // it would flash the ones that are switched off.
+                EtaScreen {}
+            } else {
+                CompositionLocalProvider(
+                    LocalPointsVisible provides stored.pointsSystem,
+                    LocalFeatures provides Features(
+                        growthTasks = stored.growthTasks,
+                        contracts = stored.contracts,
+                        rewards = stored.rewards,
+                    ),
+                ) {
+                    MainScaffold(
+                        container = container,
+                        rootViewModel = rootViewModel,
+                        openPhase = openPhase,
+                        onOpenHandled = onOpenHandled,
+                    )
+                }
             }
         }
     }
@@ -150,7 +166,12 @@ private fun MainScaffold(
     val context = LocalContext.current
     val design by container.designStore.choice.collectAsStateWithLifecycle()
 
-    var tab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(EtaTab.Today) }
+    var savedTab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(EtaTab.Today) }
+    // The tabs of the features that are switched on. One that was open when its
+    // feature went — or was saved before a restart — falls back to the first.
+    val features = LocalFeatures.current
+    val tabs = EtaTab.entries.filter { it.isShown(features) }
+    val tab = savedTab.takeIf { it in tabs } ?: EtaTab.Today
     var flow by rememberSaveable(stateSaver = FLOW_SAVER) { mutableStateOf<AppFlow?>(null) }
 
     // Answering the alarm lands in the phase itself. Dropping the user on the
@@ -171,7 +192,7 @@ private fun MainScaffold(
 
     // Back leaves a flow first, then returns to the first tab.
     BackHandler(enabled = flow != null) { flow = null }
-    BackHandler(enabled = flow == null && tab != EtaTab.Today) { tab = EtaTab.Today }
+    BackHandler(enabled = flow == null && tab != EtaTab.Today) { savedTab = EtaTab.Today }
 
     // Covers both arrivals: the first composition after the questionnaire — which
     // is the earliest the alarm can be laid down, since the setup holds its times
@@ -351,9 +372,9 @@ private fun MainScaffold(
         }
 
         EtaTabBar(
-            items = EtaTab.entries.map { EtaTabItem(it.name, it.label) },
+            items = tabs.map { EtaTabItem(it.name, it.label) },
             selectedId = tab.name,
-            onSelect = { id -> tab = EtaTab.valueOf(id) },
+            onSelect = { id -> savedTab = EtaTab.valueOf(id) },
         )
     }
 }
@@ -403,6 +424,14 @@ private enum class EtaTab(val label: String) {
 
     /** Far right, as the user asked: it is the tab opened least. */
     Settings("Einstellungen"),
+}
+
+/** Whether the tab's feature is switched on; most tabs have none and always are. */
+private fun EtaTab.isShown(features: Features): Boolean = when (this) {
+    EtaTab.Contracts -> features.contracts
+    EtaTab.Growth -> features.growthTasks
+    EtaTab.Rewards -> features.rewards
+    else -> true
 }
 
 /**

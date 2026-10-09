@@ -246,7 +246,7 @@ class SmartListsViewModel(
                     name = name,
                     category = attributes.category,
                     priority = attributes.priority,
-                    targetDate = today.plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                    targetDate = attributes.unlockFrom,
                     estimatedDuration = attributes.duration,
                     now = now,
                 ).copy(
@@ -307,7 +307,7 @@ class SmartListsViewModel(
                 item = renamed.copy(note = note),
                 category = attributes.category,
                 priority = attributes.priority,
-                targetDate = today.plus(DatePeriod(days = attributes.inDays.coerceAtLeast(0))),
+                targetDate = attributes.unlockFrom,
                 estimatedDuration = attributes.duration,
                 travelBefore = attributes.travelBefore,
                 returnAfter = attributes.returnAfter,
@@ -351,6 +351,7 @@ class SmartListsViewModel(
                 growth = attributes.growth,
                 subtasks = attributes.subtasks,
                 folded = attributes.foldedItemIds,
+                startTimes = attributes.ownStartTimes,
             )
             scheduleMaintenance.topUp()
         }
@@ -373,22 +374,7 @@ class SmartListsViewModel(
         viewModelScope.launch {
             recurringTaskService.saveGroup(
                 ids = group.ids,
-                edit = RecurringEdit(
-                    name = name,
-                    note = note,
-                    category = attributes.category,
-                    weekdays = attributes.weekdays,
-                    startTime = attributes.startTime,
-                    duration = attributes.duration,
-                    travelBefore = attributes.travelBefore,
-                    returnAfter = attributes.returnAfter,
-                    breakAfter = attributes.breakAfter,
-                    endSound = attributes.endSound,
-                    extras = attributes.extras,
-                    growth = attributes.growth,
-                    subtasks = attributes.subtasks,
-                    folded = attributes.foldedItemIds,
-                ),
+                edit = attributes.toEdit(name, note),
             )
         }
     }

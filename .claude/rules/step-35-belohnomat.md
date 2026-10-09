@@ -93,8 +93,9 @@ is copying them into `res/raw` and naming them in that object.
 
 #### The points system can be put out of sight
 
-`UserSetup.pointsSystem`, a checkbox in the settings (`PointsSystemBox`), saved with
-"Einrichtung sichern". **It stops nothing**: harvest, contracts, charges and the
+`UserSetup.pointsSystem`, a checkbox in the settings — since step 36 the
+"Punktetracker" row of `AdvancedFeaturesBox`, applied at once and off for a new
+setup (*Step 36*). **It stops nothing**: harvest, contracts, charges and the
 weekly devaluation are booked exactly as before, which is what lets it be switched
 back on with the account where it would have stood anyway.
 

@@ -193,7 +193,7 @@ fun SettingsScreen(
                 StillActiveBox(setup, viewModel::update)
                 TaskAnnouncementBox(setup, viewModel::update)
                 PlanningStep(setup, viewModel::update)
-                PointsSystemBox(setup, viewModel::update)
+                AdvancedFeaturesBox(setup, viewModel::setFeature)
                 // The two levers on the account go out of sight with it. Off the
                 // draft rather than the stored answer, so the box above folds
                 // them away the moment it is unticked.
@@ -393,28 +393,53 @@ private fun TaskAnnouncementBox(setup: UserSetup, onChange: OnSetupChange) {
 }
 
 /**
- * The points system, on show or not.
+ * The four features a newcomer does not need on the first day, each on show or
+ * not: the points, the Growth-Tasks, the contracts and the Belohn-o-mat.
  *
- * Off takes every figure in points off the screens — the account, the evening's
- * settlement page, forecasts, what a contract pays, Custom Earn and Custom Spend.
- * **It stops nothing**: harvest, contracts, charges and the weekly devaluation
- * are booked exactly as before, which is what lets the switch be flipped back
- * with the account standing where it would have stood anyway. The Belohn-o-mat
- * stays either way; it is the one place points are still seen.
+ * All off for a new setup, so the bar holds four tabs rather than seven. **A
+ * switch hides and stops nothing**: points are booked, growth tasks grow,
+ * contracts are paid as kept and rewards fill exactly as before, which is what
+ * lets any of them be switched back on with everything where it would have been.
+ *
+ * Applied the moment it is flipped — see `SettingsViewModel.setFeature`.
  */
 @Composable
-private fun PointsSystemBox(setup: UserSetup, onChange: OnSetupChange) {
+private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
-            EtaText(text = "Punktesystem", style = EtaTheme.typography.heading)
+            EtaText(text = "Advanced Features", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Gilt sofort. Ausgeschaltet verschwindet ein Feature nur aus der " +
+                    "Ansicht — im Hintergrund läuft es weiter, und wieder eingeschaltet " +
+                    "steht alles so da, als wäre es nie aus gewesen.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
             CheckRow(
                 checked = setup.pointsSystem,
                 onCheckedChange = { on -> onChange { it.copy(pointsSystem = on) } },
-                label = "Punkte anzeigen",
-                hint = "Aus: Punktestand, Abrechnung am Abend und alle Punktangaben " +
-                    "verschwinden. Gezählt wird im Hintergrund unverändert weiter — " +
-                    "wieder eingeschaltet steht alles so da, als wäre es nie aus gewesen. " +
-                    "Der Belohn-o-mat bleibt sichtbar.",
+                label = "Punktetracker",
+                hint = "Punktestand, Abrechnung am Abend und alle Punktangaben.",
+            )
+            CheckRow(
+                checked = setup.growthTasks,
+                onCheckedChange = { on -> onChange { it.copy(growthTasks = on) } },
+                label = "Growth-Tasks",
+                hint = "Der Reiter, und die Option, eine wiederkehrende Aufgabe wachsen " +
+                    "zu lassen.",
+            )
+            CheckRow(
+                checked = setup.contracts,
+                onCheckedChange = { on -> onChange { it.copy(contracts = on) } },
+                label = "Verträge",
+                hint = "Der Reiter, und die Frage am Abend, ob sie gehalten wurden. " +
+                    "Ausgeschaltet gelten laufende Verträge als gehalten.",
+            )
+            CheckRow(
+                checked = setup.rewards,
+                onCheckedChange = { on -> onChange { it.copy(rewards = on) } },
+                label = "Belohn-o-mat",
+                hint = "Der Reiter, und die Seite am Abend, auf der sich die Belohnung füllt.",
             )
         }
     }

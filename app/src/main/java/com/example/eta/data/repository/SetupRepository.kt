@@ -123,6 +123,21 @@ class SetupRepository(
         recurringTaskService.relayOccurrences((generated + obsolete).map { it.id })
     }
 
+    /**
+     * Changes the stored setup in place, without regenerating anything.
+     *
+     * For the "Advanced Features" switches, which take effect the moment they
+     * are flipped rather than with "Einrichtung sichern": they lay down no task
+     * and move no alarm, and a tab that only disappears after scrolling down to
+     * a save button reads as a switch that does not work. [transform] is applied
+     * to the **stored** row, so whatever else is half-edited in the settings'
+     * draft is not saved along with it.
+     */
+    suspend fun update(transform: (UserSetup) -> UserSetup) {
+        val stored = setupDao.find(SETUP_ID) ?: return
+        setupDao.upsert(transform(stored).copy(id = SETUP_ID, updatedAt = clock.now()))
+    }
+
     private suspend fun morningDefinitions(): List<Item> =
         itemDao.findByIdPrefix(SETUP_ITEM_ID_PREFIX)
             .filter { isMorningRoutine(it.id) && it.completedAt == null }
