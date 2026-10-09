@@ -26,6 +26,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.eta.ui.components.tutorialSpot
+import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.domain.planning.startMinute
 import com.example.eta.domain.planning.endMinute
 import com.example.eta.data.local.BlockWithItem
@@ -65,6 +67,13 @@ fun SmartListsScreen(
     onPlanWeek: () -> Unit = {},
     /** Today's planner, opened on the minute of the day it should be centred on. */
     onOpenToday: (minute: Int) -> Unit = {},
+    /**
+     * Whether the tab still owes its offer of a tutorial — true until it has
+     * been answered once, on the first visit or whenever that turns out to be.
+     */
+    tutorialOffer: Boolean = false,
+    onAcceptTutorial: () -> Unit = {},
+    onDeclineTutorial: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val todaySettled by viewModel.todaySettled.collectAsStateWithLifecycle()
@@ -110,6 +119,22 @@ fun SmartListsScreen(
                     text = "Verschoben wird in den Planungsphasen.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textSecondary,
+                )
+            }
+
+            // Turned down, the offer is answered and gone from the store at
+            // once; what stays for this visit is the word about where to find
+            // the tutorial later, held here.
+            var declined by remember { mutableStateOf(false) }
+            if (tutorialOffer || declined) {
+                TutorialOfferBox(
+                    declined = declined,
+                    onAccept = onAcceptTutorial,
+                    onDecline = {
+                        declined = true
+                        onDeclineTutorial()
+                    },
+                    onDismiss = { declined = false },
                 )
             }
 
@@ -551,6 +576,55 @@ private fun blockDetail(entry: BlockWithItem): String = buildString {
  * database, drawn in the planner on a day nobody has opened yet, and visible
  * nowhere. Last in the order because it is the one that looks furthest ahead.
  */
+/**
+ * The offer of a tutorial, the first time the tab is opened.
+ *
+ * Small, at the top, and answered once: a tab of eight folded lists explains
+ * itself to nobody, but an offer repeated on every visit would be nagging.
+ * Turned down, it says where the tutorial can be found instead — the one thing
+ * someone who said "not now" needs to know.
+ */
+@Composable
+private fun TutorialOfferBox(
+    declined: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    EtaSurface(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = EtaTheme.colors.accent,
+        contentPadding = EtaTheme.spacing.md,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            if (declined) {
+                EtaText(
+                    text = "In Ordnung. Du findest das Tutorial jederzeit unter " +
+                        "Einstellungen → Tutorial.",
+                    style = EtaTheme.typography.body,
+                )
+                EtaButton(text = "OK", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            } else {
+                EtaText(text = "Neu hier?", style = EtaTheme.typography.bodyStrong)
+                EtaText(
+                    text = "Ein kurzes Tutorial geht einmal durch alle Listen und zeigt, " +
+                        "was Gedrückthalten bewirkt. Es arbeitet mit Übungsdaten.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaButton(text = "Tutorial starten", onClick = onAccept)
+                    EtaButton(
+                        text = "Nein danke",
+                        style = EtaButtonStyle.Secondary,
+                        onClick = onDecline,
+                    )
+                }
+            }
+        }
+    }
+}
+
 private enum class ListSection(val title: String, val subtitle: String) {
     SAMMELLISTE("Sammelliste", "Alles Notierte"),
     WOCHENLISTE("Wochenliste", "Für diese Woche vorgenommen"),
@@ -581,7 +655,11 @@ private fun ListCard(
     val longPress = rememberUpdatedState(onLongPress)
     val holdable = onLongPress != null
 
-    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+    EtaSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tutorialSpot(TutorialSpot.LIST_PREFIX + section.name),
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             Row(
                 modifier = Modifier

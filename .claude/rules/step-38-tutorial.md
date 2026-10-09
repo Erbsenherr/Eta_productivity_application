@@ -100,8 +100,8 @@ before midnight, which is exactly when a new app gets tried.
 
 #### Five tutorials (third round)
 
-`TutorialId` (`domain/tutorial/TutorialCatalogue.kt`): **Quickstart**, **Extras**,
-**Growth-Tasks**, **Verträge**, **Belohn-o-mat**. Each is a list of steps over the
+`TutorialId` (`domain/tutorial/TutorialCatalogue.kt`): **Quickstart**, **Listen**,
+**Extras**, **Growth-Tasks**, **Verträge**, **Belohn-o-mat**. Each is a list of steps over the
 same machinery; `TutorialViewModel.tutorial` says which runs, and `TutorialSeed.lay`
 is told so it can add what that one needs.
 
@@ -131,6 +131,26 @@ is told so it can add what that one needs.
   being asked: whether a contract signed today is asked about today was not
   verified, and a step that waits for a page that may not come would hold the
   tutorial shut.
+
+#### The Listen tab's tutorial, and its offer
+
+`TutorialId.LISTS` walks the tab list by list (`TutorialStage.LISTS`, the real
+`SmartListsScreen`): each `ListCard` is framed as `TutorialSpot.LIST_PREFIX +
+section.name`, and the text says what the list is for and what **holding** does
+there — on the heading of Sammelliste, Wochenliste and Wiederkehrend it makes
+something new, on an entry it opens the window that edits or removes it. One
+thing is tried: a ToDo made by holding the Sammelliste's heading (done is
+`todoNoted`; the dialog covers the coach, as in the feature tutorials). The tab's
+ways out to a planner are locked.
+
+**The tab offers it once** (`TutorialOfferBox`, at the top): "Tutorial starten"
+or "Nein danke". `TutorialState.listsOffer` is true until answered
+(`answerListsOffer`, a flag in the same preferences); declined, the box stays for
+that visit to say the tutorial is under Einstellungen → Tutorial — held in the
+screen, the store having already forgotten the offer. Not "the first visit" in
+the strict sense: someone updating gets it on their next visit, never having been
+asked. The debug reset re-arms it. The screen mounted *inside* a tutorial is
+passed no offer.
 
 #### The script
 
@@ -287,7 +307,7 @@ there is a setup row, and it is a fact about this install. Not in a backup.
 - **A process death mid-run starts over** at the choice (first run) or returns to
   the app (repeat): the practice database lived in memory.
 
-**Verified by the compiler (`--rerun-tasks`), the suite (570, 38 in
+**Verified by the compiler (`--rerun-tasks`), the suite (572, 40 in
 `TutorialTest`), `assembleRelease` and `lint`.** Nobody has seen it, and more than
 usual rests on that here: whether an in-memory Room database opens on a phone,
 whether the frame and the scroll-into-view land where they should, how much of a

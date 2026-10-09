@@ -609,4 +609,36 @@ class TutorialTest {
 
         assertEquals(TutorialSpot.NOW, step.spotAt(TutorialFacts(todoNoted = true)))
     }
+
+    @Test
+    fun `the lists tutorial frames every list once, in the order of the tab`() {
+        val lists = TutorialId.LISTS.steps.mapNotNull { it.spot }.distinct()
+
+        assertEquals(
+            listOf(
+                TutorialSpot.LIST_COLLECTION,
+                TutorialSpot.LIST_WEEK,
+                TutorialSpot.LIST_RECURRING,
+                TutorialSpot.LIST_TODAY,
+                TutorialSpot.LIST_TOMORROW,
+                TutorialSpot.LIST_DONE,
+                TutorialSpot.LIST_APPOINTMENTS,
+                TutorialSpot.LIST_LOCKED,
+            ),
+            lists,
+        )
+    }
+
+    @Test
+    fun `the lists tutorial has one thing made by holding a heading`() {
+        val task = TutorialId.LISTS.steps.single { it.kind == StepKind.TASK }
+
+        assertEquals(TutorialSpot.LIST_COLLECTION, task.spot)
+        assertFalse(task.ready(TutorialFacts()))
+        assertTrue(task.ready(TutorialFacts(todoNoted = true)))
+        // The three lists whose heading makes something say so.
+        listOf("Wochenliste", "Wiederkehrende Aufgaben").forEach { title ->
+            assertTrue(TutorialId.LISTS.steps.first { it.title == title }.text(TutorialFacts()).contains("gedrückt halten"))
+        }
+    }
 }

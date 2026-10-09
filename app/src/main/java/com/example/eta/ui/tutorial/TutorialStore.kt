@@ -18,6 +18,11 @@ data class TutorialState(
      * the idea of the app again, then the list.
      */
     val requestedId: String? = null,
+    /**
+     * The Listen tab still owes its offer of a tutorial: it has not been
+     * opened yet, or the offer has not been answered.
+     */
+    val listsOffer: Boolean = true,
 ) {
     val active: Boolean get() = owed || requested
 }
@@ -42,6 +47,7 @@ class TutorialStore(context: Context) {
         TutorialState(
             introSeen = prefs.getBoolean(KEY_INTRO_SEEN, false),
             owed = prefs.getBoolean(KEY_OWED, false),
+            listsOffer = !prefs.getBoolean(KEY_LISTS_ANSWERED, false),
         ),
     )
     val state: StateFlow<TutorialState> = _state.asStateFlow()
@@ -61,8 +67,16 @@ class TutorialStore(context: Context) {
         _state.update { it.copy(requested = false, requestedId = null) }
     }
 
+    /** The Listen tab's offer was taken or turned down; it is not made again. */
+    fun answerListsOffer() {
+        prefs.edit().putBoolean(KEY_LISTS_ANSWERED, true).apply()
+        _state.update { it.copy(listsOffer = false) }
+    }
+
     /** The debug reset: back to before the first start, welcome page included. */
     fun reset() {
+        prefs.edit().putBoolean(KEY_LISTS_ANSWERED, false).apply()
+        _state.update { it.copy(listsOffer = true) }
         write(introSeen = false, owed = false)
         _state.update { it.copy(requested = false, requestedId = null) }
     }
@@ -75,5 +89,6 @@ class TutorialStore(context: Context) {
     private companion object {
         const val KEY_INTRO_SEEN = "introSeen"
         const val KEY_OWED = "owed"
+        const val KEY_LISTS_ANSWERED = "listsOfferAnswered"
     }
 }

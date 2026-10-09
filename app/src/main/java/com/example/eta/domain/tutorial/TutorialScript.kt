@@ -16,6 +16,9 @@ enum class TutorialStage {
     /** The evening's card of a note, for the Extras under it. */
     EXTRAS,
 
+    /** The Listen tab, for the walk over its lists. */
+    LISTS,
+
     /** The three tabs of the Advanced Features, each for its own tutorial. */
     GROWTH,
     CONTRACTS,
@@ -99,6 +102,20 @@ object TutorialSpot {
     const val EXTRA_REMINDER = "extras.reminder"
     const val EXTRA_DEADLINE = "extras.deadline"
     const val EXTRA_SUBTASKS = "extras.subtasks"
+
+    /**
+     * One list of the Listen tab, by the name of its section — the tab frames
+     * its cards as `LIST_PREFIX + section.name`.
+     */
+    const val LIST_PREFIX = "lists."
+    const val LIST_COLLECTION = LIST_PREFIX + "SAMMELLISTE"
+    const val LIST_WEEK = LIST_PREFIX + "WOCHENLISTE"
+    const val LIST_RECURRING = LIST_PREFIX + "WIEDERKEHREND"
+    const val LIST_TODAY = LIST_PREFIX + "TAGESLISTE"
+    const val LIST_TOMORROW = LIST_PREFIX + "MORGEN"
+    const val LIST_DONE = LIST_PREFIX + "ERFOLG"
+    const val LIST_APPOINTMENTS = LIST_PREFIX + "TERMINE"
+    const val LIST_LOCKED = LIST_PREFIX + "SPERRLISTE"
     const val QUICK_ADD = "dashboard.quickAdd"
 
     /** The two dots of the Quick-Add box: the way to its second page. */

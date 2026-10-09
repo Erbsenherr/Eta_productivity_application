@@ -68,6 +68,7 @@ import com.example.eta.ui.settings.SettingsScreen
 import com.example.eta.ui.settings.SettingsViewModel
 import com.example.eta.ui.setup.SetupScreen
 import com.example.eta.ui.setup.SetupViewModel
+import com.example.eta.domain.tutorial.TutorialId
 import com.example.eta.ui.tutorial.TutorialHost
 import com.example.eta.ui.tutorial.TutorialIntroScreen
 import com.example.eta.ui.vacation.VacationScreen
@@ -183,6 +184,7 @@ private fun MainScaffold(
     // plain String rather than anything that needs a parcelling story.
     val context = LocalContext.current
     val design by container.designStore.choice.collectAsStateWithLifecycle()
+    val tutorialState by container.tutorialStore.state.collectAsStateWithLifecycle()
 
     var savedTab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(EtaTab.Today) }
     // The tabs of the features that are switched on. One that was open when its
@@ -356,6 +358,12 @@ private fun MainScaffold(
                         flow = AppFlow.PlannerToday
                         plannerFocus = minute
                     },
+                    tutorialOffer = tutorialState.listsOffer,
+                    onAcceptTutorial = {
+                        container.tutorialStore.answerListsOffer()
+                        container.tutorialStore.request(TutorialId.LISTS.name)
+                    },
+                    onDeclineTutorial = container.tutorialStore::answerListsOffer,
                 )
 
                 EtaTab.Contracts -> ContractsScreen(
@@ -670,7 +678,7 @@ private fun settingsViewModelFactory(container: AppContainer): ViewModelProvider
         }
     }
 
-private fun smartListsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+internal fun smartListsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             SmartListsViewModel(
@@ -682,6 +690,7 @@ private fun smartListsViewModelFactory(container: AppContainer): ViewModelProvid
                 subtaskRepository = container.subtaskRepository,
                 setupRepository = container.setupRepository,
                 weekPlanningService = container.weekPlanningService,
+                clock = container.clock,
             )
         }
     }

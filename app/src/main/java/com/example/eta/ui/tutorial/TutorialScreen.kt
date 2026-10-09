@@ -38,6 +38,8 @@ import com.example.eta.ui.components.LocalTutorialGuide
 import com.example.eta.ui.concretize.ConcretizeScreen
 import com.example.eta.ui.contracts.ContractsScreen
 import com.example.eta.ui.growth.GrowthTasksScreen
+import com.example.eta.ui.lists.SmartListsScreen
+import com.example.eta.ui.root.smartListsViewModelFactory
 import com.example.eta.ui.rewards.RewardsScreen
 import com.example.eta.ui.root.contractsViewModelFactory
 import com.example.eta.ui.root.growthTasksViewModelFactory
@@ -216,6 +218,15 @@ private fun StageScreen(
             ),
             onClose = { tutorial.exitPressed(TutorialStage.PLANNER) },
             onTopUpWeek = tutorial::locked,
+        )
+
+        // The tab's own ways out — to a planner, to the weekly planning — are
+        // shut, and it makes no offer of a tutorial from inside one.
+        TutorialStage.LISTS -> SmartListsScreen(
+            viewModel = viewModel(key = "tutorial-lists", factory = smartListsViewModelFactory(container)),
+            onOpenPlanner = tutorial::locked,
+            onPlanWeek = tutorial::locked,
+            onOpenToday = { tutorial.locked() },
         )
 
         TutorialStage.GROWTH -> GrowthTasksScreen(

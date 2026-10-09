@@ -24,6 +24,11 @@ enum class TutorialId(
         summary = "Etwa fünf Minuten: ein simulierter Tag, vom Dashboard bis zum Plan für morgen.",
         advanced = false,
     ),
+    LISTS(
+        title = "Listen",
+        summary = "Einmal durch jede Liste: wofür sie da ist und was Gedrückthalten bewirkt.",
+        advanced = false,
+    ),
     EXTRAS(
         title = "Extras",
         summary = "Wege, Pause, Töne, Pomodoro, Erinnerung, Deadline und Subtasks — Schritt für Schritt.",
@@ -49,6 +54,7 @@ enum class TutorialId(
     val steps: List<TutorialStep>
         get() = when (this) {
             QUICKSTART -> QUICKSTART_STEPS
+            LISTS -> LIST_STEPS
             EXTRAS -> EXTRAS_STEPS
             GROWTH -> GROWTH_STEPS
             CONTRACTS -> CONTRACT_STEPS
@@ -71,6 +77,115 @@ private const val WHERE_TO_SWITCH =
 
 private fun text(stage: TutorialStage, title: String, body: String, spot: String? = null) =
     TutorialStep(stage = stage, title = title, text = { body }, spot = spot)
+
+/**
+ * The Listen tab, list by list: what each is for, and what holding does there.
+ *
+ * Holding is the tab's one hidden gesture, and it means two different things:
+ * on the **heading** of three lists it makes something new for that list, and
+ * on an **entry** it opens the window that edits or removes it. One list is
+ * tried out — a ToDo made from the Sammelliste's heading — and the rest is told,
+ * each with its list framed.
+ */
+val LIST_STEPS: List<TutorialStep> = listOf(
+    text(
+        TutorialStage.LISTS,
+        "Der Reiter Listen",
+        "Hier liegt jede Aufgabe in genau einer Liste — je nachdem, wie weit sie " +
+            "ist: notiert, für die Woche vorgenommen, für einen Tag geplant, erledigt. " +
+            "Ein Tipp auf eine Überschrift klappt die Liste auf und zu. Verschoben " +
+            "wird zwischen den Listen nicht von Hand, sondern in den Planungsphasen.",
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Sammelliste",
+        "Alles, was du notiert und noch nicht verplant hast — auch Quick-Adds, die " +
+            "noch auf ihre Angaben warten. Was hier länger als einen Monat liegt, " +
+            "wandert auf die Sperrliste; das Dashboard warnt rechtzeitig.",
+        spot = TutorialSpot.LIST_COLLECTION,
+    ),
+    TutorialStep(
+        stage = TutorialStage.LISTS,
+        title = "Gedrückt halten: Neues anlegen",
+        text = {
+            "Halte die Überschrift »Sammelliste« gedrückt: Es öffnet sich ein " +
+                "Fenster für ein neues, fertig ausgefülltes ToDo. Gib einen Namen " +
+                "ein und sichere es. Das Fenster verdeckt diese Leiste; danach geht " +
+                "es hier weiter."
+        },
+        kind = StepKind.TASK,
+        spot = TutorialSpot.LIST_COLLECTION,
+        checks = { listOf(TutorialCheck("Ein ToDo über die Überschrift anlegen", it.todoNoted)) },
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Gedrückt halten: Einträge",
+        "Dein ToDo steht jetzt in der Sammelliste. Einen Eintrag antippen oder " +
+            "gedrückt halten öffnet sein Fenster: »Bearbeiten« ändert die Angaben, " +
+            "»Erledigt« hakt ihn sofort ab, und der Papierkorb oben rechts löscht " +
+            "ihn. Beides fragt vorher nach.",
+        spot = TutorialSpot.LIST_COLLECTION,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Wochenliste",
+        "Was du dir für diese Woche vorgenommen hast und noch keinem Tag zugeordnet " +
+            "ist. Gefüllt wird sie in der Wochenplanung; aus ihr bedient sich der " +
+            "Tagesplaner. Überschrift gedrückt halten legt ein ToDo direkt für diese " +
+            "Woche an; Einträge lassen sich wie in der Sammelliste bearbeiten und löschen.",
+        spot = TutorialSpot.LIST_WEEK,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Wiederkehrende Aufgaben",
+        "Dein fester Wochenplan, mit der Skizze der Woche: Grün ist frei, Grau " +
+            "belegt. Überschrift gedrückt halten legt eine neue wiederkehrende " +
+            "Aufgabe an. Ein Eintrag öffnet die Aufgabe mit all ihren Wochentagen — " +
+            "zum Bearbeiten oder, wenn sie nicht mehr passt, zum Beenden.",
+        spot = TutorialSpot.LIST_RECURRING,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Tagesliste",
+        "Alles, was heute im Plan steht, mit Uhrzeit. Diese Liste zeigt nur an: Ein " +
+            "Eintrag öffnet sein Fenster mit »Im Tagesplan öffnen«, und der Planer " +
+            "springt genau an diese Stelle — dort wird verschoben, gekürzt oder abgesagt.",
+        spot = TutorialSpot.LIST_TODAY,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Liste für Morgen",
+        "Erscheint, sobald du den morgigen Tag in der Tagesplanung bestätigt hast. " +
+            "Überschrift gedrückt halten öffnet die Planung für morgen wieder, falls " +
+            "sich etwas geändert hat.",
+        spot = TutorialSpot.LIST_TOMORROW,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Erfolgsliste",
+        "Was du abgehakt hast, mit Datum und Uhrzeit. Wiederkehrende Aufgaben " +
+            "fehlen hier absichtlich — sonst stünde jeden Tag dasselbe darin. " +
+            "Hier gibt es nichts zu bearbeiten: Es ist deine Chronik.",
+        spot = TutorialSpot.LIST_DONE,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Termine",
+        "Kalendertermine an späteren Tagen, mit Datum. Sie kommen aus dem Google " +
+            "Kalender, falls du ihn verbunden hast, und werden in den Planungsphasen " +
+            "übernommen.",
+        spot = TutorialSpot.LIST_APPOINTMENTS,
+    ),
+    text(
+        TutorialStage.LISTS,
+        "Sperrliste",
+        "Was einen Monat ungeplant in der Sammelliste lag, ist hier ein halbes Jahr " +
+            "gesperrt und lässt sich so lange nicht neu anlegen. Das soll dich nicht " +
+            "bestrafen, sondern ehrlich machen: Was du einen Monat nicht anfasst, " +
+            "willst du gerade nicht wirklich. Das waren die Listen!",
+        spot = TutorialSpot.LIST_LOCKED,
+    ),
+)
 
 /**
  * The Extras, one at a time, on the card of a note being filled in.

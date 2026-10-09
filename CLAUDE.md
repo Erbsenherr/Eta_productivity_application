@@ -51,7 +51,7 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (570 tests
+this machine, so everything is verified by compilation, the unit suite (572 tests
 as of step 38), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
@@ -379,7 +379,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-34-routine.md` | *Step 34*: the Routine-Modus (`Item.routineMode`, `RoutineSteps`), the Morgenroutine and where its steps are edited, the Einstellungen tab last, and the multi-weekday steps bug (`matchedTo`) |
 | `step-35-belohnomat.md` | *Step 35*: the Belohn-o-mat (`Reward`, `pourInto`, Aufgabenbindung, the evening's fill page, placeholder sounds), the points system out of sight (`UserSetup.pointsSystem`, `LocalPointsVisible`), the long press on three list headings |
 | `step-36-advanced-features.md` | *Step 36*: Advanced Features (`LocalFeatures`, the four switches, applied at once), "Freigeschaltet ab" (`targetDate`'s new meaning, `collectionClockStart`, `EtaDatePickerDialog`), Abweichende Uhrzeiten (`rulesWithTimes`), the Sperrliste last, the free-time info button |
-| `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the tutorials there are (`TutorialId`: Quickstart, Extras, Growth-Tasks, Verträge, Belohn-o-mat) and their scripts (`TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), when it is shown (`TutorialStore`), and the two rules that came with it: the adjustable charge for unplanned time (`unplannedRate`) and Custom Spend needing a balance (`canSpend`) |
+| `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the tutorials there are (`TutorialId`: Quickstart, Listen — offered once on the Listen tab —, Extras, Growth-Tasks, Verträge, Belohn-o-mat) and their scripts (`TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), when it is shown (`TutorialStore`), and the two rules that came with it: the adjustable charge for unplanned time (`unplannedRate`) and Custom Spend needing a balance (`canSpend`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
