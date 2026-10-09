@@ -75,7 +75,7 @@ before midnight, which is exactly when a new app gets tried.
   setup is the questionnaire's own defaults — morning routine, sport, housekeeping,
   cooking, free time, mindfulness, bed preparation — and the example's tasks stand
   between them (`tutorialSchedule` = `tutorialItems` + the setup's
-  `recurringItems`). Frühstück 07:45, Arbeiten 09:00–12:00, Katze füttern 12:00,
+  `recurringItems`). Frühstück 07:45, Arbeiten 10:00–12:00, Katze füttern 12:00,
   Mail versenden 12:30, Arbeiten again 13:00–17:00; ids prefixed `tutorial:`.
 - **How the collisions were settled**, all on the tutorial's side: the setup's own
   work answer is left out (`WorkSchedule.None`) — the example's "Arbeiten" *is* the

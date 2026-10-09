@@ -198,7 +198,7 @@ class TutorialTest {
             unplannedPenaltyPerHour = setup.unplannedRate,
         )
 
-        assertTrue("harvest ${settlement.harvest}", settlement.harvest >= 7.0)
+        assertTrue("harvest ${settlement.harvest}", settlement.harvest >= 6.0)
         assertTrue("total ${settlement.total}", settlement.total > 0.0)
     }
 

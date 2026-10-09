@@ -57,8 +57,9 @@ fun tutorialItems(today: DayOfWeek, now: Instant): List<Item> = listOf(
         category = Category.FOKUS,
         role = ItemRole.WORK,
         recurrenceRule = RecurrenceRule.Daily,
-        startTime = LocalTime(9, 0),
-        estimatedDuration = 3.hours,
+        // Ten, at the user's word; still running at the tutorial's half past.
+        startTime = LocalTime(10, 0),
+        estimatedDuration = 2.hours,
         now = now,
     ),
     Item.newRecurring(
