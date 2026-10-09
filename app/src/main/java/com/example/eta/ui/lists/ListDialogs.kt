@@ -131,6 +131,12 @@ fun ItemDetailDialog(
     onEdit: () -> Unit = {},
     onComplete: () -> Unit = {},
     onDelete: () -> Unit = {},
+    /**
+     * Set on a row of the Tagesliste: the way to the day planner, opened on this
+     * entry. The list itself moves nothing — the planner is where a block is
+     * moved, shortened or called off — so this is how the row leads there.
+     */
+    onOpenPlanner: (() -> Unit)? = null,
 ) {
     // A standing task is never finished — checking one off would retire the
     // definition and with it every occurrence still to come. It is ended on the
@@ -205,6 +211,14 @@ fun ItemDetailDialog(
                     EtaButton(text = "Erledigt", onClick = onComplete)
                 }
             }
+        }
+
+        if (onOpenPlanner != null) {
+            EtaButton(
+                text = "Im Tagesplan öffnen",
+                style = EtaButtonStyle.Secondary,
+                onClick = onOpenPlanner,
+            )
         }
     }
 }

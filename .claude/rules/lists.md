@@ -54,3 +54,14 @@ and nothing else; the Sperrliste is a rule with a date on it; the Erfolgsliste h
 no card behind its rows at all, so a long name there gets three lines rather than a
 popup that could add nothing.
 
+**A row of the Tagesliste leads into today's planner** (after step 38). Its popup
+— tap or long press, the same window as everywhere on this tab — carries "Im
+Tagesplan öffnen" (`ItemDetailDialog.onOpenPlanner`), and the planner opens
+**centred on that entry**: `OpenedRow.plannerMinute` is the middle of the block,
+handed up as `onOpenToday(minute)`, held in `MainScaffold` as `plannerFocus` and
+passed to `DayPlannerScreen(focusMinute = …)`. A minute rather than a block id on
+purpose: a finished block is not among the planner's blocks (it is a freed
+stretch) and a cancelled one is not drawn at all, and both are rows of this list
+— a place in the day is the one thing all three have. The focus is cleared when
+the flow is left, so "Heute umplanen" opens an hour before now as it always did.
+The tab still moves nothing itself; this is the way to the screen that does.

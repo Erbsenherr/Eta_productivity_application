@@ -191,6 +191,12 @@ private fun MainScaffold(
     val tabs = EtaTab.entries.filter { it.isShown(features) }
     val tab = savedTab.takeIf { it in tabs } ?: EtaTab.Today
     var flow by rememberSaveable(stateSaver = FLOW_SAVER) { mutableStateOf<AppFlow?>(null) }
+    // Where today's planner opens, when it was asked for from an entry of the
+    // Tagesliste. Cleared with the flow, so "Heute umplanen" opens as it always did.
+    var plannerFocus by rememberSaveable { mutableStateOf<Int?>(null) }
+    LaunchedEffect(flow) {
+        if (flow != AppFlow.PlannerToday) plannerFocus = null
+    }
 
     // Answering the alarm lands in the phase itself. Dropping the user on the
     // dashboard would make them do the navigating they were interrupted for.
@@ -241,6 +247,7 @@ private fun MainScaffold(
                 ),
                 onClose = { flow = null },
                 onTopUpWeek = { flow = AppFlow.WeekTopUp },
+                focusMinute = plannerFocus,
             )
 
             AppFlow.WeekPlanner -> {
@@ -345,6 +352,10 @@ private fun MainScaffold(
                     viewModel = viewModel(key = "lists-$dateKey", factory = smartListsViewModelFactory(container)),
                     onOpenPlanner = { flow = AppFlow.Planner },
                     onPlanWeek = { flow = AppFlow.WeekTopUp },
+                    onOpenToday = { minute ->
+                        flow = AppFlow.PlannerToday
+                        plannerFocus = minute
+                    },
                 )
 
                 EtaTab.Contracts -> ContractsScreen(

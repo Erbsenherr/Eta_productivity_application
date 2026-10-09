@@ -26,6 +26,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.eta.domain.planning.startMinute
+import com.example.eta.domain.planning.endMinute
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.recurrence.RecurringGroup
@@ -61,6 +63,8 @@ fun SmartListsScreen(
     modifier: Modifier = Modifier,
     onOpenPlanner: () -> Unit = {},
     onPlanWeek: () -> Unit = {},
+    /** Today's planner, opened on the minute of the day it should be centred on. */
+    onOpenToday: (minute: Int) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val todaySettled by viewModel.todaySettled.collectAsStateWithLifecycle()
@@ -188,7 +192,24 @@ fun SmartListsScreen(
                 emptyHint = "Heute steht nichts im Plan.",
             ) {
                 state.todayBlocks.forEach { entry ->
-                    BlockLine(entry) { opened = OpenedRow(entry.item, blockDetail(entry), false) }
+                    BlockLine(entry) {
+                        opened = OpenedRow(
+                            item = entry.item,
+                            detail = blockDetail(entry),
+                            editable = false,
+                            // The middle of the entry, so a long one is centred
+                            // as a whole rather than by its first minute.
+                            plannerMinute = (entry.block.startMinute() + entry.block.endMinute()) / 2,
+                        )
+                    }
+                }
+                if (state.todayBlocks.isNotEmpty()) {
+                    EtaText(
+                        text = "Antippen oder gedrückt halten zeigt den Eintrag — von dort geht es " +
+                            "in den Tagesplan, genau an diese Stelle.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
                 }
             }
 
@@ -345,6 +366,12 @@ fun SmartListsScreen(
                 confirming = PendingAction.Delete(row.item)
                 opened = null
             },
+            onOpenPlanner = row.plannerMinute?.let { minute ->
+                {
+                    opened = null
+                    onOpenToday(minute)
+                }
+            },
         )
     }
 
@@ -472,6 +499,8 @@ private data class OpenedRow(
     val item: Item,
     val detail: String,
     val editable: Boolean,
+    /** A row of the Tagesliste: where in the day the planner should open on it. */
+    val plannerMinute: Int? = null,
 )
 
 /** What a long press on a list's heading is in the middle of making. */

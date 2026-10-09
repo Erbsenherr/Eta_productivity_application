@@ -121,6 +121,12 @@ fun DayPlannerScreen(
     modifier: Modifier = Modifier,
     onClose: () -> Unit = {},
     onTopUpWeek: () -> Unit = {},
+    /**
+     * The minute of the day to open centred on — an entry of the Tagesliste the
+     * user asked to see in the plan. Null opens where the day is usually looked
+     * at from.
+     */
+    focusMinute: Int? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
@@ -232,8 +238,17 @@ fun DayPlannerScreen(
     // Open where the day is being looked at from: the morning when planning
     // tomorrow, because most of a plan is there, and the hour before now when
     // correcting today, because that is what is being corrected.
-    LaunchedEffect(minutePx, state.isToday) {
+    // Keyed on the viewport as well: centring needs to know how tall it is, and
+    // that is only reported once the day has been laid out.
+    val viewportKnown = viewportHeight > 0f
+    LaunchedEffect(minutePx, state.isToday, focusMinute, viewportKnown) {
         if (minutePx <= 1f) return@LaunchedEffect
+        if (focusMinute != null) {
+            if (!viewportKnown) return@LaunchedEffect
+            val centred = focusMinute * minutePx - viewportHeight / 2f
+            scrollState.scrollTo(centred.roundToInt().coerceAtLeast(0))
+            return@LaunchedEffect
+        }
         val minute = if (state.isToday) {
             (Clock.System.now()
                 .toLocalDateTime(TimeZone.currentSystemDefault())
