@@ -43,6 +43,8 @@ class ReevaluationService(
     private val growthService: GrowthService,
     private val rewardRepository: RewardRepository,
     private val clock: Clock = Clock.System,
+    /** Nights changed for one date; null where there are none to ask about. */
+    private val nightService: NightService? = null,
 ) {
 
     /** Contracts that still owe an answer for [date]. */
@@ -50,11 +52,12 @@ class ReevaluationService(
         contractsToCheck(contractRepository.findRunning(), date)
 
     /** How much of [date] the night took, so unplanned time is only charged awake. */
-    private fun sleepMinutes(setup: UserSetup?, date: LocalDate): Int =
+    private suspend fun sleepMinutes(setup: UserSetup?, date: LocalDate): Int =
         // The night as it falls on this calendar day — the same stretches the
-        // planner shades — so a weekend night, or one that begins after
-        // midnight, is counted on the day it actually takes hours from.
-        setup?.sleepStretches(date.dayOfWeek)
+        // planner shades — so a weekend night, one that begins after midnight,
+        // or one changed for this date alone is counted on the day it actually
+        // takes hours from.
+        setup?.sleepStretches(date, nightService?.overrides().orEmpty())
             ?.sumOf { it.last - it.first + 1 }
             ?.coerceIn(0, MINUTES_PER_DAY) ?: 0
 

@@ -124,6 +124,8 @@ own `DayTimeline` — so a block looks and behaves as it does there. One
 - **"Aktuell"** is `observeRange` over Monday to Sunday of this week
   (`mondayOf`), cancellations left out, finished blocks drawn dimmed — not as
   freed stretches; this is a look at the week, not a place to plan into.
+- **A long press on the night changes that weekday's standing night** (step 40),
+  and "Aktuell" shades a night changed for one date as it was changed.
 - **The night says its hours** (`sleepLabels`): "Schlafenszeit" where a stretch
   begins after midnight's edge, "Aufstehen" where it ends before it.
 - **The lock** (`LockButton`, drawn on a `Canvas`) is not saved: locked again on

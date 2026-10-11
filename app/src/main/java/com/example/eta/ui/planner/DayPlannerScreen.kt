@@ -38,7 +38,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Priority
+import com.example.eta.domain.planning.BreakFindings
 import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.planning.PlannerWarning
+import com.example.eta.domain.planning.minuteToLocalTime
+import com.example.eta.domain.planning.nightDateAt
+import com.example.eta.domain.setup.nightEndingOn
 import com.example.eta.domain.planning.TimelineDraft
 import com.example.eta.domain.planning.autoScrollStep
 import com.example.eta.domain.planning.coveringMinute
@@ -62,6 +67,9 @@ import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.math.roundToInt
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -165,6 +173,9 @@ fun DayPlannerScreen(
     // scroll position through it: the viewport grows upward and the hour that
     // lay against the revolver lies against the bar that is left of it.
     var revolverFolded by rememberSaveable { mutableStateOf(false) }
+
+    // The night a long press landed in, as the date it ends on.
+    var editingNight by remember { mutableStateOf<LocalDate?>(null) }
 
     // Dragging past the edge of the screen scrolls the day under the finger, so
     // the hours off-screen can be reached at all.
@@ -413,6 +424,14 @@ fun DayPlannerScreen(
                             onDraftChange = { draft = it },
                             // Null on the confirmed list, where a long press
                             // anywhere means "reopen".
+                            onSleepLongPress = if (state.isConfirmed) {
+                                null
+                            } else {
+                                { minute ->
+                                    editingNight = state.setup
+                                        ?.nightDateAt(state.date, minute, state.nightOverrides)
+                                }
+                            },
                             onEmptyLongPress = if (state.isConfirmed) {
                                 null
                             } else {
@@ -482,6 +501,14 @@ fun DayPlannerScreen(
                             color = EtaTheme.colors.warning,
                         )
                     }
+                }
+
+                if (!state.isConfirmed) {
+                    BreakWarnings(
+                        findings = state.breaks,
+                        dismissed = state.dismissedWarnings,
+                        onDismiss = viewModel::dismissWarning,
+                    )
                 }
 
                 // A box being shaped takes the footer: what it needs is the
@@ -593,6 +620,38 @@ fun DayPlannerScreen(
                 newTodo = null
             },
         )
+    }
+
+    editingNight?.let { wakeDate ->
+        val setup = state.setup
+        if (setup == null) {
+            editingNight = null
+        } else {
+            val usual = setup.nightEndingOn(wakeDate.dayOfWeek)
+            NightEditDialog(
+                title = "Nacht auf ${wakeDate.formatLong()}",
+                scope = "Gilt nur für diese eine Nacht. Morgenroutine, »Bettfertig machen« " +
+                    "und der Weckruf wandern mit. Deine üblichen Zeiten änderst du im " +
+                    "Dashboard unter »Woche« oder in den Einstellungen.",
+                night = setup.nightEndingOn(wakeDate, state.nightOverrides),
+                wakeDay = wakeDate.dayOfWeek,
+                // Measured against what this weekday's night usually is.
+                compareWith = listOf(usual),
+                onDismiss = { editingNight = null },
+                onSave = { sleep, wake ->
+                    viewModel.changeNight(wakeDate, sleep, wake)
+                    editingNight = null
+                },
+                onReset = if (wakeDate in state.nightOverrides) {
+                    {
+                        viewModel.resetNight(wakeDate)
+                        editingNight = null
+                    }
+                } else {
+                    null
+                },
+            )
+        }
     }
 
     if (clearingDay) {
@@ -714,6 +773,78 @@ private fun RevolverFold(folded: Boolean, label: String, onToggle: () -> Unit) {
             style = EtaTheme.typography.label,
             color = EtaTheme.colors.textMuted,
         )
+    }
+}
+
+/**
+ * What the Pausenchecker has to say about the day, each warning with its own
+ * "Ignorieren".
+ *
+ * Above the footer, where the missing free time is said as well: both are
+ * things to hear before the day is confirmed, and neither stops it.
+ */
+@Composable
+private fun BreakWarnings(
+    findings: BreakFindings?,
+    dismissed: Set<PlannerWarning>,
+    onDismiss: (PlannerWarning) -> Unit,
+) {
+    if (findings == null) return
+
+    if (findings.tooFew && PlannerWarning.BREAK_TOTAL !in dismissed) {
+        WarningBar(
+            text = "Pausen sind wichtig — und hier sind sehr wenige verplant: " +
+                "${findings.restMinutes.minutes.formatBreak()} Pause auf " +
+                "${findings.taskMinutes.minutes.formatShort()} Aufgaben. Empfohlen wären " +
+                "${findings.neededMinutes.minutes.formatShort()}.",
+            onDismiss = { onDismiss(PlannerWarning.BREAK_TOTAL) },
+        )
+    }
+    val stretch = findings.longStretches.firstOrNull()
+    if (stretch != null && PlannerWarning.BREAK_STRETCH !in dismissed) {
+        val more = findings.longStretches.size - 1
+        WarningBar(
+            text = "Von ${minuteToLocalTime(stretch.fromMinute).formatClock()} bis " +
+                "${stretch.toMinute.formatEndClock()} liegen " +
+                "${stretch.taskMinutes.minutes.formatShort()} Aufgaben ohne Pause" +
+                when (more) {
+                    0 -> "."
+                    1 -> " — und an einer weiteren Stelle des Tages."
+                    else -> " — und an $more weiteren Stellen des Tages."
+                },
+            onDismiss = { onDismiss(PlannerWarning.BREAK_STRETCH) },
+        )
+    }
+}
+
+/** "keine" reads better than "0 min" in the middle of that sentence. */
+private fun Duration.formatBreak(): String = if (this == Duration.ZERO) "keine" else formatShort()
+
+/** A stretch may end with the day, and midnight is not "00:00" there. */
+private fun Int.formatEndClock(): String =
+    if (this >= MINUTES_PER_DAY) "24:00" else minuteToLocalTime(this).formatClock()
+
+@Composable
+private fun WarningBar(text: String, onDismiss: () -> Unit) {
+    EtaSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EtaTheme.spacing.lg, vertical = EtaTheme.spacing.xs),
+        borderColor = EtaTheme.colors.warning,
+        contentPadding = EtaTheme.spacing.md,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+        ) {
+            EtaText(
+                text = text,
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.warning,
+                modifier = Modifier.weight(1f),
+            )
+            EtaButton(text = "Ignorieren", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+        }
     }
 }
 

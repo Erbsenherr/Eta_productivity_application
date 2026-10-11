@@ -106,6 +106,10 @@ be changed there too. The morning's *length* stays one answer.
 - **`isOwnedBySettings(id)` replaced the `SETTINGS_OWNED_ITEM_IDS` set**, since the
   owned ids are no longer two fixed strings.
 
+- **Since step 40 there is a third answer, a night per weekday, and the weekend
+  is Friday and Saturday evening again** — see *Step 40*. The next point is how
+  it stood in between; `weekendDays` is still read, for the setups that carry
+  one, and no longer offered.
 - **Which days the weekend is, is the user's to say** (step 33).
   `UserSetup.weekendDays` is the set of days a weekend night **ends** on —
   Saturday and Sunday (`DEFAULT_WEEKEND`) unless chosen otherwise, so someone

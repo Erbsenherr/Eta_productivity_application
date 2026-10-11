@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (602 tests
-as of step 39), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (626 tests
+as of step 40), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -381,6 +381,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-36-advanced-features.md` | *Step 36*: Advanced Features (`LocalFeatures`, the four switches, applied at once), "Freigeschaltet ab" (`targetDate`'s new meaning, `collectionClockStart`, `EtaDatePickerDialog`), Abweichende Uhrzeiten (`rulesWithTimes`), the Sperrliste last, the free-time info button |
 | `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the tutorials there are (`TutorialId`: Quickstart, Listen — offered once on the Listen tab —, Extras, Growth-Tasks, Verträge, Belohn-o-mat) and their scripts (`TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), when it is shown (`TutorialStore`), and the two rules that came with it: the adjustable charge for unplanned time (`unplannedRate`) and Custom Spend needing a balance (`canSpend`) |
 | `step-39-week-tab.md` | *Step 39*: the dashboard's own tabs (`DashboardPage`: Heute · Morgen · Woche, tapped), the week timetable (`ui/week/`, `WeekView` Aktuell / Generell, the lock, `standingBlocksOn`, `reschedule` → `rescheduleRows`, the two questions in `PendingReschedule`), a box held into an empty stretch (`TimelineDraft`, `onEmptyLongPress`) and the pinch (`pinchTarget`, `pinchedSpan`), the revolver that folds away (`RevolverFold`), the Flexibilität settings (`allowPrioritySkip`, `allowTodoBesideWeek`) and a priority tier passed by itself (`priorityTier(…, fits)`) |
+| `step-40-nights-breaks.md` | *Step 40*: three ways of answering the nights (`NightMode`, `nightsByDay`, the weekend fixed to Friday and Saturday evening again), the advice about the sleep rhythm (`rhythmSpread`, `RHYTHM_ADVICE`), a long press on the shaded night (`onSleepLongPress`, `NightEditDialog`) — one night in the day planner (`NightOverride`, `NightService.overrideNight`, what moves with it), the weekday's standing night on the week timetable (`saveWeekdayNight`) — and the Pausenchecker (`checkBreaks`, `breakKind`, `PlannerWarning`, `PlannerDismissal`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -444,7 +445,8 @@ and a broken contract's way back · 34. The Routine-Modus, and a morning that
 is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
 36. Advanced Features, "Freigeschaltet ab", and hours of their own · 37. "Flexibel" ·
 38. The tutorial · 39. A dashboard with tabs, the week as a timetable, and
-Flexibilität.
+Flexibilität · 40. Nights changed by hand, a night per weekday, and the
+Pausenchecker.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

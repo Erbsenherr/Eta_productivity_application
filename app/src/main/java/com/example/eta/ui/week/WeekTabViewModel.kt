@@ -3,7 +3,10 @@ package com.example.eta.ui.week
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.data.local.BlockWithItem
+import com.example.eta.alarm.TaskStartCoordinator
+import com.example.eta.alarm.WakeAlarmCoordinator
 import com.example.eta.data.repository.ItemRepository
+import com.example.eta.data.repository.NightService
 import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.SetupRepository
@@ -11,6 +14,7 @@ import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Item
+import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.minuteToLocalTime
@@ -39,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
@@ -66,11 +71,19 @@ data class WeekTabUiState(
     val blocks: Map<LocalDate, List<BlockWithItem>> = emptyMap(),
     val subtasks: Map<String, List<Subtask>> = emptyMap(),
     val foldable: List<Item> = emptyList(),
+    /** Nights changed for one date — shown in "Aktuell", which is this week as it is. */
+    val nightOverrides: Map<LocalDate, NightOverride> = emptyMap(),
 ) {
     fun dateOf(day: DayOfWeek): LocalDate = weekStart.plus(DatePeriod(days = WEEK.indexOf(day)))
 
-    /** The night as it falls on [day], for the shading. */
-    fun sleepOn(day: DayOfWeek): List<IntRange> = setup?.sleepStretches(day).orEmpty()
+    /**
+     * The night as it falls on [day], for the shading: the standing one in
+     * "Generell", and in "Aktuell" whatever that date really has.
+     */
+    fun sleepOn(day: DayOfWeek, view: WeekView): List<IntRange> = when (view) {
+        WeekView.GENERAL -> setup?.sleepStretches(day)
+        WeekView.CURRENT -> setup?.sleepStretches(dateOf(day), nightOverrides)
+    }.orEmpty()
 
     /**
      * What [day] shows in [view].
@@ -146,6 +159,9 @@ data class PendingReschedule(
  * Thursday. A single day is changed where it always was, in the day planner.
  */
 class WeekTabViewModel(
+    private val nightService: NightService,
+    private val wakeAlarmCoordinator: WakeAlarmCoordinator,
+    private val taskStartCoordinator: TaskStartCoordinator,
     private val recurringTaskService: RecurringTaskService,
     planRepository: PlanRepository,
     setupRepository: SetupRepository,
@@ -168,9 +184,9 @@ class WeekTabViewModel(
         recurringTaskService.observeDefinitions(),
         setupRepository.observe(),
         planRepository.observeRange(weekStart, weekStart.plus(DatePeriod(days = WEEK.size - 1))),
-        subtaskRepository.observeByItem(),
-        itemRepository.observeFoldCandidates(),
-    ) { definitions, setup, blocks, subtasks, foldable ->
+        combine(subtaskRepository.observeByItem(), itemRepository.observeFoldCandidates(), ::Pair),
+        nightService.observeOverrides(),
+    ) { definitions, setup, blocks, (subtasks, foldable), overrides ->
         WeekTabUiState(
             today = today,
             weekStart = weekStart,
@@ -179,6 +195,7 @@ class WeekTabViewModel(
             blocks = blocks.filter { it.occupiesTime() }.groupBy { it.block.date },
             subtasks = subtasks,
             foldable = foldable,
+            nightOverrides = overrides,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -310,6 +327,19 @@ class WeekTabViewModel(
         if (attributes.weekdays.isEmpty()) return
         viewModelScope.launch {
             recurringTaskService.createGroup(attributes.toEdit(name, note))
+        }
+    }
+
+    /**
+     * The standing night that ends on [day], changed — for that weekday alone,
+     * which is what the user asked the timetable to do. Both alarms that hang
+     * off the night are aimed again, as the settings' own save does.
+     */
+    fun saveNight(day: DayOfWeek, sleep: LocalTime, wake: LocalTime) {
+        viewModelScope.launch {
+            nightService.saveWeekdayNight(day, sleep, wake)
+            wakeAlarmCoordinator.reschedule()
+            taskStartCoordinator.reschedule()
         }
     }
 

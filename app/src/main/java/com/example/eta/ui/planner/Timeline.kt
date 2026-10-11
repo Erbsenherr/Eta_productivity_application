@@ -134,6 +134,12 @@ fun DayTimeline(
      */
     onEmptyLongPress: ((minute: Int) -> Unit)? = null,
     /**
+     * The same press landing in the shaded night, which there means "change
+     * this night" rather than "put something here". Null leaves the night to
+     * [onEmptyLongPress] like any other empty stretch.
+     */
+    onSleepLongPress: ((minute: Int) -> Unit)? = null,
+    /**
      * The box that long press left behind, while it is being pushed and pinched
      * into shape. Held by the caller, who also owns the button that ends it.
      */
@@ -162,6 +168,8 @@ fun DayTimeline(
     val currentDraftChange by rememberUpdatedState(onDraftChange)
     val currentResized by rememberUpdatedState(onBlockResized)
     val currentEmptyLongPress by rememberUpdatedState(onEmptyLongPress)
+    val currentSleepLongPress by rememberUpdatedState(onSleepLongPress)
+    val currentSleep by rememberUpdatedState(sleep)
 
     // Where a block already on the day would land if the finger lifted now, and
     // which block that is. The same indicator a revolver drop gets: without it
@@ -239,12 +247,17 @@ fun DayTimeline(
             }
             // One finger held on a stretch nothing stands on. A block consumes
             // the press that lands on it, so this only ever hears the others.
-            .pointerInput(onEmptyLongPress != null, minutePx) {
-                if (onEmptyLongPress == null) return@pointerInput
+            .pointerInput(onEmptyLongPress != null || onSleepLongPress != null, minutePx) {
+                if (onEmptyLongPress == null && onSleepLongPress == null) return@pointerInput
                 detectTapGestures(
                     onLongPress = { offset ->
                         val minute = (offset.y / minutePx).toInt().coerceIn(0, MINUTES_PER_DAY - 1)
-                        currentEmptyLongPress?.invoke(minute)
+                        val onNight = currentSleepLongPress
+                        if (onNight != null && currentSleep.any { minute in it }) {
+                            onNight(minute)
+                        } else {
+                            currentEmptyLongPress?.invoke(minute)
+                        }
                     },
                 )
             },

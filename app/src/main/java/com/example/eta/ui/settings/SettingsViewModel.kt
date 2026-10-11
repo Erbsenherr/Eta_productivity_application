@@ -131,6 +131,18 @@ class SettingsViewModel(
         viewModelScope.launch {
             stored.value = setupRepository.find()
             _draft.value = stored.value
+        }
+        // The answers can change behind this tab's back — a night changed on
+        // the week timetable is written straight to the setup. An untouched
+        // draft follows; one with unsaved answers keeps them.
+        viewModelScope.launch {
+            setupRepository.observe().collect { row ->
+                if (row == null) return@collect
+                if (_draft.value == stored.value) _draft.value = row
+                stored.value = row
+            }
+        }
+        viewModelScope.launch {
             _openDays.value = catchUpService.openDays()
             refreshAlarms()
         }

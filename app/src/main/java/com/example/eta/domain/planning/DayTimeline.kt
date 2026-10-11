@@ -2,13 +2,18 @@ package com.example.eta.domain.planning
 
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.ItemRole
+import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.PlannedBlock
+import com.example.eta.domain.setup.NightTimes
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.nightEndingOn
 import com.example.eta.domain.setup.shifted
 import kotlin.time.Duration
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.plus
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -297,10 +302,44 @@ fun firstFreeStart(
  * of a Friday then belong to two different nights — the ordinary one it wakes
  * from and the weekend one it goes into.
  */
-fun UserSetup.sleepStretches(weekday: DayOfWeek): List<IntRange> {
-    val endingToday = nightEndingOn(weekday)
-    val endingTomorrow = nightEndingOn(weekday.shifted(1))
+fun UserSetup.sleepStretches(weekday: DayOfWeek): List<IntRange> =
+    sleepStretches(nightEndingOn(weekday), nightEndingOn(weekday.shifted(1)))
 
+/**
+ * The night as it falls on one **date** — the same, with whatever was changed
+ * for that night alone. What the day planner shades and the evening subtracts;
+ * the standing week asks by weekday and sees no override.
+ */
+fun UserSetup.sleepStretches(date: LocalDate, overrides: Map<LocalDate, NightOverride>): List<IntRange> =
+    sleepStretches(
+        nightEndingOn(date, overrides),
+        nightEndingOn(date.plus(DatePeriod(days = 1)), overrides),
+    )
+
+/**
+ * Which night a minute of [date] lies in, as the date that night **ends** on —
+ * or null when it is not in a night at all.
+ *
+ * What a long press on the shaded hours has to know: the morning's stretch is
+ * the night that ends today, the evening's the one that ends tomorrow.
+ */
+fun UserSetup.nightDateAt(
+    date: LocalDate,
+    minute: Int,
+    overrides: Map<LocalDate, NightOverride> = emptyMap(),
+): LocalDate? {
+    val tomorrow = date.plus(DatePeriod(days = 1))
+    val endingToday = nightEndingOn(date, overrides)
+    val endingTomorrow = nightEndingOn(tomorrow, overrides)
+    return when {
+        minute >= endingToday.sleepOffset() && minute < endingToday.wake.minuteOfDay() -> date
+        minute >= MINUTES_PER_DAY + endingTomorrow.sleepOffset() &&
+            minute < MINUTES_PER_DAY + endingTomorrow.wake.minuteOfDay() -> tomorrow
+        else -> null
+    }
+}
+
+private fun sleepStretches(endingToday: NightTimes, endingTomorrow: NightTimes): List<IntRange> {
     return listOf(
         endingToday.sleepOffset() until endingToday.wake.minuteOfDay(),
         (MINUTES_PER_DAY + endingTomorrow.sleepOffset()) until

@@ -12,7 +12,9 @@ had become every box under every other). `SettingsPage` lists the pages in menu
 order under three section labels; the menu shows titles and nothing else, a tap
 opens the page, "‹ Einstellungen" or the system back returns. The page is held
 by name in `rememberSaveable`. **Flexibilität** (step 39) follows Advanced Features
-and applies at once the same way — see *Step 39*. Urlaubsmodus is a row that leads straight to its
+and applies at once the same way — see *Step 39* — and so does **Pausenchecker**
+(step 40) after it. The draft follows the stored row while it is untouched; see
+*Step 40*. Urlaubsmodus is a row that leads straight to its
 flow, Wertverfall and Absagen are listed only while the points are on, and
 Tutorial is the last row, under Debug. The tutorial page lists every tutorial;
 the ones about a single subject (`FeatureTutorialsBox`) are mounted a second

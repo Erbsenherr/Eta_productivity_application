@@ -18,7 +18,14 @@ import com.example.eta.domain.setup.DailySlot
 import com.example.eta.domain.setup.HousekeepingPlan
 import com.example.eta.domain.setup.MealPlan
 import com.example.eta.domain.setup.MindfulnessPlan
+import com.example.eta.domain.setup.DEFAULT_WEEKEND
+import com.example.eta.domain.setup.NightMode
 import com.example.eta.domain.setup.NightTimes
+import com.example.eta.domain.setup.nightEndingOn
+import com.example.eta.domain.setup.nightMode
+import com.example.eta.domain.setup.rhythmDiverges
+import com.example.eta.domain.setup.withNightEndingOn
+import com.example.eta.domain.setup.withNightMode
 import com.example.eta.domain.setup.TimeSpan
 import com.example.eta.domain.setup.WorkBlock
 import com.example.eta.domain.setup.UserSetup
@@ -27,19 +34,23 @@ import com.example.eta.domain.setup.WeeklySlot
 import com.example.eta.domain.setup.WorkSchedule
 import com.example.eta.domain.setup.bedPrepDuration
 import com.example.eta.domain.setup.sleepDuration
-import com.example.eta.domain.setup.suggestedWeekendNight
 import com.example.eta.domain.setup.weekdayNight
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
+import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaDurationPicker
+import com.example.eta.ui.components.EtaExpander
 import com.example.eta.ui.components.EtaField
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTimePicker
 import com.example.eta.ui.components.EtaWeekdayPicker
+import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
+import com.example.eta.ui.format.formatVeryShort
+import com.example.eta.ui.planner.RHYTHM_ADVICE
 import com.example.eta.ui.format.formatMinutes
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
@@ -153,26 +164,36 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
             "freien Stunden herausgerechnet.",
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg)) {
-            EtaField(label = "Bettfertig machen ab", hint = "Wird als tägliche Aufgabe angelegt.") {
-                EtaTimePicker(
-                    value = draft.bedPrepTime,
-                    onValueChange = { time -> onChange { it.copy(bedPrepTime = time) } },
-                )
-            }
-            EtaField(
-                label = "Schlafen gehen",
-                hint = AFTER_MIDNIGHT_HINT.takeIf { draft.weekdayNight.sleepsAfterMidnight },
-            ) {
-                EtaTimePicker(
-                    value = draft.sleepTime,
-                    onValueChange = { time -> onChange { it.copy(sleepTime = time) } },
-                )
-            }
-            EtaField(label = "Aufstehen") {
-                EtaTimePicker(
-                    value = draft.wakeTime,
-                    onValueChange = { time -> onChange { it.copy(wakeTime = time) } },
-                )
+            val mode = draft.nightMode
+            // Asked before it is granted: the third option is offered and
+            // advised against in the same breath.
+            var confirmingPerDay by remember { mutableStateOf(false) }
+
+            // With a night per weekday these three are answered seven times
+            // further down, and asking them here as well would be an eighth
+            // answer that means nothing.
+            if (mode != NightMode.PER_DAY) {
+                EtaField(label = "Bettfertig machen ab", hint = "Wird als tägliche Aufgabe angelegt.") {
+                    EtaTimePicker(
+                        value = draft.bedPrepTime,
+                        onValueChange = { time -> onChange { it.copy(bedPrepTime = time) } },
+                    )
+                }
+                EtaField(
+                    label = "Schlafen gehen",
+                    hint = AFTER_MIDNIGHT_HINT.takeIf { draft.weekdayNight.sleepsAfterMidnight },
+                ) {
+                    EtaTimePicker(
+                        value = draft.sleepTime,
+                        onValueChange = { time -> onChange { it.copy(sleepTime = time) } },
+                    )
+                }
+                EtaField(label = "Aufstehen") {
+                    EtaTimePicker(
+                        value = draft.wakeTime,
+                        onValueChange = { time -> onChange { it.copy(wakeTime = time) } },
+                    )
+                }
             }
             EtaField(
                 label = "Morgenroutine",
@@ -185,65 +206,60 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                     onValueChange = { duration -> onChange { it.copy(morningDuration = duration) } },
                 )
             }
-            DerivedHint(
-                "Nacht: ${draft.sleepDuration().formatShort()} · " +
-                    "Bettfertig: ${draft.bedPrepDuration().formatShort()}",
-            )
+            if (mode != NightMode.PER_DAY) {
+                DerivedHint(
+                    "Nacht: ${draft.sleepDuration().formatShort()} · " +
+                        "Bettfertig: ${draft.bedPrepDuration().formatShort()}",
+                )
+            }
 
-            val weekend = draft.weekendNight
             EtaField(
-                label = "Am Wochenende",
-                hint = "Eigene Schlafzeiten für die Tage, an denen du ausschlafen kannst.",
+                label = "Schlafrhythmus",
+                hint = "Ob jede Nacht gleich ist. Das Wochenende sind die Nächte von Freitag " +
+                    "auf Samstag und von Samstag auf Sonntag.",
             ) {
                 EtaChoice(
-                    options = listOf(false to "Wie unter der Woche", true to "Andere Zeiten"),
-                    selected = weekend != null,
-                    onSelect = { differs ->
-                        onChange {
-                            it.copy(
-                                weekendNight = if (differs) {
-                                    it.weekendNight ?: it.suggestedWeekendNight()
-                                } else {
-                                    null
-                                },
-                            )
+                    options = listOf(
+                        NightMode.SAME to "Jede Nacht gleich",
+                        NightMode.WEEKEND to "Anderer Schlafrhythmus am Wochenende",
+                        NightMode.PER_DAY to "Für jeden Wochentag selbst entscheiden",
+                    ),
+                    selected = mode,
+                    onSelect = { chosen ->
+                        if (chosen == NightMode.PER_DAY && mode != NightMode.PER_DAY) {
+                            confirmingPerDay = true
+                        } else if (chosen != mode) {
+                            onChange { it.withNightMode(chosen) }
                         }
                     },
                 )
             }
-            if (weekend != null) {
+
+            if (confirmingPerDay) {
+                ConfirmDialog(
+                    title = "Jeden Wochentag anders?",
+                    message = "Davon wird abgeraten: Für den Schlafrhythmus ist es nicht " +
+                        "empfohlen, an jedem Tag zu anderen Zeiten zu schlafen. Wenn es sich " +
+                        "nicht vermeiden lässt, achte auf Schlafausgleich und plane " +
+                        "gegebenenfalls einen Mittagsschlaf ein.",
+                    confirm = "Trotzdem",
+                    onDismiss = { confirmingPerDay = false },
+                    onConfirm = {
+                        onChange { it.withNightMode(NightMode.PER_DAY) }
+                        confirmingPerDay = false
+                    },
+                )
+            }
+
+            val weekend = draft.weekendNight
+            if (mode == NightMode.WEEKEND && weekend != null) {
                 fun change(transform: (NightTimes) -> NightTimes) =
                     onChange { it.copy(weekendNight = it.weekendNight?.let(transform)) }
-
-                // Which days those are is the user's to say: a week that works
-                // Wednesday to Sunday has its weekend on Monday and Tuesday.
-                val days = draft.weekendDays
-                EtaField(
-                    label = "Welche Tage sind dein Wochenende?",
-                    hint = "Die Tage, an denen du nach diesen Zeiten aufstehst — der " +
-                        "Abend davor gehört jeweils dazu.",
-                ) {
-                    EtaWeekdayPicker(
-                        selected = days,
-                        onToggle = { day ->
-                            onChange {
-                                val next = if (day in it.weekendDays) {
-                                    it.weekendDays - day
-                                } else {
-                                    it.weekendDays + day
-                                }
-                                // A weekend of no days is "Wie unter der Woche",
-                                // and that is the switch above.
-                                if (next.isEmpty()) it else it.copy(weekendDays = next)
-                            }
-                        },
-                        days = WEEK,
-                    )
-                }
 
                 // The days are named beside each hour, because an hour alone
                 // does not say which day's it is — least of all one after
                 // midnight, which falls on the day of getting up.
+                val days = DEFAULT_WEEKEND
                 EtaField(
                     label = "Bettfertig machen ab (${formatWeekdays(weekend.bedPrepDays(days))})",
                 ) {
@@ -271,6 +287,66 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                     "Nacht am Wochenende: ${weekend.sleepDuration().formatShort()} · " +
                         "Bettfertig: ${weekend.bedPrepDuration().formatShort()}",
                 )
+            }
+
+            if (mode == NightMode.PER_DAY) {
+                // A night belongs to the day it ends on, so that is what each
+                // fold is named after; closed, it says its hours.
+                WEEK.forEach { wakeDay ->
+                    val night = draft.nightEndingOn(wakeDay)
+                    fun change(transform: (NightTimes) -> NightTimes) =
+                        onChange { it.withNightEndingOn(wakeDay, transform(it.nightEndingOn(wakeDay))) }
+
+                    EtaExpander(
+                        label = "Nacht auf ${wakeDay.formatLong()}",
+                        summary = "${night.sleep.formatClock()} – ${night.wake.formatClock()} · " +
+                            night.sleepDuration().formatShort(),
+                    ) {
+                        val one = setOf(wakeDay)
+                        EtaField(
+                            label = "Bettfertig machen ab (${formatWeekdays(night.bedPrepDays(one))})",
+                        ) {
+                            EtaTimePicker(
+                                value = night.bedPrep,
+                                onValueChange = { time -> change { it.copy(bedPrep = time) } },
+                            )
+                        }
+                        EtaField(
+                            label = "Schlafen gehen (${formatWeekdays(night.sleepDays(one))})",
+                            hint = AFTER_MIDNIGHT_HINT.takeIf { night.sleepsAfterMidnight },
+                        ) {
+                            EtaTimePicker(
+                                value = night.sleep,
+                                onValueChange = { time -> change { it.copy(sleep = time) } },
+                            )
+                        }
+                        EtaField(label = "Aufstehen (${wakeDay.formatVeryShort()})") {
+                            EtaTimePicker(
+                                value = night.wake,
+                                onValueChange = { time -> change { it.copy(wake = time) } },
+                            )
+                        }
+                        DerivedHint(
+                            "Nacht: ${night.sleepDuration().formatShort()} · " +
+                                "Bettfertig: ${night.bedPrepDuration().formatShort()}",
+                        )
+                    }
+                }
+            }
+
+            // More than an hour apart, whichever way it came about.
+            if (mode != NightMode.SAME && draft.rhythmDiverges()) {
+                EtaSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = EtaTheme.colors.warning,
+                    contentPadding = EtaTheme.spacing.md,
+                ) {
+                    EtaText(
+                        text = RHYTHM_ADVICE,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.warning,
+                    )
+                }
             }
         }
     }

@@ -1,10 +1,13 @@
 package com.example.eta.domain.setup
 
 import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.planning.minuteOfDay
+import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 
 /**
@@ -74,8 +77,107 @@ data class NightTimes(
 }
 
 /**
- * The days a weekend night ends on, unless the user says otherwise — see
- * [UserSetup.weekendDays]. Saturday and Sunday: Friday and Saturday evening.
+ * The same night with other hours: winding down keeps its length and moves with
+ * the bedtime. What every window that changes a night by hand writes — it asks
+ * for two hours, and the third follows.
+ */
+fun NightTimes.movedTo(sleep: LocalTime, wake: LocalTime): NightTimes {
+    val lead = bedPrepDuration().inWholeMinutes.toInt()
+    val bedPrep = LocalTime.fromSecondOfDay(
+        Math.floorMod(sleep.toSecondOfDay() - lead * 60, MINUTES_PER_DAY * 60),
+    )
+    return NightTimes(bedPrep = bedPrep, sleep = sleep, wake = wake)
+}
+
+/** How far apart two nights may lie before the app says something about it. */
+const val RHYTHM_TOLERANCE_MINUTES = 60
+
+/**
+ * How far [nights] lie apart: the widest gap between two bedtimes or between
+ * two hours of getting up, whichever is wider, in minutes.
+ *
+ * Bedtimes are compared as offsets from the wake day's midnight, so half past
+ * eleven and half past midnight are an hour apart rather than twenty-three.
+ */
+fun rhythmSpread(nights: Collection<NightTimes>): Int {
+    if (nights.size < 2) return 0
+    val bedtimes = nights.map { it.sleepOffset() }
+    val wakes = nights.map { it.wake.minuteOfDay() }
+    return maxOf(bedtimes.max() - bedtimes.min(), wakes.max() - wakes.min())
+}
+
+/** Whether [nights] differ by **more** than an hour — the point the advice is given at. */
+fun rhythmDiverges(nights: Collection<NightTimes>): Boolean =
+    rhythmSpread(nights) > RHYTHM_TOLERANCE_MINUTES
+
+/**
+ * How the week's nights are answered.
+ *
+ * [SAME] is one night for every day, [WEEKEND] a second one for Friday and
+ * Saturday evening, [PER_DAY] a night for each weekday — which the app offers
+ * and advises against.
+ */
+enum class NightMode { SAME, WEEKEND, PER_DAY }
+
+/**
+ * Which of the three the answers amount to.
+ *
+ * A weekend on days other than Saturday and Sunday could be chosen between
+ * steps 33 and 40. It no longer can, and what such a setup holds *is* a night
+ * per weekday — so it is read as one, and its first edit writes it as one.
+ */
+val UserSetup.nightMode: NightMode
+    get() = when {
+        nightsByDay != null -> NightMode.PER_DAY
+        weekendNight == null -> NightMode.SAME
+        weekendDays != DEFAULT_WEEKEND -> NightMode.PER_DAY
+        else -> NightMode.WEEKEND
+    }
+
+/** All seven nights, by the day each ends on. */
+fun UserSetup.allNights(): Map<DayOfWeek, NightTimes> = WEEK.associateWith { nightEndingOn(it) }
+
+/** Whether the week's nights lie more than an hour apart. */
+fun UserSetup.rhythmDiverges(): Boolean = rhythmDiverges(allNights().values)
+
+/**
+ * The answers switched to [mode], keeping as much of what was answered as the
+ * new mode can hold.
+ *
+ * Going to [NightMode.PER_DAY] starts from the nights as they are, so nothing
+ * moves by choosing it. Leaving it drops the seven; a weekend night that stood
+ * before is still there and comes back.
+ */
+fun UserSetup.withNightMode(mode: NightMode): UserSetup = when (mode) {
+    NightMode.SAME -> copy(weekendNight = null, nightsByDay = null)
+    NightMode.WEEKEND -> copy(
+        nightsByDay = null,
+        weekendNight = weekendNight ?: suggestedWeekendNight(),
+        weekendDays = DEFAULT_WEEKEND,
+    )
+    NightMode.PER_DAY -> copy(nightsByDay = allNights())
+}
+
+/** The answers with the night that ends on [day] changed, and that one alone. */
+fun UserSetup.withNightEndingOn(day: DayOfWeek, night: NightTimes): UserSetup =
+    copy(nightsByDay = allNights() + (day to night))
+
+/**
+ * The night that ends on [date], a one-off change for that date included.
+ *
+ * What the day planner, the wake alarm and the evening's sums ask. The standing
+ * week — the Wochenschema, the timetable's "Generell", the overlap warnings —
+ * asks [nightEndingOn] by weekday and never sees an override.
+ */
+fun UserSetup.nightEndingOn(date: LocalDate, overrides: Map<LocalDate, NightOverride>): NightTimes {
+    val usual = nightEndingOn(date.dayOfWeek)
+    return overrides[date]?.let { usual.movedTo(it.sleep, it.wake) } ?: usual
+}
+
+/**
+ * The days a weekend night ends on: Saturday and Sunday, so Friday and Saturday
+ * evening. Fixed again since step 40 — a week that runs differently is answered
+ * with a night per weekday.
  */
 val DEFAULT_WEEKEND: Set<DayOfWeek> = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
 
@@ -85,9 +187,14 @@ fun DayOfWeek.shifted(days: Int): DayOfWeek = WEEK[Math.floorMod(WEEK.indexOf(th
 /** The night of an ordinary day — the three times the questionnaire always asks for. */
 val UserSetup.weekdayNight: NightTimes get() = NightTimes(bedPrepTime, sleepTime, wakeTime)
 
-/** The night that ends on [weekday]: the weekend's own where one was given. */
-fun UserSetup.nightEndingOn(weekday: DayOfWeek): NightTimes =
-    weekendNight?.takeIf { weekday in weekendDays } ?: weekdayNight
+/**
+ * The night that ends on [weekday]: its own where every weekday has one, else
+ * the weekend's where one was given.
+ */
+fun UserSetup.nightEndingOn(weekday: DayOfWeek): NightTimes {
+    nightsByDay?.let { return it[weekday] ?: weekdayNight }
+    return weekendNight?.takeIf { weekday in weekendDays } ?: weekdayNight
+}
 
 fun UserSetup.wakeTimeOn(weekday: DayOfWeek): LocalTime = nightEndingOn(weekday).wake
 
@@ -97,8 +204,10 @@ fun UserSetup.sleepMinutesPerWeek(): Int =
 
 /**
  * What a weekend night is seeded with when the option is switched on: an hour
- * later to bed and two hours longer in it. Derived from the weekday night so it
- * moves with whatever was already answered there.
+ * later, to bed and out of it. Derived from the weekday night so it moves with
+ * whatever was already answered there — and exactly an hour, the most the app
+ * does not advise against: a suggestion that set off its own warning would be
+ * an odd thing to suggest. (It was two hours longer in bed until step 40.)
  */
 fun UserSetup.suggestedWeekendNight(): NightTimes {
     fun LocalTime.plusMinutes(minutes: Int) =
@@ -106,7 +215,7 @@ fun UserSetup.suggestedWeekendNight(): NightTimes {
     return NightTimes(
         bedPrep = bedPrepTime.plusMinutes(60),
         sleep = sleepTime.plusMinutes(60),
-        wake = wakeTime.plusMinutes(120),
+        wake = wakeTime.plusMinutes(60),
     )
 }
 

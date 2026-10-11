@@ -1,6 +1,7 @@
 package com.example.eta.alarm
 
 import android.content.Context
+import com.example.eta.data.repository.NightService
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.domain.planning.WAKE_SNOOZE
 import com.example.eta.domain.planning.nextWake
@@ -34,6 +35,8 @@ class WakeAlarmCoordinator(
      * one would ring on the user's real phone — in place of their own.
      */
     private val enabled: Boolean = true,
+    /** Nights changed for one date: the alarm rings at their hour. */
+    private val nightService: NightService? = null,
 ) {
 
     private val scheduler = WakeAlarmScheduler(context)
@@ -42,7 +45,9 @@ class WakeAlarmCoordinator(
     suspend fun reschedule() {
         if (!enabled) return
         val setup = setupRepository.find()
-        val due = setup?.let { nextWake(it, clock.now().toLocalDateTime(timeZone)) }
+        val due = setup?.let {
+            nextWake(it, clock.now().toLocalDateTime(timeZone), nightService?.overrides().orEmpty())
+        }
         if (due == null) {
             scheduler.cancel()
             // Turning the alarm off while it is ringing has to silence it too,

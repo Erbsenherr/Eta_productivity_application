@@ -66,6 +66,9 @@ import com.example.eta.ui.theme.DesignChoice
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.ui.subtasks.MorningRoutineSteps
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.domain.setup.NightMode
+import com.example.eta.domain.setup.nightMode
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -237,14 +240,19 @@ fun SettingsScreen(
                                 onStartTutorial?.let { FeatureTutorialsBox(onStart = it) }
                             }
                             SettingsPage.FLEXIBILITY -> FlexibilityBox(setup, viewModel::setFeature)
+                            SettingsPage.BREAKS -> BreakCheckerBox(setup, viewModel::setFeature)
                             SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
                             SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
                             else -> Unit
                         }
 
-                        // The switches of the Advanced Features and of the
-                        // Flexibilität apply at once and have nothing to save.
-                        if (page != SettingsPage.FEATURES && page != SettingsPage.FLEXIBILITY) {
+                        // The switches of the Advanced Features, the Flexibilität
+                        // and the Pausenchecker apply at once and have nothing
+                        // to save.
+                        if (page != SettingsPage.FEATURES &&
+                            page != SettingsPage.FLEXIBILITY &&
+                            page != SettingsPage.BREAKS
+                        ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
                                 EtaButton(text = "Sichern", enabled = dirty, onClick = viewModel::save)
                                 if (dirty) {
@@ -286,6 +294,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     ANNOUNCEMENT("Ansagen", SettingsSection.SETUP),
     FEATURES("Advanced Features", SettingsSection.SETUP),
     FLEXIBILITY("Flexibilität", SettingsSection.SETUP),
+    BREAKS("Pausenchecker", SettingsSection.SETUP),
     INFLATION("Wertverfall", SettingsSection.SETUP),
     CANCELLATION("Absagen", SettingsSection.SETUP),
 
@@ -622,6 +631,61 @@ private fun FlexibilityBox(setup: UserSetup, onChange: OnSetupChange) {
                 hint = "Im Tagesplaner lässt sich ein neues ToDo anlegen, obwohl in der " +
                     "Wochenliste noch Aufgaben warten, die in den Tag passen würden.",
             )
+        }
+    }
+}
+
+/**
+ * The Pausenchecker: on or off, and what it measures a day against.
+ *
+ * A help, not a rule — it warns in the day planner and each warning can be
+ * waved away for its day, so nothing here stops a plan from being confirmed.
+ * Applied at once, like the switches above it in the menu.
+ */
+@Composable
+private fun BreakCheckerBox(setup: UserSetup, onChange: OnSetupChange) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Pausenchecker", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Gilt sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            CheckRow(
+                checked = setup.breakChecker,
+                onCheckedChange = { on -> onChange { it.copy(breakChecker = on) } },
+                label = "Auf Pausen achten",
+                hint = "Der Tagesplaner weist darauf hin, wenn für einen Tag zu wenig Pause " +
+                    "verplant ist. Als Pause zählen Pausen, Freizeit, Essen, Achtsamkeit, " +
+                    "Social und Custom Spend — Pomodoro-Pausen kommen obendrauf und zählen " +
+                    "nicht mit. Jeder Hinweis lässt sich für den Tag ignorieren.",
+            )
+            if (setup.breakChecker) {
+                EtaField(
+                    label = "Pause je 2 Stunden Aufgaben",
+                    hint = "So viel Pause sollte auf je zwei volle Stunden Aufgaben kommen.",
+                ) {
+                    EtaDurationPicker(
+                        value = setup.breakPerTwoHours,
+                        onValueChange = { amount -> onChange { it.copy(breakPerTwoHours = amount) } },
+                        step = 5.minutes,
+                        minimum = 5.minutes,
+                    )
+                }
+                EtaField(
+                    label = "Längste Strecke ohne Pause",
+                    hint = "Liegen zwischen zwei Pausen — oder vor der ersten, nach der " +
+                        "letzten — mehr Aufgaben als das, weist der Planer darauf hin.",
+                ) {
+                    EtaDurationPicker(
+                        value = setup.breakMaxStretch,
+                        onValueChange = { length -> onChange { it.copy(breakMaxStretch = length) } },
+                        step = 30.minutes,
+                        minimum = 1.hours,
+                    )
+                }
+            }
         }
     }
 }
@@ -1085,11 +1149,16 @@ private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Weckruf", style = EtaTheme.typography.heading)
-            val weekendWake = setup.weekendNight?.wake
-            val hours = setup.wakeTime.formatClock() +
-                (weekendWake?.let { ", am Wochenende um ${it.formatClock()}" } ?: "")
+            // As many hours as the week has: one, the weekend's beside it, or
+            // one per weekday, which is too many to list in a sentence.
+            val hours = when (setup.nightMode) {
+                NightMode.SAME -> "um ${setup.wakeTime.formatClock()} Uhr"
+                NightMode.WEEKEND -> "um ${setup.wakeTime.formatClock()}, am Wochenende um " +
+                    "${setup.weekendNight?.wake?.formatClock()} Uhr"
+                NightMode.PER_DAY -> "zur Aufstehzeit des jeweiligen Tages"
+            }
             EtaText(
-                text = "Eta weckt dich um $hours Uhr — dieselbe " +
+                text = "Eta weckt dich $hours — dieselbe " +
                     "Aufstehzeit, die oben im Schlaf steht. Der Weckruf klingelt über den " +
                     "Sperrbildschirm und läutet, bis du ihn beendest oder neun Minuten " +
                     "schlummerst.",
@@ -1099,7 +1168,7 @@ private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
             EtaChoice(
                 options = listOf(
                     false to "Kein Weckruf",
-                    true to if (weekendWake == null) {
+                    true to if (setup.nightMode == NightMode.SAME) {
                         "Jeden Tag um ${setup.wakeTime.formatClock()} wecken"
                     } else {
                         "Jeden Tag zur Aufstehzeit wecken"

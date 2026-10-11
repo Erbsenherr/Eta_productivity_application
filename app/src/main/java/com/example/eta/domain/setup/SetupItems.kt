@@ -113,7 +113,7 @@ fun UserSetup.recurringItems(now: Instant): List<Item> {
         }
     }
 
-    if (weekendNight == null) {
+    if (nightMode == NightMode.SAME) {
         daily("bedprep", SetupLabels.BED_PREP, null, bedPrepTime, bedPrepDuration(), ItemRole.BED_PREP)
         daily("morning", SetupLabels.MORNING, null, wakeTime, morningDuration, ItemRole.MORNING)
     } else {

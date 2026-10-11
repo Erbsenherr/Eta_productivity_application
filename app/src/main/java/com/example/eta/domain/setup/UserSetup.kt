@@ -13,6 +13,8 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import com.example.eta.domain.planning.DEFAULT_BREAK_MAX_STRETCH
+import com.example.eta.domain.planning.DEFAULT_BREAK_PER_TWO_HOURS
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 
@@ -344,6 +346,13 @@ data class UserSetup(
      * their weekend on Monday and Tuesday. Means nothing without a [weekendNight].
      */
     val weekendDays: Set<DayOfWeek> = DEFAULT_WEEKEND,
+    /**
+     * "Für jeden Wochentag selbst entscheiden": a night for each weekday, by the
+     * day it **ends** on. Null unless that was chosen; non-null it overrules
+     * [weekendNight], which is kept so that switching back finds it again.
+     * Always all seven — see `allNights`.
+     */
+    val nightsByDay: Map<DayOfWeek, NightTimes>? = null,
     /** How much of the morning belongs to getting going, starting at [wakeTime]. */
     val morningDuration: Duration,
     val meals: MealPlan,
@@ -438,6 +447,16 @@ data class UserSetup(
      */
     val allowPrioritySkip: Boolean = false,
     val allowTodoBesideWeek: Boolean = false,
+    /**
+     * The Pausenchecker: whether the day planner says when a day holds too
+     * little rest, and what "too little" is — [breakPerTwoHours] of rest for
+     * every full two hours of tasks, and no more than [breakMaxStretch] of
+     * tasks without any. On for everyone, at the user's request; each warning
+     * can be waved away for its day. See `checkBreaks`.
+     */
+    val breakChecker: Boolean = true,
+    val breakPerTwoHours: Duration = DEFAULT_BREAK_PER_TWO_HOURS,
+    val breakMaxStretch: Duration = DEFAULT_BREAK_MAX_STRETCH,
     val completedAt: Instant,
     val updatedAt: Instant,
 ) {

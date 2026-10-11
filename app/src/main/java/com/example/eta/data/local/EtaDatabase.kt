@@ -13,7 +13,9 @@ import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.DayPlan
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.JournalEntry
+import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.PlannedBlock
+import com.example.eta.domain.model.PlannerDismissal
 import com.example.eta.domain.model.PointsTransaction
 import com.example.eta.domain.model.Reminder
 import com.example.eta.domain.model.Reward
@@ -43,8 +45,10 @@ import com.example.eta.domain.setup.UserSetup
         SubtaskCheck::class,
         Reward::class,
         RewardTask::class,
+        NightOverride::class,
+        PlannerDismissal::class,
     ],
-    version = 28,
+    version = 29,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -62,6 +66,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun conflictDao(): ConflictDao
     abstract fun subtaskDao(): SubtaskDao
     abstract fun rewardDao(): RewardDao
+    abstract fun plannerExtrasDao(): PlannerExtrasDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -868,6 +873,51 @@ val MIGRATION_27_28 = object : Migration(27, 28) {
         )
         connection.execSQL(
             "ALTER TABLE `user_setup` ADD COLUMN `allowTodoBesideWeek` INTEGER NOT NULL DEFAULT 0",
+        )
+    }
+}
+
+/**
+ * Step 40: nights changed by hand, and the Pausenchecker.
+ *
+ * - `user_setup.nightsByDay` — a night per weekday, null for everyone.
+ * - `user_setup.breakChecker` (on) with `breakPerTwoHours` (900 s) and
+ *   `breakMaxStretch` (10 800 s). On for whoever upgrades too: it is a hint that
+ *   can be waved away, and the user asked for it to be there.
+ * - `night_overrides` and `planner_dismissals`, both keyed by a date.
+ */
+val MIGRATION_28_29 = object : Migration(28, 29) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `nightsByDay` TEXT")
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `breakChecker` INTEGER NOT NULL DEFAULT 1",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `breakPerTwoHours` INTEGER NOT NULL DEFAULT 900",
+        )
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `breakMaxStretch` INTEGER NOT NULL DEFAULT 10800",
+        )
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `night_overrides` (
+                `date` TEXT NOT NULL,
+                `sleep` INTEGER NOT NULL,
+                `wake` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`date`)
+            )
+            """.trimIndent(),
+        )
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `planner_dismissals` (
+                `date` TEXT NOT NULL,
+                `kind` TEXT NOT NULL,
+                `dismissedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`date`, `kind`)
+            )
+            """.trimIndent(),
         )
     }
 }

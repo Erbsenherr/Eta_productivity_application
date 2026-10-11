@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.AddItemResult
+import com.example.eta.alarm.WakeAlarmCoordinator
 import com.example.eta.data.repository.ItemRepository
+import com.example.eta.data.repository.NightService
 import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.PointsRepository
 import com.example.eta.data.repository.ScheduleMaintenance
@@ -17,6 +19,7 @@ import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.DayPlan
 import com.example.eta.domain.model.Item
+import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.model.ItemType
 import com.example.eta.domain.model.PlannedBlock
@@ -25,7 +28,10 @@ import com.example.eta.domain.model.Stage
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.stampedWith
 import com.example.eta.domain.model.withExtras
+import com.example.eta.domain.planning.BreakFindings
 import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.planning.PlannerWarning
+import com.example.eta.domain.planning.checkBreaks
 import com.example.eta.domain.planning.SPONTANEOUS_BREAK
 import com.example.eta.domain.planning.canPlace
 import com.example.eta.domain.planning.coveringMinute
@@ -45,6 +51,7 @@ import com.example.eta.domain.reward.CUSTOM_EARN_POINTS_PER_HOUR
 import com.example.eta.domain.reward.CUSTOM_SPEND_POINTS_PER_HOUR
 import com.example.eta.domain.reward.SOCIAL_POINTS_PER_HOUR
 import com.example.eta.domain.reward.plannedYield
+import com.example.eta.domain.setup.UserSetup
 import com.example.eta.ui.attributes.TodoAttributes
 import com.example.eta.ui.subtasks.SubtaskSetting
 import com.example.eta.ui.subtasks.addedDuration
@@ -122,6 +129,16 @@ data class PlannerUiState(
      * day is not one that is being dodged.
      */
     val canCreateTodo: Boolean = true,
+    /**
+     * The standing answers and the nights changed for one date — what the
+     * window behind a long press on the shaded night is drawn from.
+     */
+    val setup: UserSetup? = null,
+    val nightOverrides: Map<LocalDate, NightOverride> = emptyMap(),
+    /** What the Pausenchecker found, or null while it is switched off. */
+    val breaks: BreakFindings? = null,
+    /** The warnings waved away for this day. */
+    val dismissedWarnings: Set<PlannerWarning> = emptySet(),
     /** Minutes of the day the night covers; shaded rather than drawn as blocks. */
     val sleep: List<IntRange> = emptyList(),
     val isConfirmed: Boolean = false,
@@ -234,6 +251,13 @@ sealed interface PendingPlacement {
     ) : PendingPlacement
 }
 
+/** The standing answers, and what this day carries beside its blocks. */
+private data class DayFrame(
+    val setup: UserSetup?,
+    val overrides: Map<LocalDate, NightOverride>,
+    val dismissed: Set<PlannerWarning>,
+)
+
 /** The four things about one day that are always read together. */
 private data class DayState(
     val blocks: List<BlockWithItem>,
@@ -251,6 +275,8 @@ class DayPlannerViewModel(
     private val scheduleMaintenance: ScheduleMaintenance,
     private val weekPlanningService: WeekPlanningService,
     pointsRepository: PointsRepository,
+    private val nightService: NightService,
+    private val wakeAlarmCoordinator: WakeAlarmCoordinator,
     private val day: PlannerDay = PlannerDay.TOMORROW,
     private val clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
@@ -315,14 +341,21 @@ class DayPlannerViewModel(
         subtaskRepository.observeChecked(date),
     ) { blocks, dayPlan, subtasks, checked -> DayState(blocks, dayPlan, subtasks, checked) }
 
+    private val frame = combine(
+        setupRepository.observe(),
+        nightService.observeOverrides(),
+        nightService.observeDismissed(date),
+    ) { setup, overrides, dismissed -> DayFrame(setup, overrides, dismissed) }
+
     val uiState: StateFlow<PlannerUiState> = combine(
         dayState,
         itemRepository.observeStage(Stage.WEEK),
-        setupRepository.observe(),
+        frame,
         skippedTiers,
         itemRepository.observeFoldCandidates(),
-    ) { read, weekItems, setup, skipped, foldable ->
+    ) { read, weekItems, frame, skipped, foldable ->
         val (allBlocks, dayPlan, subtasks, checked) = read
+        val setup = frame.setup
         // Two ways a block leaves the plan, and they look different on screen. A
         // **cancellation** gives its hours back and is not drawn at all. A
         // **completed** block has been dealt with: the stretch it held is free
@@ -365,7 +398,13 @@ class DayPlannerViewModel(
             canSkipPriority = canSkip,
             prioritySkipped = canSkip && skipped > 0,
             canCreateTodo = setup?.allowTodoBesideWeek == true || candidates.none(fits),
-            sleep = setup?.sleepStretches(date.dayOfWeek).orEmpty(),
+            sleep = setup?.sleepStretches(date, frame.overrides).orEmpty(),
+            setup = setup,
+            nightOverrides = frame.overrides,
+            breaks = setup?.takeIf { it.breakChecker }?.let {
+                checkBreaks(allBlocks, it.breakPerTwoHours, it.breakMaxStretch)
+            },
+            dismissedWarnings = frame.dismissed,
             // Today is never locked by its confirmation: that confirmation was
             // last night's planning, and this screen exists to correct it.
             isConfirmed = day == PlannerDay.TOMORROW && dayPlan?.isConfirmed == true,
@@ -1030,6 +1069,29 @@ class DayPlannerViewModel(
                 ),
             )
         }
+    }
+
+    /**
+     * The night that ends on [wakeDate] gets hours of its own — that night and
+     * no other. See [NightService.overrideNight] for what moves with it.
+     */
+    fun changeNight(wakeDate: LocalDate, sleep: LocalTime, wake: LocalTime) {
+        viewModelScope.launch {
+            nightService.overrideNight(wakeDate, sleep, wake)
+            wakeAlarmCoordinator.reschedule()
+        }
+    }
+
+    fun resetNight(wakeDate: LocalDate) {
+        viewModelScope.launch {
+            nightService.clearOverride(wakeDate)
+            wakeAlarmCoordinator.reschedule()
+        }
+    }
+
+    /** "Ignorieren" under a warning: gone for this day, and it stays gone. */
+    fun dismissWarning(warning: PlannerWarning) {
+        viewModelScope.launch { nightService.dismiss(date, warning) }
     }
 
     /** Ends the planning phase; the day then reads as the "Liste für Morgen". */

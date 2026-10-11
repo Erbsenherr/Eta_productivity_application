@@ -39,6 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.domain.planning.TimelineDraft
 import com.example.eta.domain.planning.minuteToLocalTime
+import com.example.eta.domain.planning.nightDateAt
+import com.example.eta.domain.setup.allNights
+import com.example.eta.domain.setup.nightEndingOn
+import com.example.eta.ui.planner.NightEditDialog
 import com.example.eta.domain.setup.WEEK
 import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.attributes.RecurringAttributes
@@ -104,6 +108,8 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
     var creating by remember { mutableStateOf<Pair<DayOfWeek, TimelineDraft>?>(null) }
     // Held as an id and resolved against the tasks as they are now.
     var editingId by remember { mutableStateOf<String?>(null) }
+    // The weekday whose night a long press landed in — the day it ends on.
+    var editingNight by remember { mutableStateOf<DayOfWeek?>(null) }
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -160,7 +166,15 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
             ) {
                 DayTimeline(
                     blocks = state.blocksOn(pageDay, view, unlocked),
-                    sleep = state.sleepOn(pageDay),
+                    sleep = state.sleepOn(pageDay, view),
+                    // Read off the standing nights in both views: what the
+                    // window changes is the weekday's night, whatever a single
+                    // date in "Aktuell" happens to show.
+                    onSleepLongPress = { minute ->
+                        val date = state.dateOf(pageDay)
+                        editingNight = state.setup?.nightDateAt(date, minute)?.dayOfWeek
+                            ?: state.setup?.nightDateAt(date, minute, state.nightOverrides)?.dayOfWeek
+                    },
                     sleepLabels = true,
                     editable = true,
                     subtasks = state.subtasks,
@@ -212,6 +226,29 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
     }
 
     if (showInfo) WeekInfoDialog(onDismiss = { showInfo = false })
+
+    editingNight?.let { wakeDay ->
+        val setup = state.setup
+        if (setup == null) {
+            editingNight = null
+        } else {
+            NightEditDialog(
+                title = "Nacht auf ${wakeDay.formatLong()}",
+                scope = "Gilt ab jetzt für jede Nacht auf ${wakeDay.formatLong()} — und nur für " +
+                    "diesen Wochentag. Morgenroutine und »Bettfertig machen« ziehen mit; " +
+                    "heute, und morgen, wenn die Planung schon bestätigt ist, bleiben wie geplant.",
+                night = setup.nightEndingOn(wakeDay),
+                wakeDay = wakeDay,
+                // Against the other six: this one is about to be the odd one out.
+                compareWith = (setup.allNights() - wakeDay).values,
+                onDismiss = { editingNight = null },
+                onSave = { sleep, wake ->
+                    viewModel.saveNight(wakeDay, sleep, wake)
+                    editingNight = null
+                },
+            )
+        }
+    }
 
     pending?.let { request ->
         if (request.clashes == null) {

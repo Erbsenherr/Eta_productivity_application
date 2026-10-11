@@ -129,6 +129,10 @@ fun tutorialSetup(now: Instant, advanced: Boolean = false): UserSetup = UserSetu
         // tutorial says it is evening.
         dailyPlanningTime = TUTORIAL_EVENING,
         pointsSystem = true,
+        // Off in the practice app: the example day is laid out for the script,
+        // and a warning about its breaks would be one more thing on a screen
+        // the coach is already talking over.
+        breakChecker = false,
         growthTasks = advanced,
         contracts = advanced,
         rewards = advanced,

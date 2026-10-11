@@ -598,6 +598,8 @@ internal fun plannerViewModelFactory(
                 scheduleMaintenance = container.scheduleMaintenance,
                 weekPlanningService = container.weekPlanningService,
                 pointsRepository = container.pointsRepository,
+                nightService = container.nightService,
+                wakeAlarmCoordinator = container.wakeAlarmCoordinator,
                 day = day,
                 clock = container.clock,
             )
@@ -626,6 +628,9 @@ private fun weekTabViewModelFactory(container: AppContainer): ViewModelProvider.
     viewModelFactory {
         initializer {
             WeekTabViewModel(
+                nightService = container.nightService,
+                wakeAlarmCoordinator = container.wakeAlarmCoordinator,
+                taskStartCoordinator = container.taskStartCoordinator,
                 recurringTaskService = container.recurringTaskService,
                 planRepository = container.planRepository,
                 setupRepository = container.setupRepository,

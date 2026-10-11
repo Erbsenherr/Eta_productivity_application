@@ -112,6 +112,21 @@ class Converters {
     @ColumnTypeConverter
     fun stringToNightTimes(value: String?): NightTimes? = value?.let { NightTimes.decode(it) }
 
+    /** "MONDAY=79200,82800,25200;TUESDAY=…", in week order. */
+    @ColumnTypeConverter
+    fun nightsByDayToString(value: Map<DayOfWeek, NightTimes>?): String? =
+        value?.let { nights ->
+            DayOfWeek.entries.filter { it in nights }
+                .joinToString(";") { "${it.name}=${nights.getValue(it).encode()}" }
+        }
+
+    @ColumnTypeConverter
+    fun stringToNightsByDay(value: String?): Map<DayOfWeek, NightTimes>? =
+        value?.split(';')?.filter { it.isNotEmpty() }?.associate { entry ->
+            val (day, night) = entry.split('=', limit = 2)
+            DayOfWeek.valueOf(day) to NightTimes.decode(night)
+        }
+
     @ColumnTypeConverter
     fun workScheduleToString(value: WorkSchedule?): String? = value?.encode()
 

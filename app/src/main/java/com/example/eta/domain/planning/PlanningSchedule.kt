@@ -1,7 +1,8 @@
 package com.example.eta.domain.planning
 
 import com.example.eta.domain.setup.UserSetup
-import com.example.eta.domain.setup.wakeTimeOn
+import com.example.eta.domain.model.NightOverride
+import com.example.eta.domain.setup.nightEndingOn
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -66,12 +67,17 @@ val WAKE_SNOOZE: Duration = 9.minutes
  * Strict about "after", like the planning alarm and for the same reason: ringing at the appointed minute must not be able to schedule that
  * same minute again and loop.
  */
-fun nextWake(setup: UserSetup, after: LocalDateTime): LocalDateTime? {
+fun nextWake(
+    setup: UserSetup,
+    after: LocalDateTime,
+    /** Nights changed for one date alone; the alarm rings at their hour. */
+    overrides: Map<LocalDate, NightOverride> = emptyMap(),
+): LocalDateTime? {
     if (!setup.wakeAlarm) return null
     // Day by day, since the weekend may get up at an hour of its own.
     for (offset in 0..7) {
         val date: LocalDate = after.date.plus(DatePeriod(days = offset))
-        val candidate = LocalDateTime(date, setup.wakeTimeOn(date.dayOfWeek))
+        val candidate = LocalDateTime(date, setup.nightEndingOn(date, overrides).wake)
         if (candidate > after) return candidate
     }
     return null
