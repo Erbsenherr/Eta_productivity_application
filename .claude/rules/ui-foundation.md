@@ -55,7 +55,8 @@ state of its own so the questionnaire does not flash on every cold start. Past t
 setup, `MainScaffold` splits everything into **tabs** and **flows**, and that split
 is the point:
 
-- A **tab** is a place you can always get back to — Heute, Listen, Verträge,
+- A **tab** is a place you can always get back to — Dashboard (called Heute until
+  step 39, and with Heute · Morgen · Woche as tabs of its own inside), Listen, Verträge,
   Erinnerungen, Growth-Tasks, Belohn-o-mat, Einstellungen, in that order since step 35;
   Verträge, Growth-Tasks and Belohn-o-mat only while their feature is switched on (*Step 36*) — so `EtaTabBar` stays put beneath it.
 - A **flow** is something you are in the middle of: a planning phase, the

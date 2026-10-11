@@ -74,6 +74,11 @@ snapping, and where a block can actually go.
   because they are different acts and only one of them is reversible by re-planning.
 - Confirming writes the `DayPlan`; the screen then reads as "Liste für Morgen" and a
   long press anywhere reopens it.
+- **The revolver folds away**, a long press on an empty stretch leaves a box that
+  becomes a ToDo, and the box is pushed and pinched into shape first — all three
+  since step 39, see *Step 39*. The timeline's new parameters (`movable`, `draft`,
+  `onEmptyLongPress`, `onBlockResized`, `sleepLabels`) are there because the week
+  timetable is drawn by the same `DayTimeline`.
 
 The revolver holds `Stage.WEEK` items, which the weekly planning phase fills.
 `PlannerDay` decides which day is on the screen: the planning phase is `TOMORROW`,
@@ -173,7 +178,8 @@ is drawn with rounded corners and dragged like a ToDo. Database **version 26**.
 ### The third revolver: Pause (step 29)
 
 The footer button walks through **three** revolvers now — ToDos → Punkte → Pause —
-and still names the one it leads to. `RevolverKind` carries the label and `next()`,
+and still names the one it leads to. (The second one lost its first chamber, "Neues
+ToDo", in step 39: a ToDo made on the spot is held into the day itself.) `RevolverKind` carries the label and `next()`,
 so a fourth is one line.
 
 The Pause revolver holds a single chamber, "Pause · 15 min · 0 Punkte". Dropping it

@@ -236,14 +236,15 @@ fun SettingsScreen(
                                 AdvancedFeaturesBox(setup, viewModel::setFeature)
                                 onStartTutorial?.let { FeatureTutorialsBox(onStart = it) }
                             }
+                            SettingsPage.FLEXIBILITY -> FlexibilityBox(setup, viewModel::setFeature)
                             SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
                             SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
                             else -> Unit
                         }
 
-                        // The switches of the Advanced Features apply at once and
-                        // have nothing to save.
-                        if (page != SettingsPage.FEATURES) {
+                        // The switches of the Advanced Features and of the
+                        // Flexibilität apply at once and have nothing to save.
+                        if (page != SettingsPage.FEATURES && page != SettingsPage.FLEXIBILITY) {
                             Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
                                 EtaButton(text = "Sichern", enabled = dirty, onClick = viewModel::save)
                                 if (dirty) {
@@ -284,6 +285,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     STILL_ACTIVE("Bin ich noch bei der Sache?", SettingsSection.SETUP),
     ANNOUNCEMENT("Ansagen", SettingsSection.SETUP),
     FEATURES("Advanced Features", SettingsSection.SETUP),
+    FLEXIBILITY("Flexibilität", SettingsSection.SETUP),
     INFLATION("Wertverfall", SettingsSection.SETUP),
     CANCELLATION("Absagen", SettingsSection.SETUP),
 
@@ -573,6 +575,52 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
                 onCheckedChange = { on -> onChange { it.copy(rewards = on) } },
                 label = "Belohn-o-mat",
                 hint = "Der Reiter, und die Seite am Abend, auf der sich die Belohnung füllt.",
+            )
+        }
+    }
+}
+
+/**
+ * The rules that may be loosened, each off until someone asks for it.
+ *
+ * The page opens on why: the app is meant to be used on its strictest rules, and
+ * this is where to go when that does not work for someone — not a list of
+ * features to try. Applied at once, like the Advanced Features: a switch that
+ * waited for a save button further down would read as one that does nothing.
+ */
+@Composable
+private fun FlexibilityBox(setup: UserSetup, onChange: OnSetupChange) {
+    EtaSurface(modifier = Modifier.fillMaxWidth(), borderColor = EtaTheme.colors.accent) {
+        EtaText(
+            text = "Eta ist darauf ausgelegt, mit den striktesten Einstellungen genutzt zu " +
+                "werden — die Regeln sind das, was die App leistet. Wenn du damit " +
+                "überhaupt nicht zurechtkommst, kannst du sie hier lockern.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+    }
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Flexibilität", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Gilt sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            CheckRow(
+                checked = setup.allowPrioritySkip,
+                onCheckedChange = { on -> onChange { it.copy(allowPrioritySkip = on) } },
+                label = "Prioritäten überspringen",
+                hint = "Im Tagesplaner lässt sich eine Prioritätsstufe von Hand " +
+                    "überspringen. Ausgeschaltet kommt die nächste Stufe erst, wenn die " +
+                    "höhere eingeplant ist oder nichts mehr von ihr in den Tag passt.",
+            )
+            CheckRow(
+                checked = setup.allowTodoBesideWeek,
+                onCheckedChange = { on -> onChange { it.copy(allowTodoBesideWeek = on) } },
+                label = "Neue ToDos trotz offener Wochenliste",
+                hint = "Im Tagesplaner lässt sich ein neues ToDo anlegen, obwohl in der " +
+                    "Wochenliste noch Aufgaben warten, die in den Tag passen würden.",
             )
         }
     }

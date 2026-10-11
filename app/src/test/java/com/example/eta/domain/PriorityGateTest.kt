@@ -95,4 +95,54 @@ class PriorityGateTest {
         assertEquals(Priority.WANT, priorityTier(listOf(bare, todo("x", Priority.WANT))).priority)
         assertNull(priorityTier(listOf(bare)).priority)
     }
+
+    @Test
+    fun `a tier of which nothing fits the day is passed by itself`() {
+        val candidates = listOf(
+            todo("zu lang", Priority.URGENT_MUST),
+            todo("passt", Priority.MUST),
+            todo("später", Priority.WANT),
+        )
+        val tier = priorityTier(candidates, fits = { it.name != "zu lang" })
+
+        assertEquals(Priority.MUST, tier.priority)
+        assertEquals(1, tier.passedAbove)
+        assertEquals(1, tier.lockedBelow)
+    }
+
+    @Test
+    fun `a tier holds as long as one of its cards still fits`() {
+        val candidates = listOf(
+            todo("zu lang", Priority.URGENT_MUST),
+            todo("kurz", Priority.URGENT_MUST),
+            todo("muss", Priority.MUST),
+        )
+        val tier = priorityTier(candidates, fits = { it.name != "zu lang" })
+
+        assertEquals(Priority.URGENT_MUST, tier.priority)
+        assertEquals(0, tier.passedAbove)
+        // The whole tier is offered; the card that does not fit refuses its own drop.
+        assertEquals(2, tier.items.size)
+    }
+
+    @Test
+    fun `when nothing fits anywhere the top tier is offered as before`() {
+        val candidates = listOf(todo("a", Priority.MUST), todo("b", Priority.WANT))
+        val tier = priorityTier(candidates, fits = { false })
+
+        assertEquals(Priority.MUST, tier.priority)
+        assertEquals(0, tier.passedAbove)
+    }
+
+    @Test
+    fun `a skip by hand counts from the tier that was reached`() {
+        val candidates = listOf(
+            todo("zu lang", Priority.URGENT_MUST),
+            todo("muss", Priority.MUST),
+            todo("später", Priority.WANT),
+        )
+        val tier = priorityTier(candidates, skipped = 1, fits = { it.name != "zu lang" })
+
+        assertEquals(Priority.WANT, tier.priority)
+    }
 }

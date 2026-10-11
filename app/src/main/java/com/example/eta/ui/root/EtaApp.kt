@@ -73,6 +73,8 @@ import com.example.eta.ui.tutorial.TutorialHost
 import com.example.eta.ui.tutorial.TutorialIntroScreen
 import com.example.eta.ui.vacation.VacationScreen
 import com.example.eta.ui.vacation.VacationViewModel
+import com.example.eta.ui.week.WeekTabScreen
+import com.example.eta.ui.week.WeekTabViewModel
 import com.example.eta.ui.weekplanner.WeekPlannerScreen
 import com.example.eta.ui.weekplanner.WeekPlannerViewModel
 import com.example.eta.widget.QuickAddWidgetProvider
@@ -348,6 +350,14 @@ private fun MainScaffold(
                     onReplanToday = { flow = AppFlow.PlannerToday },
                     onPlanWeek = { flow = AppFlow.WeekPlanner },
                     onCloseDay = { flow = AppFlow.Reevaluation },
+                    weekPage = {
+                        WeekTabScreen(
+                            viewModel = viewModel(
+                                key = "week-tab-$dateKey",
+                                factory = weekTabViewModelFactory(container),
+                            ),
+                        )
+                    },
                 )
 
                 EtaTab.Lists -> SmartListsScreen(
@@ -445,7 +455,11 @@ private fun currentDate(): LocalDate =
  * place to look things up, not something one is in the middle of.
  */
 private enum class EtaTab(val label: String) {
-    Today("Heute"),
+    /**
+     * Called "Heute" until it grew tabs of its own, one of which carries that
+     * name now. The entry keeps its, being what a saved tab is restored by.
+     */
+    Today("Dashboard"),
     Lists("Listen"),
     Contracts("Verträge"),
     Reminders("Erinnerungen"),
@@ -603,6 +617,20 @@ internal fun weekPlannerViewModelFactory(
                 planRepository = container.planRepository,
                 setupRepository = container.setupRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
+                clock = container.clock,
+            )
+        }
+    }
+
+private fun weekTabViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            WeekTabViewModel(
+                recurringTaskService = container.recurringTaskService,
+                planRepository = container.planRepository,
+                setupRepository = container.setupRepository,
+                subtaskRepository = container.subtaskRepository,
+                itemRepository = container.itemRepository,
                 clock = container.clock,
             )
         }

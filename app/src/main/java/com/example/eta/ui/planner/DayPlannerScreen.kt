@@ -1,6 +1,8 @@
 package com.example.eta.ui.planner
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -21,6 +23,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -36,6 +39,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Priority
 import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.planning.TimelineDraft
 import com.example.eta.domain.planning.autoScrollStep
 import com.example.eta.domain.planning.coveringMinute
 import com.example.eta.domain.planning.minuteOfDay
@@ -65,7 +69,6 @@ import kotlinx.datetime.toLocalDateTime
 private sealed interface DragPayload {
     data class Task(val item: Item) : DragPayload
     data class Spend(val kind: SpendKind) : DragPayload
-    data object NewTodo : DragPayload
     data object Break : DragPayload
 }
 
@@ -95,9 +98,6 @@ private enum class RevolverKind(val label: String) {
     fun shownLabel(): String =
         if (this == SPEND && !LocalPointsVisible.current) "Spontan" else label
 }
-
-/** The second revolver's first chamber. */
-private const val NEW_TODO_ID = "NEW_TODO"
 
 /** The third revolver's only one. */
 private const val BREAK_ID = "BREAK"
@@ -154,7 +154,17 @@ fun DayPlannerScreen(
     var choosingIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var clearingDay by remember { mutableStateOf(false) }
     var spendPrompt by remember { mutableStateOf<Pair<SpendKind, Int>?>(null) }
-    var newTodoMinute by remember { mutableStateOf<Int?>(null) }
+
+    // A ToDo made on the spot: held into an empty stretch, pushed and pinched
+    // into shape as [draft], and only then asked about as [newTodo]. It used to
+    // be a chamber of the second revolver, dropped and an hour long.
+    var draft by remember { mutableStateOf<TimelineDraft?>(null) }
+    var newTodo by remember { mutableStateOf<TimelineDraft?>(null) }
+
+    // The revolver folded away, so more of the day shows. The day keeps its
+    // scroll position through it: the viewport grows upward and the hour that
+    // lay against the revolver lies against the bar that is left of it.
+    var revolverFolded by rememberSaveable { mutableStateOf(false) }
 
     // Dragging past the edge of the screen scrolls the day under the finger, so
     // the hours off-screen can be reached at all.
@@ -173,7 +183,9 @@ fun DayPlannerScreen(
     // line goes back to the week list rather than to a time.
     var revolverBottom by remember { mutableFloatStateOf(0f) }
 
-    fun overRevolver(y: Float?): Boolean = y != null && revolverBottom > 0f && y < revolverBottom
+    // Folded, there is nothing above the day to drop a block on.
+    fun overRevolver(y: Float?): Boolean =
+        y != null && !revolverFolded && revolverBottom > 0f && y < revolverBottom
 
     val edgeDragging = dragPointerY != null
     LaunchedEffect(edgeDragging) {
@@ -194,15 +206,12 @@ fun DayPlannerScreen(
     }
 
     val taskEntries = state.revolver.map { it.toColouredRevolverEntry() }
-    // The spontaneous ToDo leads the second revolver: it is the one a stray
-    // thought reaches for, and dropping it is how it gets a time.
     // Custom Earn and Custom Spend are points and nothing else, so they leave
     // the revolver with the points system. What already stands on a day stays
-    // and is booked as before; Social is neutral and stays offered.
+    // and is booked as before; Social is neutral and stays offered. A ToDo made
+    // on the spot is no longer here — it is held into the day itself.
     val pointsVisible = LocalPointsVisible.current
-    val spendEntries = listOf(
-        RevolverEntry(id = NEW_TODO_ID, title = "Neues ToDo", subtitle = "spontan", accent = null),
-    ) + SpendKind.entries
+    val spendEntries = SpendKind.entries
         .filter { pointsVisible || it.pointsPerHour == 0.0 }
         .map { kind ->
             // Spending takes points to spend; the card stays, and says why not.
@@ -276,10 +285,15 @@ fun DayPlannerScreen(
                     ),
                 )
 
-                if (!state.isConfirmed && revolverKind == RevolverKind.TASKS) {
+                val revolverOut = !state.isConfirmed && !revolverFolded
+
+                if (revolverOut && revolverKind == RevolverKind.TASKS) {
                     PriorityBar(
                         priority = state.revolverPriority,
                         lockedBelow = state.lockedPriorities,
+                        passedAbove = state.passedPriorities,
+                        canSkip = state.canSkipPriority,
+                        skipped = state.prioritySkipped,
                         onSkip = viewModel::skipPriority,
                         onReset = viewModel::resetPriority,
                     )
@@ -288,7 +302,7 @@ fun DayPlannerScreen(
                 // The empty revolver is where the missing week list is actually
                 // felt, so the way to fill it belongs here rather than only on a
                 // screen behind a swipe.
-                if (!state.isConfirmed &&
+                if (revolverOut &&
                     revolverKind == RevolverKind.TASKS &&
                     state.revolver.isEmpty()
                 ) {
@@ -300,7 +314,7 @@ fun DayPlannerScreen(
                     )
                 }
 
-                if (!state.isConfirmed) {
+                if (revolverOut) {
                     Revolver(
                         modifier = Modifier.onGloballyPositioned {
                             revolverBottom = it.positionInRoot().y + it.size.height
@@ -320,7 +334,6 @@ fun DayPlannerScreen(
                                         ?.let { DragPayload.Task(it) }
 
                                 revolverKind == RevolverKind.BREAK -> DragPayload.Break
-                                entry.id == NEW_TODO_ID -> DragPayload.NewTodo
                                 else -> SpendKind.entries.firstOrNull { it.name == entry.id }
                                     ?.let { DragPayload.Spend(it) }
                             }
@@ -347,7 +360,6 @@ fun DayPlannerScreen(
                                         } else {
                                             spendPrompt = payload.kind to minute
                                         }
-                                    is DragPayload.NewTodo -> newTodoMinute = minute
                                     // No dialog: a break has nothing to ask. Its
                                     // length is changed like any block's, by a
                                     // long press on it.
@@ -355,6 +367,14 @@ fun DayPlannerScreen(
                                 }
                             }
                         },
+                    )
+                }
+
+                if (!state.isConfirmed) {
+                    RevolverFold(
+                        folded = revolverFolded,
+                        label = revolverKind.shownLabel(),
+                        onToggle = { revolverFolded = !revolverFolded },
                     )
                 }
 
@@ -389,6 +409,21 @@ fun DayPlannerScreen(
                                 minutePx = perMinute
                             },
                             onDragPointer = { dragPointerY = it },
+                            draft = draft,
+                            onDraftChange = { draft = it },
+                            // Null on the confirmed list, where a long press
+                            // anywhere means "reopen".
+                            onEmptyLongPress = if (state.isConfirmed) {
+                                null
+                            } else {
+                                { minute ->
+                                    if (state.canCreateTodo) {
+                                        draft = TimelineDraft.at(minute)
+                                    } else {
+                                        viewModel.refuseNewTodo()
+                                    }
+                                }
+                            },
                             onBlockLongPress = { entry, minute ->
                                 // What else is drawn over that minute. Two blocks
                                 // sharing an hour are stacked, and only the one on
@@ -449,7 +484,19 @@ fun DayPlannerScreen(
                     }
                 }
 
-                PlannerFooter(
+                // A box being shaped takes the footer: what it needs is the
+                // button that ends it, and confirming the day meanwhile would
+                // put the revolver away from under it.
+                val shaping = draft
+                if (shaping != null && !state.isConfirmed) {
+                    DraftFooter(
+                        onCancel = { draft = null },
+                        onConfirm = {
+                            newTodo = shaping
+                            draft = null
+                        },
+                    )
+                } else PlannerFooter(
                     confirmed = state.isConfirmed,
                     isToday = state.isToday,
                     revolverKind = revolverKind,
@@ -535,14 +582,15 @@ fun DayPlannerScreen(
         )
     }
 
-    newTodoMinute?.let { minute ->
+    newTodo?.let { box ->
         NewTodoDialog(
             today = state.date,
             foldCandidates = state.foldable.foldCandidatesExcept(),
-            onDismiss = { newTodoMinute = null },
+            duration = box.duration,
+            onDismiss = { newTodo = null },
             onCreate = { name, attributes ->
-                viewModel.createTodo(name, attributes, minute)
-                newTodoMinute = null
+                viewModel.createTodo(name, attributes, box.startMinute)
+                newTodo = null
             },
         )
     }
@@ -638,16 +686,74 @@ fun DayPlannerScreen(
 }
 
 /**
+ * The bar between the revolver and the day, and the way to fold the revolver
+ * away so more of the day shows.
+ *
+ * Always there while the day is being planned, in both states, which is what
+ * keeps the day where it is: it is the edge the hours lie against, and only what
+ * is above it comes and goes.
+ */
+@Composable
+private fun RevolverFold(folded: Boolean, label: String, onToggle: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onToggle)
+            .padding(horizontal = EtaTheme.spacing.lg, vertical = EtaTheme.spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        EtaText(
+            text = if (folded) "$label ausklappen" else "Einklappen",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textMuted,
+            modifier = Modifier.weight(1f),
+        )
+        EtaText(
+            text = if (folded) "▾" else "▴",
+            style = EtaTheme.typography.label,
+            color = EtaTheme.colors.textMuted,
+        )
+    }
+}
+
+/** What the footer is while a new ToDo's box is being pushed and pinched into shape. */
+@Composable
+private fun DraftFooter(onCancel: () -> Unit, onConfirm: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(EtaTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+    ) {
+        EtaText(
+            text = "Neues ToDo: Box verschieben, mit zwei Fingern länger oder kürzer ziehen.",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textMuted,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onCancel)
+            Spacer(Modifier.weight(1f))
+            EtaButton(text = "Bestätigen", onClick = onConfirm)
+        }
+    }
+}
+
+/**
  * Which priority the revolver is currently offering, and the way past it.
  *
- * Skipping is offered rather than done automatically: the point of the rule is
- * that the important things are offered first, so waving one past should take a
- * deliberate tap.
+ * The way past is a setting now ([canSkip], under Flexibilität): the point of
+ * the rule is that the important things come first, and a button beside it that
+ * waves them through made the rule a suggestion. A tier of which nothing fits
+ * the day any more is passed by itself, and the bar says so.
  */
 @Composable
 private fun PriorityBar(
     priority: Priority?,
     lockedBelow: Int,
+    passedAbove: Int,
+    canSkip: Boolean,
+    skipped: Boolean,
     onSkip: () -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
@@ -676,14 +782,25 @@ private fun PriorityBar(
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
+            if (passedAbove > 0) {
+                EtaText(
+                    text = if (passedAbove == 1) {
+                        "Eine höhere Stufe passt nicht mehr in den Tag."
+                    } else {
+                        "$passedAbove höhere Stufen passen nicht mehr in den Tag."
+                    },
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
         }
-        if (lockedBelow > 0) {
+        if (canSkip && lockedBelow > 0) {
             EtaButton(
                 text = "Überspringen",
                 style = EtaButtonStyle.Secondary,
                 onClick = onSkip,
             )
-        } else {
+        } else if (skipped) {
             EtaButton(
                 text = "Von vorn",
                 style = EtaButtonStyle.Secondary,
@@ -846,6 +963,10 @@ private fun BoxScope.PlacementBanner(
                     PlacementFeedback.NoPoints ->
                         "Custom Spend braucht Guthaben — dein Punktestand liegt bei 0 " +
                             "oder darunter."
+
+                    PlacementFeedback.WeekFirst ->
+                        "Du hast noch Aufgaben in deiner Woche, die du zuerst " +
+                            "abzuarbeiten hast."
 
                     is PlacementFeedback.DayCleared -> when (feedback.count) {
                         0 -> "Es stand nichts mehr offen."

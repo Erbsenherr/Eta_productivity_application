@@ -512,10 +512,15 @@ fun RecurringCreateDialog(
     /** The setup, for the night the Wochenschema books. Null draws no night. */
     setup: UserSetup? = null,
     foldCandidates: List<FoldCandidate> = emptyList(),
+    /**
+     * What the form opens on. The week timetable hands in the weekday, hour and
+     * length of the box that was shaped there; everything else is the default.
+     */
+    initial: RecurringAttributes = RecurringAttributes(),
 ) {
     var name by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    var attributes by remember { mutableStateOf(RecurringAttributes()) }
+    var attributes by remember { mutableStateOf(initial) }
 
     val overlaps = remember(attributes, definitions) {
         recurringOverlaps(attributes.slots(), definitions)

@@ -645,11 +645,15 @@ fun NewTodoDialog(
     today: LocalDate,
     /** ToDos the new card can swallow as steps. */
     foldCandidates: List<FoldCandidate> = emptyList(),
+    /** The length the box on the day was pinched to; the form opens on it. */
+    duration: Duration? = null,
     onDismiss: () -> Unit,
     onCreate: (name: String, attributes: TodoAttributes) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    var attributes by remember { mutableStateOf(TodoAttributes()) }
+    var attributes by remember {
+        mutableStateOf(TodoAttributes().let { if (duration != null) it.copy(duration = duration) else it })
+    }
 
     PlannerDialog(title = "Neues ToDo", onDismiss = onDismiss) {
         EtaField(label = "Name") {

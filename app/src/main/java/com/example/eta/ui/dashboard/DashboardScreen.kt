@@ -1,6 +1,8 @@
 package com.example.eta.ui.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,22 +10,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.data.local.BlockWithItem
@@ -52,13 +54,22 @@ import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
-private const val PAGE_TODAY = 0
-private const val PAGE_TOMORROW = 1
-private const val PAGE_COUNT = 2
+/**
+ * The dashboard's own tabs, across the top.
+ *
+ * Tapped, not swiped: on "Woche" a swipe turns the weekdays, and a screen where
+ * the same gesture means two things depending on where the thumb starts is one
+ * that gets it wrong half the time. Today and tomorrow used to be two pages of
+ * a pager; they are tabs like the third now.
+ */
+private enum class DashboardPage(val label: String) {
+    TODAY("Heute"),
+    TOMORROW("Morgen"),
+    WEEK("Woche"),
+}
 
 /**
- * The app's home screen. Swiping right reveals tomorrow, as the concept asks —
- * a pager rather than navigation, so the two days feel like one surface.
+ * The app's home screen: today, tomorrow and the week, each under its tab.
  */
 @Composable
 fun DashboardScreen(
@@ -75,31 +86,27 @@ fun DashboardScreen(
     onReplanToday: () -> Unit = {},
     onPlanWeek: () -> Unit = {},
     onCloseDay: () -> Unit = {},
+    /**
+     * The "Woche" page. Null leaves the tab out altogether — the tutorial's
+     * dashboard has none, there being nothing in its script to do there.
+     */
+    weekPage: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val editFeedback by viewModel.blockEditFeedback.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(initialPage = PAGE_TODAY) { PAGE_COUNT }
     val now = rememberTickingNow()
+
+    val pages = DashboardPage.entries.filter { it != DashboardPage.WEEK || weekPage != null }
+    var pageName by rememberSaveable { mutableStateOf(DashboardPage.TODAY.name) }
+    val page = pages.firstOrNull { it.name == pageName } ?: DashboardPage.TODAY
 
     EtaScreen(modifier = modifier, bottomInset = false) {
         Column(Modifier.fillMaxSize()) {
-            PageIndicator(
-                currentPage = pagerState.currentPage,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = EtaTheme.spacing.lg,
-                        end = EtaTheme.spacing.lg,
-                        top = EtaTheme.spacing.lg,
-                    ),
-            )
+            DashboardTabs(pages = pages, selected = page, onSelect = { pageName = it.name })
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
+            Box(Modifier.weight(1f)) {
                 when (page) {
-                    PAGE_TODAY -> TodayPage(
+                    DashboardPage.TODAY -> TodayPage(
                         state = state,
                         editFeedback = editFeedback,
                         now = now,
@@ -111,10 +118,71 @@ fun DashboardScreen(
                         onReplanToday = onReplanToday,
                     )
 
-                    else -> TomorrowPage(state, onPlanTomorrow, onPlanWeek)
+                    DashboardPage.TOMORROW -> TomorrowPage(state, onPlanTomorrow, onPlanWeek)
+                    DashboardPage.WEEK -> weekPage?.invoke()
                 }
             }
         }
+    }
+}
+
+/**
+ * Heute · Morgen · Woche, in the shape of the bar at the bottom of the screen:
+ * the label and a short accent mark, the chosen one in the accent colour. Three
+ * equal parts rather than a scrolling row — three short words always fit.
+ */
+@Composable
+private fun DashboardTabs(
+    pages: List<DashboardPage>,
+    selected: DashboardPage,
+    onSelect: (DashboardPage) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EtaTheme.colors.surface),
+        ) {
+            pages.forEach { page ->
+                val chosen = page == selected
+                val interactionSource = remember { MutableInteractionSource() }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { onSelect(page) },
+                        )
+                        .padding(vertical = EtaTheme.spacing.sm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    EtaText(
+                        text = page.label,
+                        style = if (chosen) EtaTheme.typography.label else EtaTheme.typography.caption,
+                        color = if (chosen) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(EtaTheme.spacing.xs))
+                    Box(
+                        modifier = Modifier
+                            .width(18.dp)
+                            .height(3.dp)
+                            .background(
+                                color = if (chosen) EtaTheme.colors.accent else EtaTheme.colors.surface,
+                                shape = EtaTheme.shapes.pill,
+                            ),
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(EtaTheme.colors.border),
+        )
     }
 }
 
@@ -491,36 +559,6 @@ private fun BlockEditFeedbackLine(
             )
             EtaButton(text = "OK", style = EtaButtonStyle.Secondary, onClick = onDismiss)
         }
-    }
-}
-
-@Composable
-private fun PageIndicator(currentPage: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(PAGE_COUNT) { page ->
-            Box(
-                modifier = Modifier
-                    .size(if (page == currentPage) 8.dp else 6.dp)
-                    .background(
-                        color = if (page == currentPage) {
-                            EtaTheme.colors.accent
-                        } else {
-                            EtaTheme.colors.border
-                        },
-                        shape = CircleShape,
-                    ),
-            )
-        }
-        Spacer(Modifier.width(EtaTheme.spacing.sm))
-        EtaText(
-            text = if (currentPage == PAGE_TODAY) "wischen für morgen" else "wischen für heute",
-            style = EtaTheme.typography.caption,
-            color = EtaTheme.colors.textMuted,
-        )
     }
 }
 

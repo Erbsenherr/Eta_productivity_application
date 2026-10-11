@@ -107,6 +107,21 @@ data class PlannerUiState(
     val revolverPriority: Priority? = null,
     /** Priorities being held back below the one on offer. */
     val lockedPriorities: Int = 0,
+    /** Higher priorities passed by themselves, nothing of them fitting the day. */
+    val passedPriorities: Int = 0,
+    /** Whether "Überspringen" is offered — the Flexibilität setting. */
+    val canSkipPriority: Boolean = false,
+    /** Whether tiers have been waved past by hand, so there is a way back to offer. */
+    val prioritySkipped: Boolean = false,
+    /**
+     * Whether a ToDo may be made on the spot by holding an empty stretch.
+     *
+     * Not while the week list still holds something that could go on this day
+     * instead — unless the Flexibilität setting says otherwise. "Could go" is
+     * the same test the priority gate applies: a card that fits nowhere on the
+     * day is not one that is being dodged.
+     */
+    val canCreateTodo: Boolean = true,
     /** Minutes of the day the night covers; shaded rather than drawn as blocks. */
     val sleep: List<IntRange> = emptyList(),
     val isConfirmed: Boolean = false,
@@ -158,6 +173,9 @@ sealed interface PlacementFeedback {
 
     /** A Custom Spend was reached for with nothing on the account to spend. */
     data object NoPoints : PlacementFeedback
+
+    /** A new ToDo was asked for while the week list still holds some. */
+    data object WeekFirst : PlacementFeedback
 
     /**
      * A group was made, but the day had no stretch long enough for it — so it
@@ -284,6 +302,11 @@ class DayPlannerViewModel(
         _feedback.value = PlacementFeedback.NoPoints
     }
 
+    /** Holding an empty stretch while [PlannerUiState.canCreateTodo] says no. */
+    fun refuseNewTodo() {
+        _feedback.value = PlacementFeedback.WeekFirst
+    }
+
     /** The day, its plan and the steps inside its cards — read together. */
     private val dayState = combine(
         planRepository.observeDay(date),
@@ -314,8 +337,22 @@ class DayPlannerViewModel(
         val candidates = weekItems.filter {
             it.id !in placed && it.isConcretized && it.isAvailableOn(date)
         }
-        // Only the highest outstanding priority is offered; the rest waits.
-        val tier = priorityTier(candidates, skipped)
+        // Only the highest outstanding priority is offered; the rest waits — a
+        // tier of which nothing fits the day any more is passed by itself, and
+        // by hand only where the settings allow that.
+        val standing = blocks.standing()
+        val fits = { item: Item ->
+            val duration = item.estimatedDuration
+            duration != null && fitsSomewhere(
+                standing,
+                duration,
+                preferredStart = 0,
+                leadIn = item.travelBefore,
+                tailOut = item.returnAfter,
+            )
+        }
+        val canSkip = setup?.allowPrioritySkip == true
+        val tier = priorityTier(candidates, if (canSkip) skipped else 0, fits)
 
         PlannerUiState(
             date = date,
@@ -324,6 +361,10 @@ class DayPlannerViewModel(
             revolver = tier.items,
             revolverPriority = tier.priority,
             lockedPriorities = tier.lockedBelow,
+            passedPriorities = tier.passedAbove,
+            canSkipPriority = canSkip,
+            prioritySkipped = canSkip && skipped > 0,
+            canCreateTodo = setup?.allowTodoBesideWeek == true || candidates.none(fits),
             sleep = setup?.sleepStretches(date.dayOfWeek).orEmpty(),
             // Today is never locked by its confirmation: that confirmation was
             // last night's planning, and this screen exists to correct it.
@@ -1004,8 +1045,8 @@ class DayPlannerViewModel(
     /**
      * Waves the offered priority past to reach the one below.
      *
-     * The escape hatch for a tier that cannot be placed — nothing left in the day
-     * fits it — which would otherwise hold the revolver shut for good.
+     * Only counted while the Flexibilität setting allows it — see `uiState`. A
+     * tier that cannot be placed needs no waving: it is passed by itself.
      */
     fun skipPriority() {
         skippedTiers.update { it + 1 }

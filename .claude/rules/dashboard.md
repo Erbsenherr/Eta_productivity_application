@@ -21,10 +21,10 @@ forms have no note field, Quick-Add being name-only by design.
 **Priority gating** lives in `domain/planning/PriorityGate.kt`: the revolver offers
 one tier at a time, highest first, and `Priority`'s declaration order is the ranking.
 The trap it had to answer: a tier that *cannot* be placed — nothing left in the day
-fits it — would hold the revolver shut and hide everything below. Hence `skipped`, a
-manual wave-past offered as a button rather than applied automatically, since the
-whole point of the rule is that the important things come first. Items without a
-priority sort last, which is what a Quick-Add is until someone says how much it
+fits it — would hold the revolver shut and hide everything below. Since step 39 such
+a tier is **passed by itself** (`fits`), and `skipped`, the wave-past by hand, exists
+only for someone who switched it on under Flexibilität — see *Step 39*. Items without
+a priority sort last, which is what a Quick-Add is until someone says how much it
 matters.
 
 **The "now" box** reads `nowAndNext`, which only considers **open** blocks: a task
@@ -34,6 +34,10 @@ now", the first thing the screen is asked — and its two pages swipe. A long pr
 either opens `PomodoroDialog`.
 
 ### The Heute tab
+
+**It is the "Heute" page of the Dashboard tab since step 39** — the bottom bar says
+"Dashboard", and Heute, Morgen and Woche are tabs across its top (*Step 39*). What
+follows describes that page; cross-references still call it *The Heute tab*.
 
 Top to bottom: box 0 ("Kritisch"), the "now" box, the points box, the deadlines box
 when there is one, Quick-Add, "Heute anstehend", and `PhaseBox` — at the top from the

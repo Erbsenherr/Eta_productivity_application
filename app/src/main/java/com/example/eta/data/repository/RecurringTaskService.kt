@@ -12,6 +12,7 @@ import com.example.eta.domain.model.withExtras
 import com.example.eta.domain.recurrence.Rhythm
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.recurrence.reassignRows
+import com.example.eta.domain.recurrence.rescheduleRows
 import com.example.eta.domain.recurrence.rulesWithTimes
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -210,6 +211,38 @@ class RecurringTaskService(
         // the user is looking at the screen that just created it reads as broken.
         scheduleMaintenance.topUp()
         return rows.map { it.id }
+    }
+
+    /**
+     * Gives a standing task a new hour and length on **some** of its weekdays —
+     * what a drag or a pinch in the week timetable asks for.
+     *
+     * Not [saveGroup]: that writes one answer for the whole task, and here the
+     * Tuesday may move while the Thursday stays. `rescheduleRows` decides which
+     * rows that takes, and splits a daily one where it has to.
+     *
+     * Occurrences follow the rule of every edit to a standing task: the confirmed
+     * days keep what they have, everything after is laid down again.
+     */
+    suspend fun reschedule(
+        ids: Collection<String>,
+        days: Set<DayOfWeek>,
+        startTime: LocalTime,
+        duration: Duration,
+    ) {
+        val existing = ids.mapNotNull { itemDao.findById(it) }
+        val (rows, copiedFrom) = rescheduleRows(existing, days, startTime, duration, clock.now()) {
+            UUID.randomUUID().toString()
+        }
+        if (rows.isEmpty()) return
+
+        itemDao.upsertAll(rows)
+        // A row split off a daily one is the same task on another day, steps
+        // included — or the two would start showing up as two tasks.
+        copiedFrom.forEach { (copyId, sourceId) ->
+            subtaskRepository.copy(subtaskRepository.forItem(sourceId), copyId)
+        }
+        relayOccurrences(rows.map { it.id })
     }
 
     /**

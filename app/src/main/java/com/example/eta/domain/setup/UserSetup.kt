@@ -424,6 +424,20 @@ data class UserSetup(
     val contracts: Boolean = false,
     /** Whether the Belohn-o-mat tab and its evening page are on show. Rewards fill either way. */
     val rewards: Boolean = false,
+    /**
+     * The two "Flexibilität" switches, both **off** for everyone: the app means
+     * to be run on its strictest rules, and loosening one is a decision made in
+     * the settings rather than a button on the screen where it tempts.
+     *
+     * [allowPrioritySkip] brings "Überspringen" back to the day planner's
+     * priority bar. Without it a tier is only passed when nothing in it fits
+     * the day any more — see `priorityTier`.
+     *
+     * [allowTodoBesideWeek] lets a ToDo be made on the spot in the planner
+     * while the week list still holds something that could be planned instead.
+     */
+    val allowPrioritySkip: Boolean = false,
+    val allowTodoBesideWeek: Boolean = false,
     val completedAt: Instant,
     val updatedAt: Instant,
 ) {

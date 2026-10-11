@@ -2,6 +2,8 @@ package com.example.eta.ui.planner
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -23,7 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -37,6 +41,9 @@ import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.planning.TimelineDraft
+import com.example.eta.domain.planning.coveringMinute
+import com.example.eta.domain.planning.pinchedSpan
 import com.example.eta.domain.planning.containerEndMinute
 import com.example.eta.domain.planning.containerStartMinute
 import com.example.eta.domain.planning.endMinute
@@ -54,6 +61,7 @@ import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.EtaTheme
 import com.example.eta.ui.theme.colorOf
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.minutes
 
 /** One hour of the day. Tall enough that a 15-minute block is still a target. */
 val HOUR_HEIGHT: Dp = 64.dp
@@ -114,8 +122,46 @@ fun DayTimeline(
      */
     onBlockLongPress: (entry: BlockWithItem, minute: Int) -> Unit = { _, _ -> },
     onBlockMoved: (blockId: String, minute: Int) -> Unit = { _, _ -> },
+    /**
+     * Which blocks a finger may drag. The planner's own answer by default; the
+     * week timetable has one of its own, where what moves is a standing task
+     * that has been unlocked and nothing else.
+     */
+    movable: (BlockWithItem) -> Boolean = { it.block.isMovable },
+    /**
+     * A long press on a stretch nothing stands on, with its minute. Null where
+     * the day cannot take anything new.
+     */
+    onEmptyLongPress: ((minute: Int) -> Unit)? = null,
+    /**
+     * The box that long press left behind, while it is being pushed and pinched
+     * into shape. Held by the caller, who also owns the button that ends it.
+     */
+    draft: TimelineDraft? = null,
+    onDraftChange: (TimelineDraft) -> Unit = {},
+    /**
+     * A block pinched longer or shorter, with where it now starts and how long it
+     * is. Null where blocks are not resized by hand; the [draft] always is.
+     */
+    onBlockResized: ((blockId: String, startMinute: Int, durationMinutes: Int) -> Unit)? = null,
+    /** Whether the night says when it begins and ends — the week timetable's request. */
+    sleepLabels: Boolean = false,
 ) {
     val minutePx = with(LocalDensity.current) { HOUR_HEIGHT.toPx() / 60f }
+
+    // A pinch under way: which block (null is the draft) and the span it has
+    // reached. Drawn from here until the fingers lift, then handed up once.
+    var pinch by remember { mutableStateOf<Pinch?>(null) }
+
+    // Everything the two gesture blocks below read. They are launched once and
+    // outlive every recomposition, so nothing may be closed over directly — the
+    // rule from *Compose traps*.
+    val currentBlocks by rememberUpdatedState(blocks)
+    val currentMovable by rememberUpdatedState(movable)
+    val currentDraft by rememberUpdatedState(draft)
+    val currentDraftChange by rememberUpdatedState(onDraftChange)
+    val currentResized by rememberUpdatedState(onBlockResized)
+    val currentEmptyLongPress by rememberUpdatedState(onEmptyLongPress)
 
     // Where a block already on the day would land if the finger lifted now, and
     // which block that is. The same indicator a revolver drop gets: without it
@@ -128,14 +174,82 @@ fun DayTimeline(
     // before — buys a readable label. Long-press already means "edit".
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = blocks.firstOrNull { it.block.id == selectedId }
+    val currentSelectedId by rememberUpdatedState(selectedId)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(HOUR_HEIGHT * 24)
-            .onGloballyPositioned { onGeometry(it.positionInRoot().y, minutePx) },
+            .onGloballyPositioned { onGeometry(it.positionInRoot().y, minutePx) }
+            // Two fingers: a pinch. Watched from here rather than from the block,
+            // and on the way *down* to the children (the initial pass), because a
+            // quarter-hour block is sixteen pixels tall and no two fingers fit on
+            // it — the pinch has to be allowed to start around what it means.
+            // Nothing is consumed until there are two fingers and something to
+            // resize, so every one-finger gesture below works as before.
+            .pointerInput(minutePx) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var target: Pinch? = null
+                    var resolved = false
+                    var topTravel = 0f
+                    var bottomTravel = 0f
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+                        if (pressed.size < 2) {
+                            // One finger lifted mid-pinch: the other must not go
+                            // on to drag what was just being resized.
+                            if (target != null) pressed.forEach { it.consume() }
+                            continue
+                        }
+                        val top = pressed.minBy { it.position.y }
+                        val bottom = pressed.maxBy { it.position.y }
+                        if (!resolved) {
+                            resolved = true
+                            target = pinchTarget(
+                                draft = currentDraft,
+                                blocks = if (currentResized != null) {
+                                    currentBlocks.filter { currentMovable(it) && !it.block.isDiscarded }
+                                } else {
+                                    emptyList()
+                                },
+                                selectedId = currentSelectedId,
+                                topMinute = (top.position.y / minutePx).toInt(),
+                                bottomMinute = (bottom.position.y / minutePx).toInt(),
+                            )
+                        }
+                        val origin = target ?: continue
+                        topTravel += top.positionChange().y / minutePx
+                        bottomTravel += bottom.positionChange().y / minutePx
+                        val (from, to) = pinchedSpan(origin.from, origin.to, topTravel, bottomTravel)
+                        pinch = origin.copy(from = from, to = to)
+                        if (origin.blockId == null) {
+                            currentDraftChange(TimelineDraft(from, to - from))
+                        }
+                        event.changes.forEach { it.consume() }
+                    }
+                    val done = pinch
+                    pinch = null
+                    if (done?.blockId != null) {
+                        currentResized?.invoke(done.blockId, done.from, done.to - done.from)
+                    }
+                }
+            }
+            // One finger held on a stretch nothing stands on. A block consumes
+            // the press that lands on it, so this only ever hears the others.
+            .pointerInput(onEmptyLongPress != null, minutePx) {
+                if (onEmptyLongPress == null) return@pointerInput
+                detectTapGestures(
+                    onLongPress = { offset ->
+                        val minute = (offset.y / minutePx).toInt().coerceIn(0, MINUTES_PER_DAY - 1)
+                        currentEmptyLongPress?.invoke(minute)
+                    },
+                )
+            },
     ) {
-        SleepShading(sleep, minutePx)
+        SleepShading(sleep, minutePx, labels = sleepLabels)
         HourGrid()
 
         // Behind everything a placement can put there, which is the point: the
@@ -160,6 +274,8 @@ fun DayTimeline(
                 entry = entry,
                 minutePx = minutePx,
                 editable = editable,
+                canMove = movable(entry),
+                resized = pinch?.takeIf { it.blockId == entry.block.id }?.let { it.from to it.to },
                 steps = subtasks[entry.item.id].orEmpty(),
                 checkedIds = checked[entry.block.id].orEmpty(),
                 selected = entry.block.id == selectedId,
@@ -179,10 +295,17 @@ fun DayTimeline(
             )
         }
 
+        // Over the blocks: it is what is being worked on, and it may be pushed
+        // across something that already stands there on its way to a free hour.
+        draft?.let { DraftBlock(draft = it, minutePx = minutePx, onChange = onDraftChange) }
+
         val indicator = dropIndicatorMinute ?: movingMinute
         if (indicator != null) {
             DropIndicator(minute = indicator, minutePx = minutePx)
         }
+
+        // The length as it changes, said where the lower finger is pulling it.
+        pinch?.let { DurationTag(fromMinute = it.from, toMinute = it.to, minutePx = minutePx) }
 
         // Drawn last, so it sits over whatever it has to overlap to be legible.
         selected?.let {
@@ -415,7 +538,7 @@ private fun FreedStretch(entry: BlockWithItem, minutePx: Float) {
 }
 
 @Composable
-private fun SleepShading(sleep: List<IntRange>, minutePx: Float) {
+private fun SleepShading(sleep: List<IntRange>, minutePx: Float, labels: Boolean = false) {
     sleep.forEach { stretch ->
         Box(
             modifier = Modifier
@@ -423,7 +546,31 @@ private fun SleepShading(sleep: List<IntRange>, minutePx: Float) {
                 .offsetMinutes(stretch.first, minutePx)
                 .height(with(LocalDensity.current) { ((stretch.last + 1 - stretch.first) * minutePx).toDp() })
                 .background(EtaTheme.colors.sleep),
-        )
+        ) {
+            if (!labels) return@Box
+            // An edge at midnight is the night running on into the next day, not
+            // a time anyone goes to bed or gets up at.
+            if (stretch.first > 0) {
+                EtaText(
+                    text = "Schlafenszeit · ${minuteToLocalTime(stretch.first).formatClock()}",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.xs),
+                )
+            }
+            if (stretch.last + 1 < MINUTES_PER_DAY) {
+                EtaText(
+                    text = "Aufstehen · ${minuteToLocalTime(stretch.last + 1).formatClock()}",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.xs),
+                )
+            }
+        }
     }
 }
 
@@ -460,6 +607,10 @@ private fun TimelineBlock(
     entry: BlockWithItem,
     minutePx: Float,
     editable: Boolean,
+    /** Whether a finger may drag it — the caller's answer, not always the block's own. */
+    canMove: Boolean,
+    /** The span a pinch has it at, start and end, while one is under way. */
+    resized: Pair<Int, Int>?,
     selected: Boolean,
     steps: List<Subtask>,
     checkedIds: Set<String>,
@@ -488,7 +639,7 @@ private fun TimelineBlock(
     // state, and the screen has to be the thing that shows it. Before it did,
     // pressing the button looked like it had done nothing at all.
     val cancelled = block.isDiscarded
-    val movable = editable && block.isMovable && !cancelled
+    val movable = editable && canMove && !cancelled
 
     // How far the finger has travelled, and the minute that travel snaps to. The
     // block follows the *snapped* minute rather than the finger: a drag that
@@ -526,6 +677,10 @@ private fun TimelineBlock(
     val draggedMinute = minuteAt(travel())
     val dragOffset = if (dragging) (draggedMinute - block.startMinute()) * minutePx else 0f
 
+    // Where it is drawn: its own span, or the one a pinch has pulled it to.
+    val shownStart = resized?.first ?: block.startMinute()
+    val shownEnd = resized?.second ?: block.endMinute()
+
     // Reported from composition rather than from the gesture, so an auto-scroll
     // with a still finger still moves the indicator.
     LaunchedEffect(dragging, draggedMinute) {
@@ -544,14 +699,14 @@ private fun TimelineBlock(
     }
     val shape = if (block.isMovable) EtaTheme.shapes.draggedBlock else EtaTheme.shapes.fixedBlock
     val height = with(LocalDensity.current) {
-        ((block.endMinute() - block.startMinute()) * minutePx).toDp()
+        ((shownEnd - shownStart) * minutePx).toDp()
     }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = GUTTER_WIDTH, end = EtaTheme.spacing.sm)
-            .offset { IntOffset(0, (block.startMinute() * minutePx + dragOffset).roundToInt()) }
+            .offset { IntOffset(0, (shownStart * minutePx + dragOffset).roundToInt()) }
             .onGloballyPositioned { blockTop.floatValue = it.positionInRoot().y }
             .height(height)
             .background(
@@ -643,20 +798,27 @@ private fun TimelineBlock(
                         // While dragging, the block says where it is going, not
                         // where it came from.
                         append(
-                            if (dragging) {
-                                minuteToLocalTime(draggedMinute).formatClock()
-                            } else {
-                                block.start.formatClock()
+                            when {
+                                dragging -> minuteToLocalTime(draggedMinute).formatClock()
+                                resized != null -> minuteToLocalTime(shownStart).formatClock()
+                                else -> block.start.formatClock()
                             },
                         )
                         append(" · ")
-                        append(block.effectiveDuration.formatShort())
+                        append(
+                            if (resized != null) {
+                                (shownEnd - shownStart).minutes.formatShort()
+                            } else {
+                                block.effectiveDuration.formatShort()
+                            },
+                        )
                         if (imported) append(" · Kalender")
                         if (cancelled) append(" · abgesagt")
                         else if (block.isCompleted) append(" · erledigt")
                     },
                     style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textSecondary,
+                    // The line that is changing under the fingers stands out.
+                    color = if (resized != null) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -706,6 +868,119 @@ private fun TimelineBlock(
                 )
             }
         }
+    }
+}
+
+/** A pinch under way. [blockId] null means the draft is what is being resized. */
+private data class Pinch(val blockId: String?, val from: Int, val to: Int)
+
+/**
+ * What two fingers are resizing, or null when it is nothing of ours.
+ *
+ * The draft, while there is one: it is what the user is in the middle of
+ * shaping, wherever the fingers land. Otherwise the block **between** the
+ * fingers — the one their midpoint is on — then one a finger touches, and last
+ * the block that was tapped, which is how a quarter-hour block is reached at
+ * all: tap it, then pinch around it.
+ */
+private fun pinchTarget(
+    draft: TimelineDraft?,
+    blocks: List<BlockWithItem>,
+    selectedId: String?,
+    topMinute: Int,
+    bottomMinute: Int,
+): Pinch? {
+    if (draft != null) return Pinch(null, draft.startMinute, draft.endMinute)
+    val hit = blocks.coveringMinute((topMinute + bottomMinute) / 2).lastOrNull()
+        ?: blocks.coveringMinute(topMinute).lastOrNull()
+        ?: blocks.coveringMinute(bottomMinute).lastOrNull()
+        ?: blocks.firstOrNull { it.block.id == selectedId }
+        ?: return null
+    return Pinch(hit.block.id, hit.block.startMinute(), hit.block.endMinute())
+}
+
+/**
+ * The box for a task that does not exist yet.
+ *
+ * Pushed with one finger, pinched with two — the pinch is the timeline's, see
+ * [pinchTarget] — and it says its hours the whole time, because choosing them
+ * is all it is for. The accent colour over almost no fill, which no real block
+ * wears.
+ */
+@Composable
+private fun DraftBlock(
+    draft: TimelineDraft,
+    minutePx: Float,
+    onChange: (TimelineDraft) -> Unit,
+) {
+    val current by rememberUpdatedState(draft)
+    val currentChange by rememberUpdatedState(onChange)
+    val height = with(LocalDensity.current) { (draft.durationMinutes * minutePx).toDp() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = GUTTER_WIDTH, end = EtaTheme.spacing.sm)
+            .offsetMinutes(draft.startMinute, minutePx)
+            .height(height)
+            .background(EtaTheme.colors.accent.copy(alpha = 0.10f), EtaTheme.shapes.draggedBlock)
+            .border(2.dp, EtaTheme.colors.accent, EtaTheme.shapes.draggedBlock)
+            .pointerInput(minutePx) {
+                // Where the box stood when the finger came down, and how far the
+                // finger has come since: the box follows the snapped sum, as a
+                // dragged block does.
+                var origin = 0
+                var travel = 0f
+                detectDragGestures(
+                    onDragStart = {
+                        origin = current.startMinute
+                        travel = 0f
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    travel += amount.y
+                    currentChange(current.movedTo(origin + (travel / minutePx).roundToInt()))
+                }
+            }
+            .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.xs),
+    ) {
+        EtaText(
+            text = buildString {
+                append(minuteToLocalTime(draft.startMinute).formatClock())
+                append(" – ")
+                append(
+                    if (draft.endMinute >= MINUTES_PER_DAY) "24:00"
+                    else minuteToLocalTime(draft.endMinute).formatClock(),
+                )
+                append(" · ")
+                append(draft.duration.formatShort())
+            },
+            style = EtaTheme.typography.bodyStrong,
+            color = EtaTheme.colors.accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** The length a pinch has reached, on a tag at the edge being pulled. */
+@Composable
+private fun DurationTag(fromMinute: Int, toMinute: Int, minutePx: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offsetMinutes(toMinute, minutePx)
+            .padding(end = EtaTheme.spacing.lg),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        EtaText(
+            text = (toMinute - fromMinute).minutes.formatShort(),
+            style = EtaTheme.typography.bodyStrong,
+            color = EtaTheme.colors.onAccent,
+            modifier = Modifier
+                .background(EtaTheme.colors.accent, EtaTheme.shapes.small)
+                .padding(horizontal = EtaTheme.spacing.sm, vertical = 1.dp),
+        )
     }
 }
 
