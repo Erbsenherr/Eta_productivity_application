@@ -434,10 +434,7 @@ class TutorialTest {
             .copy(
                 todoNoted = true,
                 recurringNoted = true,
-                seen = setOf(
-                    "${TutorialSignal.NOW_PAGE}=1",
-                    "${TutorialSignal.PLANNER_REVOLVER}=SPEND",
-                ),
+                seen = setOf("${TutorialSignal.NOW_PAGE}=1"),
             )
 
         QUICKSTART_STEPS.filter { it.kind == StepKind.TASK }.forEach { step ->
@@ -487,14 +484,10 @@ class TutorialTest {
     @Test
     fun `leaving the planner shows the closing words first and ends the tutorial after`() {
         val first = QUICKSTART_STEPS.indexOfFirst { it.stage == TutorialStage.PLANNER }
-        val done = TutorialFacts(
-            plannedTomorrow = true,
-            seen = setOf("${TutorialSignal.PLANNER_REVOLVER}=SPEND"),
-        )
+        // Placing the card is all the planner asks for; the rest is read.
+        val done = TutorialFacts(plannedTomorrow = true)
 
         assertNull(exitTarget(QUICKSTART_STEPS, first, TutorialStage.PLANNER, TutorialFacts()))
-        // The card placed, the second revolver not yet looked at: not yet.
-        assertNull(exitTarget(QUICKSTART_STEPS, first, TutorialStage.PLANNER, TutorialFacts(plannedTomorrow = true)))
         assertEquals(QUICKSTART_STEPS.lastIndex, exitTarget(QUICKSTART_STEPS, first, TutorialStage.PLANNER, done))
         assertEquals(QUICKSTART_STEPS.size, exitTarget(QUICKSTART_STEPS, QUICKSTART_STEPS.lastIndex, TutorialStage.PLANNER, done))
     }
@@ -502,7 +495,7 @@ class TutorialTest {
     // --- the points in the Quickstart ---------------------------------------
 
     @Test
-    fun `the Quickstart shows the account, the settlement and the second revolver`() {
+    fun `the Quickstart shows the account, the settlement and what a box can become`() {
         val titles = QUICKSTART_STEPS.map { it.title }
 
         assertEquals(TutorialSpot.POINTS, QUICKSTART_STEPS.first { it.title == "Dein Punktekonto" }.spot)
@@ -511,9 +504,11 @@ class TutorialTest {
         assertTrue(titles.indexOf("Die Abrechnung") in (titles.indexOf("Hervorragend!") + 1) until titles.indexOf("Kurz nachdenken"))
         // Why empty time costs, straight after the page that shows it costing.
         assertEquals(titles.indexOf("Die Abrechnung") + 1, titles.indexOf("Warum leere Zeit Punkte kostet"))
-        // And the third revolver after the second.
-        assertEquals(titles.indexOf("Punkte verdienen und ausgeben") + 1, titles.indexOf("Der dritte Revolver: Pause"))
-        assertTrue(titles.indexOf("Der zweite Revolver") > titles.indexOf("Der Tagesplaner"))
+        // The box first, then the three things it can become, then the overlap question.
+        assertTrue(titles.indexOf("Eigenes in den Tag setzen") > titles.indexOf("Der Tagesplaner"))
+        assertEquals(titles.indexOf("Eigenes in den Tag setzen") + 1, titles.indexOf("Punkte verdienen und ausgeben"))
+        assertEquals(titles.indexOf("Punkte verdienen und ausgeben") + 1, titles.indexOf("Pausen einplanen"))
+        assertEquals(titles.indexOf("Pausen einplanen") + 1, titles.indexOf("Wenn sich etwas überschneidet"))
         // Reading a block too short for its name comes right after placing one.
         assertEquals(titles.indexOf("Der Tagesplaner") + 1, titles.indexOf("Kurze Blöcke lesen"))
         assertTrue(QUICKSTART_STEPS.last().text(TutorialFacts()).contains("Einstellungen → Tutorial"))

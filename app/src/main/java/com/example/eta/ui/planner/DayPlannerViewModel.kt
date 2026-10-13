@@ -29,10 +29,14 @@ import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.stampedWith
 import com.example.eta.domain.model.withExtras
 import com.example.eta.domain.planning.BreakFindings
+import com.example.eta.domain.planning.PlacementSpan
+import com.example.eta.domain.planning.PlanRelief
+import com.example.eta.domain.planning.collisions
+import com.example.eta.domain.planning.fittedSpan
+import com.example.eta.domain.planning.planRelief
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.planning.PlannerWarning
 import com.example.eta.domain.planning.checkBreaks
-import com.example.eta.domain.planning.SPONTANEOUS_BREAK
 import com.example.eta.domain.planning.canPlace
 import com.example.eta.domain.planning.coveringMinute
 import com.example.eta.domain.planning.firstFreeStart
@@ -49,7 +53,6 @@ import com.example.eta.domain.reevaluation.isOneOffBreak
 import com.example.eta.domain.reevaluation.returnedToCollection
 import com.example.eta.domain.reward.CUSTOM_EARN_POINTS_PER_HOUR
 import com.example.eta.domain.reward.CUSTOM_SPEND_POINTS_PER_HOUR
-import com.example.eta.domain.reward.SOCIAL_POINTS_PER_HOUR
 import com.example.eta.domain.reward.plannedYield
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.ui.attributes.TodoAttributes
@@ -57,7 +60,7 @@ import com.example.eta.ui.subtasks.SubtaskSetting
 import com.example.eta.ui.subtasks.addedDuration
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -84,18 +87,17 @@ import kotlinx.datetime.todayIn
  */
 enum class PlannerDay { TODAY, TOMORROW }
 
-/** What the second revolver offers. Fixed, and not backed by the database. */
+/**
+ * The two points entries a box on the day can become.
+ *
+ * They were chambers of a second revolver until step 41, with a neutral
+ * "Social" beside them; now they are the two answers behind "Custom", and an
+ * hour that neither earns nor costs is one of these with its rate set to 0.
+ */
 enum class SpendKind(val label: String, val pointsPerHour: Double) {
     CUSTOM_EARN("Custom Earn", CUSTOM_EARN_POINTS_PER_HOUR),
     CUSTOM_SPEND("Custom Spend", CUSTOM_SPEND_POINTS_PER_HOUR),
-    SOCIAL("Social", SOCIAL_POINTS_PER_HOUR),
 }
-
-/** Everything from the second revolver is an hour long until edited. */
-val DEFAULT_SPEND_DURATION: Duration = 1.hours
-
-/** What a break dragged in from the third revolver lasts until it is told otherwise. */
-val PLANNED_BREAK: Duration = SPONTANEOUS_BREAK
 
 data class PlannerUiState(
     val date: LocalDate,
@@ -188,12 +190,6 @@ sealed interface PlacementFeedback {
     /** The whole day was called off at once; [count] cards were dealt with. */
     data class DayCleared(val count: Int) : PlacementFeedback
 
-    /** A Custom Spend was reached for with nothing on the account to spend. */
-    data object NoPoints : PlacementFeedback
-
-    /** A new ToDo was asked for while the week list still holds some. */
-    data object WeekFirst : PlacementFeedback
-
     /**
      * A group was made, but the day had no stretch long enough for it — so it
      * stands where it was and overlaps what follows.
@@ -220,35 +216,73 @@ data class MergeRequest(
 )
 
 /**
- * The day has room for the task and its journey, but not for the break the card
- * asks for.
+ * Something about to be put on the day, held until it is known where and how.
  *
- * Asked rather than decided: a break the user configured is part of what they
- * meant by the task, and silently dropping it would be the app quietly changing
- * the plan. Answering yes places it without the break — the journey is never
- * dropped, being the time the task takes to reach rather than a courtesy after
- * it.
- */
-data class BreakPrompt(
-    val name: String,
-    val pending: PendingPlacement,
-)
-
-/**
- * The placement a [BreakPrompt] is holding back, so answering it can re-run
- * exactly the one that was refused rather than an approximation of it.
- *
- * Two shapes because two things reach the day: a finished card out of the
- * revolver, and one invented on the spot for the slot it was dropped on. Both go
- * through the same placement, which is why both can be asked the same question.
+ * Four shapes because four things reach the day: a finished card out of the
+ * revolver, and the three a box held into the day can become. All go through the
+ * same placement, which is why all of them can be asked the same question — see
+ * [OverlapPrompt].
  */
 sealed interface PendingPlacement {
-    data class FromRevolver(val item: Item, val atMinute: Int) : PendingPlacement
-    data class Spontaneous(
-        val name: String,
+    val name: String
+
+    /** The note for this one occurrence, if the form asked for one. */
+    val note: String get() = ""
+
+    data class FromRevolver(val item: Item) : PendingPlacement {
+        override val name: String get() = item.name
+    }
+
+    data class Todo(
+        override val name: String,
         val attributes: TodoAttributes,
-        val atMinute: Int,
+        override val note: String,
     ) : PendingPlacement
+
+    data class Spend(
+        val kind: SpendKind,
+        override val name: String,
+        val pointsPerHour: Double,
+        override val note: String,
+    ) : PendingPlacement
+
+    data class Break(override val note: String) : PendingPlacement {
+        override val name: String get() = "Pause"
+    }
+}
+
+/**
+ * A card was put where something already stands.
+ *
+ * Asked rather than decided. The planner used to slide the card to the next free
+ * hour, or refuse it when the day had none — which is the app choosing a time
+ * the user did not choose. The three answers: put it there regardless, let the
+ * card give way ([fitted], null when nothing of it would be left), or let the
+ * plan give way ([relief], one entry per block in its path).
+ *
+ * [fitted] and [relief] are what the dialog **shows**. Both are worked out again
+ * from the day as it then stands when an answer is given.
+ */
+data class OverlapPrompt(
+    val pending: PendingPlacement,
+    val wanted: PlacementSpan,
+    val fitted: PlacementSpan?,
+    val relief: List<PlanRelief>,
+)
+
+/** What becomes of a block "Plan anpassen" or "Ganzen Tag absagen" clears away. */
+enum class RemovalFate { DELETED, BACK_TO_WEEK, CALLED_OFF }
+
+/**
+ * Which of the three a block gets, and it follows from what the block is: a
+ * break made for this day is simply gone, a ToDo the user dragged in goes back
+ * to the week list, and everything else — the standing schedule, a points entry
+ * — is called off, there being no list for it to return to.
+ */
+fun BlockWithItem.removalFate(): RemovalFate = when {
+    block.isHandPlaced && item.isOneOffBreak -> RemovalFate.DELETED
+    block.isHandPlaced && item.type == ItemType.TODO -> RemovalFate.BACK_TO_WEEK
+    else -> RemovalFate.CALLED_OFF
 }
 
 /** The standing answers, and what this day carries beside its blocks. */
@@ -296,8 +330,8 @@ class DayPlannerViewModel(
     private val _feedback = MutableStateFlow<PlacementFeedback?>(null)
     val feedback: StateFlow<PlacementFeedback?> = _feedback.asStateFlow()
 
-    private val _breakPrompt = MutableStateFlow<BreakPrompt?>(null)
-    val breakPrompt: StateFlow<BreakPrompt?> = _breakPrompt.asStateFlow()
+    private val _overlapPrompt = MutableStateFlow<OverlapPrompt?>(null)
+    val overlapPrompt: StateFlow<OverlapPrompt?> = _overlapPrompt.asStateFlow()
 
     private val _mergeRequest = MutableStateFlow<MergeRequest?>(null)
     val mergeRequest: StateFlow<MergeRequest?> = _mergeRequest.asStateFlow()
@@ -322,16 +356,6 @@ class DayPlannerViewModel(
     val canSpend: StateFlow<Boolean> = pointsRepository.observeBalance()
         .map { it > 0.0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
-
-    /** The drop of a Custom Spend that [canSpend] refuses: said, not swallowed. */
-    fun refuseSpend() {
-        _feedback.value = PlacementFeedback.NoPoints
-    }
-
-    /** Holding an empty stretch while [PlannerUiState.canCreateTodo] says no. */
-    fun refuseNewTodo() {
-        _feedback.value = PlacementFeedback.WeekFirst
-    }
 
     /** The day, its plan and the steps inside its cards — read together. */
     private val dayState = combine(
@@ -425,100 +449,218 @@ class DayPlannerViewModel(
     )
 
     /**
-     * Drops a ToDo onto the day.
+     * Drops a ToDo onto the day, at the minute it was dropped on.
      *
-     * A drop onto occupied time is neither refused nor allowed to overwrite: the
-     * block slides to the next place it fits and the user is told where it went.
-     * Refusing would make dropping onto a dense day almost impossible, and
-     * overwriting would quietly destroy something already planned.
+     * A drop onto occupied time is a question — see [OverlapPrompt].
      */
     fun place(item: Item, atMinute: Int) {
-        viewModelScope.launch { placeWithMargins(item, atMinute, item.breakAfter) }
+        val duration = item.estimatedDuration ?: return
+        request(
+            PendingPlacement.FromRevolver(item),
+            spanAt(atMinute, duration, item.travelBefore, item.returnAfter, item.breakAfter),
+        )
     }
 
-    /** The answer to [BreakPrompt]: plan it anyway, and the break falls away. */
-    fun placeWithoutBreak() {
-        val prompt = _breakPrompt.value ?: return
-        _breakPrompt.value = null
-        viewModelScope.launch {
-            when (val pending = prompt.pending) {
-                is PendingPlacement.FromRevolver ->
-                    placeWithMargins(pending.item, pending.atMinute, breakAfter = null)
+    private fun spanAt(
+        atMinute: Int,
+        duration: Duration,
+        travelBefore: Duration? = null,
+        returnAfter: Duration? = null,
+        breakAfter: Duration? = null,
+    ) = PlacementSpan(
+        startMinute = snapToGrid(atMinute).coerceIn(0, MINUTES_PER_DAY - 1),
+        duration = duration,
+        travelBefore = travelBefore,
+        returnAfter = returnAfter,
+        breakAfter = breakAfter,
+    )
 
-                is PendingPlacement.Spontaneous -> createTodoWithMargins(
-                    name = pending.name,
-                    attributes = pending.attributes.copy(breakAfter = null),
-                    atMinute = pending.atMinute,
-                )
-            }
+    /**
+     * The one way anything new reaches the day: written at once where it fits,
+     * asked about where it does not.
+     *
+     * Compared as containers, so a card whose break alone runs into the next
+     * task is asked about as well — and "ToDo anpassen" then answers by leaving
+     * the break out, which is what the planner's own question about a break
+     * that does not fit used to be.
+     */
+    private fun request(pending: PendingPlacement, wanted: PlacementSpan) {
+        val existing = uiState.value.blocks.standing()
+        if (wanted.collisions(existing).isEmpty()) {
+            viewModelScope.launch { commit(pending, wanted) }
+            return
         }
+        _overlapPrompt.value = OverlapPrompt(
+            pending = pending,
+            wanted = wanted,
+            fitted = fittedSpan(existing, wanted),
+            relief = planRelief(existing, wanted),
+        )
     }
 
-    fun dismissBreakPrompt() {
-        _breakPrompt.value = null
+    /** "Dennoch setzen": where it was put, overlap and all. */
+    fun placeAnyway() {
+        val prompt = _overlapPrompt.value ?: return
+        _overlapPrompt.value = null
+        viewModelScope.launch { commit(prompt.pending, prompt.wanted) }
     }
 
     /**
-     * Placing a card together with whatever margins it brings.
+     * "ToDo anpassen": the card is cut to the stretch that is free.
      *
-     * Three outcomes, in the order the day allows them: it fits as asked; it fits
-     * only without the break, and the user is asked; or it does not fit at all,
-     * which is the ordinary refusal. [breakAfter] is passed rather than read off
-     * the item so that answering the prompt can retry with it gone.
+     * Worked out again rather than taken from the prompt — the day is the one
+     * thing here that can have changed while a dialog stood open.
      */
-    private suspend fun placeWithMargins(item: Item, atMinute: Int, breakAfter: Duration?) {
-        val duration = item.estimatedDuration ?: return
-        val existing = uiState.value.blocks.standing()
-        val wanted = snapToGrid(atMinute).coerceIn(0, MINUTES_PER_DAY - 1)
-        val travel = item.travelBefore
-        val back = item.returnAfter
-
-        val start = firstFreeStart(
-            existing,
-            duration,
-            wanted,
-            leadIn = travel,
-            tailOut = back,
-            tailOutExtra = breakAfter,
-        )
-
-        if (start == null) {
-            // The break is the only part that may be given up. A journey — in
-            // either direction — is time the task actually takes, and a task
-            // planned without it is planned wrong.
-            if (breakAfter != null &&
-                fitsSomewhere(existing, duration, wanted, leadIn = travel, tailOut = back)
-            ) {
-                _breakPrompt.value = BreakPrompt(
-                    name = item.name,
-                    pending = PendingPlacement.FromRevolver(item, wanted),
-                )
-            } else {
-                _feedback.value = PlacementFeedback.NoRoom(item.name)
-            }
+    fun placeFitted() {
+        val prompt = _overlapPrompt.value ?: return
+        _overlapPrompt.value = null
+        val fitted = fittedSpan(uiState.value.blocks.standing(), prompt.wanted)
+        if (fitted == null) {
+            _feedback.value = PlacementFeedback.NoRoom(prompt.pending.name)
             return
         }
-        if (start != wanted) {
-            _feedback.value = PlacementFeedback.Moved(item.name, minuteToLocalTime(start))
-        }
+        viewModelScope.launch { commit(prompt.pending, fitted) }
+    }
 
+    /** "Plan anpassen": the card stands, and what is in its way is cut or cleared. */
+    fun placeAdjustingPlan() {
+        val prompt = _overlapPrompt.value ?: return
+        _overlapPrompt.value = null
+        viewModelScope.launch { commit(prompt.pending, prompt.wanted, adjustPlan = true) }
+    }
+
+    fun dismissOverlap() {
+        _overlapPrompt.value = null
+    }
+
+    /**
+     * Writes a placement: the card first, then the room for it, then the block.
+     *
+     * In that order because the Sperrliste can still refuse a new card, and a
+     * plan cut open for something that then never arrives would be the worst of
+     * the three outcomes.
+     */
+    private suspend fun commit(
+        pending: PendingPlacement,
+        span: PlacementSpan,
+        adjustPlan: Boolean = false,
+    ) {
         val now = clock.now()
+        val item = itemFor(pending, span, now) ?: return
+        if (adjustPlan) makeRoomFor(span, now)
+
         planRepository.addBlock(
             PlannedBlock(
                 itemId = item.id,
                 date = date,
-                start = minuteToLocalTime(start),
-                plannedDuration = duration,
-                travelBefore = travel,
-                returnAfter = back,
-                breakAfter = breakAfter,
+                start = minuteToLocalTime(span.startMinute),
+                plannedDuration = span.duration,
+                travelBefore = span.travelBefore,
+                returnAfter = span.returnAfter,
+                breakAfter = span.breakAfter,
+                // On the block: a card made for one slot has one occurrence, and
+                // this is the note the edit dialog shows for it.
+                note = pending.note.ifBlank { null },
                 origin = BlockOrigin.DRAGGED,
                 createdAt = now,
                 updatedAt = now,
             ).stampedWith(item),
         )
         // Planning it is what takes it out of the week list.
-        itemRepository.moveTo(item, Stage.DAY)
+        if (pending is PendingPlacement.FromRevolver) itemRepository.moveTo(item, Stage.DAY)
+    }
+
+    /**
+     * The card behind a placement — the revolver's own, or one written now.
+     *
+     * Null when the Sperrliste refused the name, which has been said by then.
+     * Ignoring that refusal once left a block pointing at an item that was never
+     * written: a foreign key violation, and a crash rather than a message.
+     */
+    private suspend fun itemFor(pending: PendingPlacement, span: PlacementSpan, now: Instant): Item? =
+        when (pending) {
+            is PendingPlacement.FromRevolver -> pending.item
+
+            is PendingPlacement.Todo -> {
+                val attributes = pending.attributes
+                val item = Item.newTodo(
+                    name = pending.name,
+                    category = attributes.category,
+                    // Planned by hand for a specific slot: it must happen then. The
+                    // form does ask for a priority, but putting it on an hour has
+                    // already said something stronger than any of the four.
+                    priority = Priority.URGENT_MUST,
+                    targetDate = date,
+                    // What the form said, not what "ToDo anpassen" left of it: the
+                    // card is that long, this occurrence of it is shorter.
+                    estimatedDuration = attributes.duration,
+                    now = now,
+                ).copy(
+                    stage = Stage.DAY,
+                    travelBefore = attributes.travelBefore,
+                    returnAfter = attributes.returnAfter,
+                    breakAfter = attributes.breakAfter,
+                    endSound = attributes.endSound,
+                ).withExtras(attributes.extras)
+                item.takeUnless { refused(itemRepository.add(it, attributes.subtasks, attributes.foldedItemIds), it) }
+            }
+
+            is PendingPlacement.Spend -> {
+                val item = Item.newSpend(
+                    name = pending.name,
+                    pointsPerHour = pending.pointsPerHour,
+                    now = now,
+                )
+                item.takeUnless { refused(itemRepository.add(it), it) }
+            }
+
+            // The card the dashboard slips in after a finished task, planned
+            // ahead: `ItemRole.BREAK` and no category, so it neither earns nor
+            // costs. A new one per break — the unique index allows an item one
+            // occurrence a day — and the Sperrliste is not consulted: "Pause"
+            // is not an idea being hoarded.
+            is PendingPlacement.Break -> Item.spontaneousBreak(span.duration, now).also {
+                itemRepository.addWithoutLockCheck(it)
+            }
+        }
+
+    /** Whether the Sperrliste turned [item] away — and says so if it did. */
+    private fun refused(result: AddItemResult, item: Item): Boolean {
+        if (result !is AddItemResult.BlockedByLock) return false
+        _feedback.value = PlacementFeedback.Blocked(item.name)
+        return true
+    }
+
+    /** Cuts or clears what stands in [span]'s way — "Plan anpassen". */
+    private suspend fun makeRoomFor(span: PlacementSpan, now: Instant) {
+        val standing = uiState.value.blocks.filter { it.claimsItsSlot() }
+        planRelief(standing.map { it.block }, span).forEach { relief ->
+            when (relief) {
+                is PlanRelief.EndsEarlier -> planRepository.addBlock(relief.result.copy(updatedAt = now))
+                is PlanRelief.StartsLater -> planRepository.addBlock(relief.result.copy(updatedAt = now))
+                is PlanRelief.Removed ->
+                    standing.firstOrNull { it.block.id == relief.block.id }?.let { clearFromDay(it) }
+
+                is PlanRelief.Kept -> Unit
+            }
+        }
+    }
+
+    /** Takes one block off the day by the route its kind has — see [removalFate]. */
+    private suspend fun clearFromDay(entry: BlockWithItem) {
+        when (entry.removalFate()) {
+            RemovalFate.DELETED -> {
+                planRepository.removeBlock(entry.block)
+                itemRepository.delete(entry.item)
+            }
+
+            RemovalFate.BACK_TO_WEEK -> {
+                planRepository.removeBlock(entry.block)
+                if (entry.item.stage == Stage.DAY) itemRepository.moveTo(entry.item, Stage.WEEK)
+            }
+
+            RemovalFate.CALLED_OFF -> planRepository.discard(entry.block)
+        }
     }
 
     /**
@@ -775,17 +917,7 @@ class DayPlannerViewModel(
     fun cancelWholeDay() {
         viewModelScope.launch {
             val entries = uiState.value.blocks.filter { it.block.isOpen }
-            entries.forEach { entry ->
-                if (entry.block.isHandPlaced && entry.item.isOneOffBreak) {
-                    planRepository.removeBlock(entry.block)
-                    itemRepository.delete(entry.item)
-                } else if (entry.block.isHandPlaced && entry.item.type == ItemType.TODO) {
-                    planRepository.removeBlock(entry.block)
-                    if (entry.item.stage == Stage.DAY) itemRepository.moveTo(entry.item, Stage.WEEK)
-                } else {
-                    planRepository.discard(entry.block)
-                }
-            }
+            entries.forEach { clearFromDay(it) }
             _feedback.value = PlacementFeedback.DayCleared(entries.size)
         }
     }
@@ -895,180 +1027,44 @@ class DayPlannerViewModel(
     }
 
     /**
-     * A ToDo thought of on the spot and dropped straight onto a slot.
+     * A ToDo thought of on the spot, for the box that was held into the day.
      *
      * The ordinary route — Quick-Add, weekly planning, concretizing — is right for
      * an idea that needs a week to settle, and wrong for one that belongs at
      * half past four tomorrow. This creates it already concretized and already on
      * the day, so a spontaneous thought does not have to wait for a phase.
      */
-    fun createTodo(name: String, attributes: TodoAttributes, atMinute: Int) {
-        viewModelScope.launch { createTodoWithMargins(name, attributes, atMinute) }
+    fun createTodo(name: String, attributes: TodoAttributes, note: String, atMinute: Int) {
+        request(
+            PendingPlacement.Todo(name, attributes, note),
+            spanAt(
+                atMinute,
+                attributes.duration,
+                attributes.travelBefore,
+                attributes.returnAfter,
+                attributes.breakAfter,
+            ),
+        )
     }
 
-    /**
-     * The spontaneous card, placed by the same rules as one out of the revolver.
-     *
-     * Including the break prompt: sharing the placement is what makes the two
-     * routes onto the day behave alike, rather than the second one quietly
-     * ignoring a margin because it was written later.
-     */
-    private suspend fun createTodoWithMargins(
+    /** "Custom": a named one-off that earns or spends, as long as its box. */
+    fun createSpend(
+        kind: SpendKind,
         name: String,
-        attributes: TodoAttributes,
+        pointsPerHour: Double,
+        note: String,
         atMinute: Int,
+        duration: Duration,
     ) {
-        val existing = uiState.value.blocks.standing()
-        val wanted = snapToGrid(atMinute).coerceIn(0, MINUTES_PER_DAY - 1)
-        val duration = attributes.duration
-        val travel = attributes.travelBefore
-        val back = attributes.returnAfter
-
-        val start = firstFreeStart(
-            existing,
-            duration,
-            wanted,
-            leadIn = travel,
-            tailOut = back,
-            tailOutExtra = attributes.breakAfter,
-        )
-        if (start == null) {
-            if (attributes.breakAfter != null &&
-                fitsSomewhere(existing, duration, wanted, leadIn = travel, tailOut = back)
-            ) {
-                _breakPrompt.value = BreakPrompt(
-                    name = name,
-                    pending = PendingPlacement.Spontaneous(name, attributes, wanted),
-                )
-            } else {
-                _feedback.value = PlacementFeedback.NoRoom(name)
-            }
-            return
-        }
-        if (start != wanted) {
-            _feedback.value = PlacementFeedback.Moved(name, minuteToLocalTime(start))
-        }
-
-        val now = clock.now()
-        val item = Item.newTodo(
-            name = name,
-            category = attributes.category,
-            // Planned by hand for a specific slot: it must happen then. The form
-            // does ask for a priority, but dropping it on an hour has already
-            // said something stronger than any of the four.
-            priority = Priority.URGENT_MUST,
-            targetDate = date,
-            estimatedDuration = duration,
-            now = now,
-        ).copy(
-            stage = Stage.DAY,
-            travelBefore = travel,
-            returnAfter = back,
-            breakAfter = attributes.breakAfter,
-            endSound = attributes.endSound,
-        ).withExtras(attributes.extras)
-
-        val added = itemRepository.add(item, attributes.subtasks, attributes.foldedItemIds)
-        if (added is AddItemResult.BlockedByLock) {
-            _feedback.value = PlacementFeedback.Blocked(name)
-            return
-        }
-        planRepository.addBlock(
-            PlannedBlock(
-                itemId = item.id,
-                date = date,
-                start = minuteToLocalTime(start),
-                plannedDuration = duration,
-                travelBefore = travel,
-                returnAfter = back,
-                breakAfter = attributes.breakAfter,
-                origin = BlockOrigin.DRAGGED,
-                createdAt = now,
-                updatedAt = now,
-            ).stampedWith(item),
+        request(
+            PendingPlacement.Spend(kind, name.ifBlank { kind.label }, pointsPerHour, note),
+            spanAt(atMinute, duration),
         )
     }
 
-    /** The second revolver: a named one-off that earns, spends or is simply social. */
-    fun createSpend(kind: SpendKind, name: String, pointsPerHour: Double, atMinute: Int) {
-        viewModelScope.launch {
-            val existing = uiState.value.blocks.standing()
-            val wanted = snapToGrid(atMinute).coerceIn(0, MINUTES_PER_DAY - 1)
-            val start = firstFreeStart(existing, DEFAULT_SPEND_DURATION, wanted)
-            if (start == null) {
-                _feedback.value = PlacementFeedback.NoRoom(name)
-                return@launch
-            }
-            if (start != wanted) {
-                _feedback.value = PlacementFeedback.Moved(name, minuteToLocalTime(start))
-            }
-
-            val now = clock.now()
-            val item = Item.newSpend(
-                name = name.ifBlank { kind.label },
-                pointsPerHour = pointsPerHour,
-                now = now,
-            )
-            // The Sperrliste can veto this name. Ignoring the refusal used to leave
-            // a block pointing at an item that was never written — a foreign key
-            // violation, and a crash rather than a message.
-            if (itemRepository.add(item) is AddItemResult.BlockedByLock) {
-                _feedback.value = PlacementFeedback.Blocked(item.name)
-                return@launch
-            }
-            planRepository.addBlock(
-                PlannedBlock(
-                    itemId = item.id,
-                    date = date,
-                    start = minuteToLocalTime(start),
-                    plannedDuration = DEFAULT_SPEND_DURATION,
-                    origin = BlockOrigin.DRAGGED,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        }
-    }
-
-    /**
-     * The third revolver: a break, placed like any card and worth nothing.
-     *
-     * The same card the dashboard slips in after a finished task —
-     * `Item.spontaneousBreak`, `ItemRole.BREAK` and no category, so it neither
-     * earns nor costs — only planned ahead instead of taken on the spot. A new
-     * card per break, because the unique index allows an item one occurrence a
-     * day and two breaks in one afternoon is nothing unusual. The Sperrliste is
-     * not consulted: "Pause" is not an idea being hoarded.
-     */
-    fun createBreak(atMinute: Int) {
-        viewModelScope.launch {
-            val existing = uiState.value.blocks.standing()
-            val wanted = snapToGrid(atMinute).coerceIn(0, MINUTES_PER_DAY - 1)
-            val now = clock.now()
-            val item = Item.spontaneousBreak(PLANNED_BREAK, now)
-
-            val start = firstFreeStart(existing, PLANNED_BREAK, wanted)
-            if (start == null) {
-                _feedback.value = PlacementFeedback.NoRoom(item.name)
-                return@launch
-            }
-            if (start != wanted) {
-                _feedback.value = PlacementFeedback.Moved(item.name, minuteToLocalTime(start))
-            }
-
-            itemRepository.addWithoutLockCheck(item)
-            planRepository.addBlock(
-                PlannedBlock(
-                    itemId = item.id,
-                    date = date,
-                    start = minuteToLocalTime(start),
-                    plannedDuration = PLANNED_BREAK,
-                    origin = BlockOrigin.DRAGGED,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        }
+    /** "Pause": a break as long as its box, placed like any card and worth nothing. */
+    fun createBreak(note: String, atMinute: Int, duration: Duration) {
+        request(PendingPlacement.Break(note), spanAt(atMinute, duration))
     }
 
     /**

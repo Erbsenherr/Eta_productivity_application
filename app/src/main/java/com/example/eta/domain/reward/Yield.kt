@@ -18,14 +18,6 @@ const val CUSTOM_EARN_POINTS_PER_HOUR = 1.5
 const val CUSTOM_SPEND_POINTS_PER_HOUR = -5.0
 
 /**
- * Social time neither earns nor costs. `Belohnungssystem.md` gives rates only
- * for the two custom types, so this is an assumption. (It was once argued from
- * a weekly social budget in the setup; that question is gone, the neutral rate
- * stays.)
- */
-const val SOCIAL_POINTS_PER_HOUR = 0.0
-
-/**
  * Points a block is worth. Positive earns, negative spends.
  *
  * The caller decides which blocks count — the daily reevaluation sums this over

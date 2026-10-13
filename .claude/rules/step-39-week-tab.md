@@ -67,14 +67,15 @@ one finger and pinched with two. The **caller** holds it and owns the button
 that ends it: `DraftFooter` in the planner (it replaces the footer, so the day
 cannot be confirmed from under the box), `DraftBar` in the week tab.
 
-- **In the day planner it makes a ToDo** — `NewTodoDialog`, opened on the box's
-  length, then `createTodo` at its start. **The "Neues ToDo" chamber of the
-  second revolver is gone**; `DragPayload.NewTodo` with it.
-- **Not while the week list still holds something plannable**
-  (`PlannerUiState.canCreateTodo`): the press is answered with
-  `PlacementFeedback.WeekFirst`. "Plannable" is the priority gate's own test —
-  concretized, unlocked, not on this day, and fitting somewhere — so a card that
-  cannot go on the day does not block the day. `allowTodoBesideWeek` lifts it.
+- **In the day planner it asks what it is** (step 41): a ToDo, a break or a
+  points entry — `NewEntryKindDialog`, then that kind's form, opened on the
+  box's length. See *Step 41*.
+- **No new ToDo while the week list still holds something plannable**
+  (`PlannerUiState.canCreateTodo`): the "Neues ToDo" button is grey and says
+  why. It used to refuse the press itself, before the box was also the way to a
+  break. "Plannable" is the priority gate's own test — concretized, unlocked,
+  not on this day, and fitting somewhere — so a card that cannot go on the day
+  does not block the day. `allowTodoBesideWeek` lifts it.
 - **In the week tab it makes a standing task**: `RecurringCreateDialog(initial =
   …)` with the box's weekday ticked, its hour and its length.
 - A block consumes the press that lands on it, so the timeline's own detector

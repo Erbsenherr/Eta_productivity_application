@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (626 tests
-as of step 40), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (643 tests
+as of step 41), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -382,6 +382,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-38-tutorial.md` | *Step 38*: the tutorial — a practice `AppContainer` over an in-memory database (`sandbox`, `TutorialSession`), the simulated day (`TutorialClock`, `LocalEtaClock`), the tutorials there are (`TutorialId`: Quickstart, Listen — offered once on the Listen tab —, Extras, Growth-Tasks, Verträge, Belohn-o-mat) and their scripts (`TEXT`/`TASK`/`FOLLOW`, `tutorialFacts`), the gates that keep a screen's buttons shut until their step (`TutorialGate`, `tutorialAllows`), the hooks in the real screens (`tutorialSpot`, `ReportToTutorial`), when it is shown (`TutorialStore`), and the two rules that came with it: the adjustable charge for unplanned time (`unplannedRate`) and Custom Spend needing a balance (`canSpend`) |
 | `step-39-week-tab.md` | *Step 39*: the dashboard's own tabs (`DashboardPage`: Heute · Morgen · Woche, tapped), the week timetable (`ui/week/`, `WeekView` Aktuell / Generell, the lock, `standingBlocksOn`, `reschedule` → `rescheduleRows`, the two questions in `PendingReschedule`), a box held into an empty stretch (`TimelineDraft`, `onEmptyLongPress`) and the pinch (`pinchTarget`, `pinchedSpan`), the revolver that folds away (`RevolverFold`), the Flexibilität settings (`allowPrioritySkip`, `allowTodoBesideWeek`) and a priority tier passed by itself (`priorityTier(…, fits)`) |
 | `step-40-nights-breaks.md` | *Step 40*: three ways of answering the nights (`NightMode`, `nightsByDay`, the weekend fixed to Friday and Saturday evening again), the advice about the sleep rhythm (`rhythmSpread`, `RHYTHM_ADVICE`), a long press on the shaded night (`onSleepLongPress`, `NightEditDialog`) — one night in the day planner (`NightOverride`, `NightService.overrideNight`, what moves with it), the weekday's standing night on the week timetable (`saveWeekdayNight`) — and the Pausenchecker (`checkBreaks`, `breakKind`, `PlannerWarning`, `PlannerDismissal`) |
+| `step-41-overlap-kinds.md` | *Step 41*: something new on occupied time asks (`OverlapPrompt`, `PlacementSpan`, `fittedSpan`, `planRelief`, `removalFate`), one revolver — a box asks what it is (`NewEntryKindDialog`: Neues ToDo · Pause · Custom), and a note when a card is made |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -409,12 +410,14 @@ These came out of discussion with the user and are not all derivable from `Eta_d
   screen. Overlapping imported events count **once** toward free time (interval
   merge) — `plannedMinutes` and `occupiedMinutesOfWeek` merge per day, and always did.
 - **Sperrliste identity:** normalized name (trimmed, lowercased).
-- **Spend covers both** Custom Spend and Custom Earn via a signed `pointsPerHour`. The
-  second revolver's third entry, "Social", is assumed neutral at 0
-  (`SOCIAL_POINTS_PER_HOUR`). `Belohnungssystem.md` gives no rate for it. The
-  weekly "Soziale Interaktion" budget it was once argued from is **gone** (step 38):
-  not asked, not shown, and `socialTimePerWeek` — the column stays — is read by
-  nothing.
+- **Spend covers both** Custom Spend and Custom Earn via a signed `pointsPerHour`.
+  The neutral third entry, "Social", went with the second revolver in step 41 —
+  an hour that neither earns nor costs is a Custom entry with its rate set to 0. The weekly
+  "Soziale Interaktion" budget is **gone** as well (step 38): not asked, not
+  shown, and `socialTimePerWeek` — the column stays — is read by nothing.
+- **Something new put on occupied time is asked about, never slid** (step 41):
+  "Dennoch setzen", "ToDo anpassen", "Plan anpassen". A block *moved* there
+  still slides. See *Step 41*.
 - **The questionnaire's framework blocks carry no category** and therefore no yield;
   "Arbeit / Uni" is the exception and counts as Fokus **for now** — the Listen tab is
   where that provisional choice gets corrected.
@@ -446,7 +449,8 @@ is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
 36. Advanced Features, "Freigeschaltet ab", and hours of their own · 37. "Flexibel" ·
 38. The tutorial · 39. A dashboard with tabs, the week as a timetable, and
 Flexibilität · 40. Nights changed by hand, a night per weekday, and the
-Pausenchecker.
+Pausenchecker · 41. An overlap that is asked about, one revolver, and a note at
+creation.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and
@@ -463,8 +467,9 @@ lands.
   migration test needs `MigrationTestHelper` with a JVM SQLite driver; `room3-testing` is
   already on the test classpath for it.
 - **Nothing lets the user set an `ItemRole`** — see *`ItemRole`*.
-- **Notes at creation time**, and a deadline on a card already planned into a day, have
-  nowhere to be asked for yet.
+- **A deadline on a card already planned into a day** has nowhere to be asked for
+  yet. (A note at creation time is asked in the planner's forms since step 41;
+  Quick-Add stays name-only.)
 - **A second Google account** needs a second grant — see *Google Calendar*.
 
 Both parked reward questions were decided with the user at step 6: the legacy cap is

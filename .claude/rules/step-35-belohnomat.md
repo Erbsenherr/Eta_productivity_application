@@ -129,9 +129,9 @@ back on with the account where it would have stood anyway.
   the tab, in both dialogs and in the evening's question; the points sentence of
   "Erledigt?"; the billing question of the follow-up dialog (the block keeps its
   default); the `RateField`; the Inflation and Absagen cards in the settings.
-- **Custom Earn and Custom Spend leave the revolver**; Social, being neutral,
-  stays, and the revolver is then called "Spontan". What already stands on a day
-  stays and is booked.
+- **Custom Earn and Custom Spend are not offered**: "Custom" is missing from
+  what a box can become (step 41; they were chambers of a revolver before).
+  What already stands on a day stays and is booked.
 - **Contracts stay**, as asked: listed, signed, asked about every evening — only
   their figures go.
 - **The Belohn-o-mat does not read the switch.** Tab, evening page and numbers

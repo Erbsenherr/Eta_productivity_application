@@ -41,10 +41,14 @@ import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.components.EtaTimePicker
+import com.example.eta.domain.planning.MINUTES_PER_DAY
+import com.example.eta.domain.planning.PlanRelief
 import com.example.eta.domain.planning.endMinute
+import com.example.eta.domain.planning.startMinute
 import com.example.eta.domain.planning.minuteToLocalTime
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
+import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.subtask.drafts
@@ -558,31 +562,308 @@ fun ClearDayDialog(
 }
 
 /**
- * The one question a full day raises: the task fits, its journey fits, the break
- * does not.
+ * A card was put where something already stands, and the three ways out of it.
  *
- * Answering yes plans it without the break. The journey is never on the table —
- * it is the time the task takes to reach, and a task planned without it is simply
- * planned wrong.
+ * Every answer says what it would do before it is given: "ToDo anpassen" names
+ * the hours the card would get, "Plan anpassen" lists what happens to each block
+ * in its path. Without that the two would be buttons whose consequences can only
+ * be found out by pressing them — and one of those consequences, calling a
+ * standing task off on a day already running, costs.
+ *
+ * [blocks] is the day as it stands, to put names to the blocks the prompt holds.
  */
 @Composable
-fun BreakDroppedDialog(
-    name: String,
+fun OverlapDialog(
+    prompt: OverlapPrompt,
+    blocks: List<BlockWithItem>,
+    /** Whether calling something off costs here — today yes, tomorrow no. */
+    costs: Boolean,
     onDismiss: () -> Unit,
     onPlaceAnyway: () -> Unit,
+    onFit: () -> Unit,
+    onAdjustPlan: () -> Unit,
 ) {
-    PlannerDialog(title = "Kein Platz für die Pause", onDismiss = onDismiss) {
+    val name = prompt.pending.name
+    val wanted = prompt.wanted
+    val entries = prompt.relief.mapNotNull { relief ->
+        blocks.firstOrNull { it.block.id == relief.block.id }?.let { relief to it }
+    }
+    val pointsVisible = LocalPointsVisible.current
+
+    PlannerDialog(title = "Überschneidung", onDismiss = onDismiss) {
         EtaText(
-            text = "Es ist kein Zeitslot frei, der die für »$name« vorgesehene Pause " +
-                "zulässt. Trotzdem hinzufügen? Die Pause entfällt dann.",
+            text = "»$name« würde von ${clockAt(wanted.startMinute)} bis " +
+                "${clockAt(wanted.endMinute)} stehen — dort liegt bereits " +
+                entries.joinToString(separator = ", ", postfix = ".") { "»${it.second.item.name}«" },
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )
+
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Dennoch setzen",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onPlaceAnyway,
+            )
+            EtaText(
+                text = "Beides steht dann zur selben Zeit im Plan.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+
+        val fitted = prompt.fitted
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "ToDo anpassen",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = fitted != null,
+                onClick = onFit,
+            )
+            EtaText(
+                text = when {
+                    fitted == null -> "Es ist keine Lücke mehr frei, in die »$name« passen würde."
+                    else -> buildString {
+                        val moved = fitted.startMinute != wanted.startMinute
+                        val cut = fitted.duration != wanted.duration
+                        if (moved || cut) {
+                            append("»$name« steht dann von ${clockAt(fitted.startMinute)} bis ")
+                            append("${clockAt(fitted.endMinute)}")
+                            if (cut) {
+                                append(" — ${fitted.duration.formatShort()} statt ")
+                                append(wanted.duration.formatShort())
+                            }
+                            append(". ")
+                        } else {
+                            append("»$name« bleibt, wo es ist. ")
+                        }
+                        if (wanted.breakAfter != null && fitted.breakAfter == null) {
+                            append("Die Pause danach entfällt. ")
+                        }
+                        append("Der Plan bleibt, wie er ist.")
+                    }
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+
+        // An appointment out of the calendar is never cut, so a card that only
+        // runs into those has nothing in the plan to adjust.
+        val adjustable = entries.any { it.first !is PlanRelief.Kept }
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Plan anpassen",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = adjustable,
+                onClick = onAdjustPlan,
+            )
+            entries.forEach { (relief, entry) ->
+                val other = entry.item.name
+                EtaText(
+                    text = "· " + when (relief) {
+                        is PlanRelief.EndsEarlier ->
+                            "»$other« endet schon um ${clockAt(relief.result.endMinute())}."
+
+                        is PlanRelief.StartsLater ->
+                            "»$other« beginnt erst um ${clockAt(relief.result.startMinute())}."
+
+                        is PlanRelief.Removed -> when (entry.removalFate()) {
+                            RemovalFate.DELETED -> "»$other« entfällt."
+                            RemovalFate.BACK_TO_WEEK -> "»$other« geht zurück in die Wochenliste."
+                            RemovalFate.CALLED_OFF -> "»$other« wird abgesagt."
+                        }
+
+                        is PlanRelief.Kept ->
+                            "»$other« ist ein Kalendertermin und bleibt stehen — die " +
+                                "Überschneidung mit ihm auch."
+                    },
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                )
+            }
+            val callsOff = entries.any { (relief, entry) ->
+                relief is PlanRelief.Removed && entry.removalFate() == RemovalFate.CALLED_OFF
+            }
+            if (callsOff && costs && pointsVisible) {
+                EtaText(
+                    text = "Der Tag läuft bereits: Absagen kostet die abgesagten Stunden an Punkten.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+        }
+    }
+}
+
+/** A minute of the day as a clock time; the end of the day is not "23:59". */
+private fun clockAt(minute: Int): String =
+    if (minute >= MINUTES_PER_DAY) "24:00" else minuteToLocalTime(minute).formatClock()
+
+/** What a box held into the day can become. */
+enum class NewEntryKind { TODO, BREAK, EARN, SPEND }
+
+/**
+ * The box has its hours; this asks what it is.
+ *
+ * Three answers, and "Custom" has two of its own behind it. They used to be
+ * three revolvers — ToDos, Punkte, Pause — walked through with a button in the
+ * footer; since step 41 the revolver holds the week's ToDos and nothing else,
+ * and everything made on the spot starts as a box.
+ *
+ * What is refused is shown and says why, rather than left out: a missing button
+ * would read as a feature that went away.
+ */
+@Composable
+fun NewEntryKindDialog(
+    from: Int,
+    until: Int,
+    /** False while the week list still holds something that could be planned. */
+    canCreateTodo: Boolean,
+    /** False while there is nothing on the account to spend. */
+    canSpend: Boolean,
+    onDismiss: () -> Unit,
+    onChoose: (NewEntryKind) -> Unit,
+) {
+    var custom by remember { mutableStateOf(false) }
+    val pointsVisible = LocalPointsVisible.current
+
+    PlannerDialog(title = if (custom) "Custom" else "Neuer Eintrag", onDismiss = onDismiss) {
+        EtaText(
+            text = "${clockAt(from)} bis ${clockAt(until)} — " +
+                if (custom) "Punkte verdienen oder ausgeben?" else "was soll hier stehen?",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+
+        if (custom) {
+            EtaButton(
+                text = "Punkte verdienen",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onChoose(NewEntryKind.EARN) },
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                EtaButton(
+                    text = "Punkte ausgeben",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSpend,
+                    onClick = { onChoose(NewEntryKind.SPEND) },
+                )
+                if (!canSpend) {
+                    EtaText(
+                        text = "Ausgeben braucht Guthaben — dein Punktestand liegt bei 0 " +
+                            "oder darunter.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.warning,
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                EtaButton(
+                    text = "Neues ToDo",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canCreateTodo,
+                    onClick = { onChoose(NewEntryKind.TODO) },
+                )
+                if (!canCreateTodo) {
+                    EtaText(
+                        text = "Du hast noch Aufgaben in deiner Woche, die du zuerst " +
+                            "abzuarbeiten hast.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.warning,
+                    )
+                }
+            }
+            EtaButton(
+                text = "Pause",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onChoose(NewEntryKind.BREAK) },
+            )
+            // Custom is points and nothing else, so it goes out of sight with them.
+            if (pointsVisible) {
+                EtaButton(
+                    text = "Custom",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { custom = true },
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            if (custom) {
+                EtaButton(
+                    text = "Zurück",
+                    style = EtaButtonStyle.Secondary,
+                    onClick = { custom = false },
+                )
+            } else {
+                EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            }
+        }
+    }
+}
+
+/**
+ * A break for the box that was drawn: nothing to ask but whether there is
+ * something to say about it.
+ *
+ * Its length is the box's, and is changed afterwards like any block's — by a
+ * long press on it.
+ */
+@Composable
+fun BreakDialog(
+    duration: Duration,
+    onDismiss: () -> Unit,
+    onCreate: (note: String) -> Unit,
+) {
+    var note by remember { mutableStateOf("") }
+
+    PlannerDialog(title = "Pause", onDismiss = onDismiss) {
+        EtaText(
+            text = duration.formatShort() +
+                if (LocalPointsVisible.current) " · bringt und kostet keine Punkte" else "",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        NoteField(value = note, onValueChange = { note = it })
+
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
             Spacer(Modifier.weight(1f))
-            EtaButton(text = "Ohne Pause einplanen", onClick = onPlaceAnyway)
+            EtaButton(text = "Einplanen", onClick = { onCreate(note.trim()) })
         }
+    }
+}
+
+/**
+ * The note a card made on the spot can be given at once.
+ *
+ * It lands on the block, where `BlockEditDialog` shows and edits it — these
+ * cards have the one occurrence. The forms here had no such field, so a note
+ * could only be added by planning the card first and long-pressing it after.
+ */
+@Composable
+private fun NoteField(value: String, onValueChange: (String) -> Unit) {
+    EtaField(label = "Notiz") {
+        EtaTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = "Was gibt es dazu zu wissen?",
+            singleLine = false,
+        )
     }
 }
 
@@ -648,9 +929,10 @@ fun NewTodoDialog(
     /** The length the box on the day was pinched to; the form opens on it. */
     duration: Duration? = null,
     onDismiss: () -> Unit,
-    onCreate: (name: String, attributes: TodoAttributes) -> Unit,
+    onCreate: (name: String, attributes: TodoAttributes, note: String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
     var attributes by remember {
         mutableStateOf(TodoAttributes().let { if (duration != null) it.copy(duration = duration) else it })
     }
@@ -663,6 +945,8 @@ fun NewTodoDialog(
                 placeholder = "Was ist dir eingefallen?",
             )
         }
+        // Directly under the name, as in the edit dialogs: it is read with it.
+        NoteField(value = note, onValueChange = { note = it })
 
         TodoAttributeFields(
             value = attributes,
@@ -680,23 +964,24 @@ fun NewTodoDialog(
             EtaButton(
                 text = "Einplanen",
                 enabled = name.isNotBlank(),
-                onClick = { onCreate(name.trim(), attributes) },
+                onClick = { onCreate(name.trim(), attributes, note.trim()) },
             )
         }
     }
 }
 
 /**
- * The prompt the second revolver owes: a name, and the rate if the default is not
- * what was meant.
+ * What "Custom" asks: a name, a note, and the rate if the default is not what
+ * was meant. The length is the box's.
  */
 @Composable
 fun SpendDialog(
     kind: SpendKind,
     onDismiss: () -> Unit,
-    onCreate: (name: String, pointsPerHour: Double) -> Unit,
+    onCreate: (name: String, pointsPerHour: Double, note: String) -> Unit,
 ) {
     var name by remember(kind) { mutableStateOf("") }
+    var note by remember(kind) { mutableStateOf("") }
     var rate by remember(kind) { mutableStateOf(kind.pointsPerHour) }
 
     PlannerDialog(title = kind.label, onDismiss = onDismiss) {
@@ -707,6 +992,7 @@ fun SpendDialog(
                 placeholder = "Wofür?",
             )
         }
+        NoteField(value = note, onValueChange = { note = it })
         if (LocalPointsVisible.current) {
             RateField(
                 rate = rate,
@@ -714,7 +1000,6 @@ fun SpendDialog(
                 hint = when (kind) {
                     SpendKind.CUSTOM_SPEND -> "Negativ: zehrt vom Konto."
                     SpendKind.CUSTOM_EARN -> "Positiv: schreibt gut."
-                    SpendKind.SOCIAL -> "Neutral: bringt und kostet nichts."
                 },
             )
         }
@@ -722,7 +1007,7 @@ fun SpendDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
             Spacer(Modifier.weight(1f))
-            EtaButton(text = "Einplanen", onClick = { onCreate(name.trim(), rate) })
+            EtaButton(text = "Einplanen", onClick = { onCreate(name.trim(), rate, note.trim()) })
         }
     }
 }

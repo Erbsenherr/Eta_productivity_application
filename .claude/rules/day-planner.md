@@ -21,9 +21,9 @@ snapping, and where a block can actually go.
 - **A drop onto another movable block asks.** "Tasks gruppieren?" — with "Nur
   verschieben" as one of the answers, because the slide below is a gesture a dense
   day needs. See *Step 23*.
-- **A drop onto occupied time slides.** `firstFreeStart` finds the next place the
-  block fits and the user is told where it went. Refusing would make a dense day
-  nearly unplannable; overwriting would quietly destroy something already planned.
+- **A block moved onto occupied time slides.** `firstFreeStart` finds the next
+  place it fits. Something **new** put on occupied time is asked about instead,
+  since step 41 — see *Step 41*.
 - **Turn versus pull.** Both gestures live on the centre chamber, so the *first*
   direction the finger takes decides which one it is, and that decision is held
   until the finger lifts. Anything else and a hesitant drag does both. `onPullStart`
@@ -129,13 +129,11 @@ those is a place for them to come apart. As columns there is nothing to keep in 
   defaults. They travel with both copies the app makes of a task,
   `Item.newMakeUpTodo` and "in die Woche kopieren", both being the same work on
   another day.
-- **The break is the part that yields when the day is full.** Placement tries the
-  whole container first; if only the task with its journeys fits, the user gets
-  `BreakDroppedDialog` — "Es ist kein Zeitslot frei, der die vorgesehene Pause
-  zulässt. Trotzdem einplanen?" — and yes places it with `breakAfter = null`. The
-  **journeys are never dropped**: they are time the task actually takes, in either
-  direction, and a task planned without them is planned wrong. If even that finds no
-  room it is the ordinary `NoRoom` refusal.
+- **The break is the part that yields when the day is full.** Since step 41 that
+  is the first thing "ToDo anpassen" tries (`fittedSpan`) — the dialog of its own,
+  `BreakDroppedDialog`, is gone. The **journeys are never dropped**: they are time
+  the task actually takes, in either direction, and a task planned without them is
+  planned wrong.
 - **"Als Nächstes" reads the container**, not the task's own span, and says which
   part is meant. `nowAndNext` used to report a dentist's appointment at 17:15 as
   starting at 17:15, by which time you should be in the chair; it now reads
@@ -175,29 +173,21 @@ is drawn with rounded corners and dragged like a ToDo. Database **version 26**.
   confirmed tomorrow, keep it.
 - Pinned in `YieldTest` beside the older movability test.
 
-### The third revolver: Pause (step 29)
+### A planned break (step 29, reshaped in step 41)
 
-The footer button walks through **three** revolvers now — ToDos → Punkte → Pause —
-and still names the one it leads to. (The second one lost its first chamber, "Neues
-ToDo", in step 39: a ToDo made on the spot is held into the day itself.) `RevolverKind` carries the label and `next()`,
-so a fourth is one line.
-
-The Pause revolver holds a single chamber, "Pause · 15 min · 0 Punkte". Dropping it
-calls `DayPlannerViewModel.createBreak`, **without a dialog**: a break has nothing to
-ask. It is the card the dashboard already slips in after a finished task —
+There was a Pause revolver, a third one beside ToDos and Punkte. **All but the
+first are gone since step 41**: a break is one of the three things a box held
+into the day can become, as long as the box, made by
+`DayPlannerViewModel.createBreak` — see *Step 41*. What it *is* has not changed:
+the card the dashboard already slips in after a finished task —
 `Item.spontaneousBreak`, `ItemRole.BREAK`, no category — so it neither earns nor
 costs, the still-active question skips it, and the evening asks about it like any
-block. `PLANNED_BREAK` is `SPONTANEOUS_BREAK`: one default length, a quarter of an
-hour, for both ways a break comes about.
+block.
 
-- **A revolver of its own rather than a chamber among the points**, at the user's
-  request: it is not a points entry, and it should not sit behind four others.
-- **Placed like any card** — `firstFreeStart` from the dropped minute, with the
-  "moved to" banner when the slot was taken.
 - **A new item per break**, because the unique index allows an item one occurrence
   a day. The Sperrliste is not consulted.
 - **Length and category are changed on the block**, by a long press, like any
-  other; nothing here offers a second default.
+  other.
 - **A planned break left unticked is unplanned time** in the evening, the same as
   the spontaneous one — a break costs nothing, but its quarter of an hour is still
   a quarter of an hour the day has to account for.

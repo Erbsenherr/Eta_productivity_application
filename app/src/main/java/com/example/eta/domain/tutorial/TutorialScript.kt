@@ -53,9 +53,6 @@ object TutorialSignal {
     /** The page of the weekly planning in front, by its name. */
     const val WEEK_STEP = "week.step"
 
-    /** Which revolver the day planner has out, by its name. */
-    const val PLANNER_REVOLVER = "planner.revolver"
-
     /** "1" once the Extras box of a card has been unfolded. */
     const val EXTRAS_OPEN = "extras.open"
 }
@@ -618,39 +615,41 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
             "etwa dauert nur eine Viertelstunde. Tippe einen Block an, und sein Name " +
             "erscheint groß über dem Tag, mit Uhrzeit und Notiz.",
     ),
-    TutorialStep(
-        stage = TutorialStage.PLANNER,
-        title = "Der zweite Revolver",
-        text = {
-            "Oben steht die Prognose: so viele Punkte bringt der Tag, wenn alles " +
-                "erledigt wird. Der Knopf unten wechselt den Revolver. " +
-                "Tippe auf »Punkte«."
-        },
-        kind = StepKind.TASK,
-        checks = {
-            listOf(
-                TutorialCheck(
-                    "Zum Revolver »Punkte« wechseln",
-                    it.saw(TutorialSignal.PLANNER_REVOLVER, "SPEND"),
-                ),
-            )
-        },
+    text(
+        TutorialStage.PLANNER,
+        "Eigenes in den Tag setzen",
+        "Oben steht die Prognose: so viele Punkte bringt der Tag, wenn alles " +
+            "erledigt wird. Was nicht auf deiner Wochenliste steht, setzt du direkt " +
+            "in den Tag: Halte eine freie Stelle gedrückt, schiebe die Box zurecht " +
+            "und ziehe sie mit zwei Fingern länger oder kürzer. »Bestätigen« fragt " +
+            "dann, was daraus wird — ein neues ToDo, eine Pause oder »Custom«.",
     ),
     text(
         TutorialStage.PLANNER,
         "Punkte verdienen und ausgeben",
-        "Auch diese Karten ziehst du in den Tag. »Custom Earn« ist für Verdienst, " +
-            "den keine Aufgabe abbildet, und bringt 1,5 Punkte pro Stunde. »Custom " +
-            "Spend« ist dein Lohn: eine Stunde Serie oder Spielen kostet 5 Punkte. " +
-            "Beide Sätze lassen sich beim Einplanen anpassen. Ausgeben geht nur mit " +
-            "Guthaben — bei einem Punktestand von 0 oder darunter ist die Karte gesperrt.",
+        "»Custom« fragt, ob du Punkte verdienen oder ausgeben willst. Verdienen " +
+            "ist für das, was keine Aufgabe abbildet, und bringt 1,5 Punkte pro " +
+            "Stunde. Ausgeben ist dein Lohn: eine Stunde Serie oder Spielen kostet " +
+            "5 Punkte. Beide Sätze lassen sich beim Einplanen anpassen. Ausgeben " +
+            "geht nur mit Guthaben — bei einem Punktestand von 0 oder darunter ist " +
+            "der Knopf gesperrt.",
     ),
     text(
         TutorialStage.PLANNER,
-        "Der dritte Revolver: Pause",
-        "Ein weiterer Tipp auf den Knopf führt zur Pause: eine Viertelstunde, die du " +
-            "ohne Umstände hinter eine oder mehrere Aufgaben ziehst. Verbringe Pausen " +
-            "am besten mit Entspannung — und behalte deine Bildschirmzeit im Blick.",
+        "Pausen einplanen",
+        "Auf demselben Weg setzt du eine Pause hinter eine oder mehrere Aufgaben: " +
+            "freie Stelle gedrückt halten, Box zurechtziehen, »Pause« wählen. " +
+            "Verbringe Pausen am besten mit Entspannung — und behalte deine " +
+            "Bildschirmzeit im Blick.",
+    ),
+    text(
+        TutorialStage.PLANNER,
+        "Wenn sich etwas überschneidet",
+        "Setzt du etwas auf eine Uhrzeit, an der schon etwas steht, fragt der " +
+            "Planer nach: »Dennoch setzen« lässt beides stehen, »ToDo anpassen« " +
+            "kürzt das Neue auf die freie Lücke, und »Plan anpassen« kürzt oder " +
+            "räumt, was im Weg steht. Was genau passieren würde, steht jeweils " +
+            "darunter.",
     ),
     TutorialStep(
         stage = TutorialStage.PLANNER,

@@ -48,12 +48,19 @@ val MIN_BLOCK_DURATION: Duration = SNAP_MINUTES.minutes
  * rounding it down would silently throw away the minutes between — the block ends
  * exactly where the appointment's claim begins.
  */
-fun PlannedBlock.shortenedBefore(fixed: PlannedBlock): PlannedBlock? {
-    if (containerStartMinute() >= fixed.containerStartMinute()) return null
+fun PlannedBlock.shortenedBefore(fixed: PlannedBlock): PlannedBlock? =
+    shortenedBefore(fixed.containerStartMinute())
+
+/**
+ * The same cut against a claim that is not a block yet — a card about to be put
+ * on the day, whose container begins at [claimStart]. See `OverlapRelief.kt`.
+ */
+fun PlannedBlock.shortenedBefore(claimStart: Int): PlannedBlock? {
+    if (containerStartMinute() >= claimStart) return null
 
     val tail = (returnAfter?.inWholeMinutes?.toInt() ?: 0) +
         (breakAfter?.inWholeMinutes?.toInt() ?: 0)
-    val newEnd = fixed.containerStartMinute() - tail
+    val newEnd = claimStart - tail
     val minutes = newEnd - startMinute()
     if (minutes < MIN_BLOCK_DURATION.inWholeMinutes) return null
 

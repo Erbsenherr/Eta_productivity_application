@@ -109,8 +109,9 @@ is told so it can add what that one needs.
   is on for a new setup now, and on in the practice app, so the Quickstart frames
   the account ("Dein Punktekonto", which also says where to switch it off), says
   what a category pays, stops on the evening's settlement page ("Die
-  Abrechnung"), and has the user turn to the second revolver before explaining
-  Custom Earn and Custom Spend. Its last words point at the other tutorials.
+  Abrechnung"), and explains — as text, since step 41 took the revolvers it used
+  to have the user turn to — the box held into the day and what it can become.
+  Its last words point at the other tutorials.
 - **A feature tutorial stays on its feature's tab** (`TutorialStage.GROWTH` /
   `CONTRACTS` / `REWARDS`) and has one `TASK`: make one. Done is a count read off
   the practice database. **Creating happens in a dialog, and a dialog is a window
@@ -248,7 +249,7 @@ reason; done is `forceMajeure` on the block.
   shows a sentence rather than opening a button.
 - **Two more steps**: why empty time costs points, on the settlement page — "Die
   Abrechnung" became a `TEXT` step and the new one is the `FOLLOW` that turns
-  the page — and the Pause revolver after the second one.
+  the page — and a step about breaks (a revolver then, a kind of box now).
 
 #### Two rules that changed with it
 
@@ -260,11 +261,11 @@ reason; done is `forceMajeure` on the block.
   `ReevaluationService` hands `settleDay`. The stepper stops at half a point —
   "nothing" is the checkbox. The two free hours stay a constant.
 - **A Custom Spend needs points to spend.** `DayPlannerViewModel.canSpend` is
-  the ledger balance `> 0` — as it stands, not as tonight will leave it. The
-  card stays in the revolver, reads "kein Guthaben", and a drop is answered with
-  `PlacementFeedback.NoPoints` rather than swallowed. A Custom Spend already on
-  a day is left alone. The practice account is at zero or below by the time the
-  tutorial reaches the planner, and its text says the card is locked.
+  the ledger balance `> 0` — as it stands, not as tonight will leave it. "Punkte
+  ausgeben" in `NewEntryKindDialog` is grey without it and says why (step 41;
+  it was a locked card in a revolver). A Custom Spend already on a day is left
+  alone. The practice account is at zero or below by the time the
+  tutorial reaches the planner, and its text says the button is locked.
 
 #### The hooks in the real screens
 

@@ -15,8 +15,9 @@ split carries them for free: `Item.note` follows every occurrence,
 note first** — it is the one that says something about today. In the edit dialogs the
 note sits directly under the name; the block dialog offers both fields for a
 recurring task and only the occurrence one for a one-off, and "Notiz für alle
-Termine" stays down with the standing configuration. **Still open:** the creation
-forms have no note field, Quick-Add being name-only by design.
+Termine" stays down with the standing configuration. Since step 41 the
+planner's creation forms ask for a note and write it to the block (*Step 41*);
+Quick-Add stays name-only by design.
 
 **Priority gating** lives in `domain/planning/PriorityGate.kt`: the revolver offers
 one tier at a time, highest first, and `Priority`'s declaration order is the ranking.

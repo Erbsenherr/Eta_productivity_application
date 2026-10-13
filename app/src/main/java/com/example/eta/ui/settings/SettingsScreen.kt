@@ -657,8 +657,8 @@ private fun BreakCheckerBox(setup: UserSetup, onChange: OnSetupChange) {
                 onCheckedChange = { on -> onChange { it.copy(breakChecker = on) } },
                 label = "Auf Pausen achten",
                 hint = "Der Tagesplaner weist darauf hin, wenn für einen Tag zu wenig Pause " +
-                    "verplant ist. Als Pause zählen Pausen, Freizeit, Essen, Achtsamkeit, " +
-                    "Social und Custom Spend — Pomodoro-Pausen kommen obendrauf und zählen " +
+                    "verplant ist. Als Pause zählen Pausen, Freizeit, Essen, Achtsamkeit " +
+                    "und Custom Spend — Pomodoro-Pausen kommen obendrauf und zählen " +
                     "nicht mit. Jeder Hinweis lässt sich für den Tag ignorieren.",
             )
             if (setup.breakChecker) {
