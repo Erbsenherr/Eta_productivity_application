@@ -3,7 +3,6 @@ package com.example.eta.ui.stats
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -476,7 +476,11 @@ private fun Dot(color: Color) {
     )
 }
 
-/** The four ranges, side by side; the chosen one is the filled button. */
+/**
+ * The four ranges as one fixed line of words, each a quarter of the width: the
+ * chosen one wears the accent and a stroke under it. Not buttons and not
+ * scrolling sideways — it was both, and read as four more boxes among boxes.
+ */
 @Composable
 private fun RangeChips(
     selected: StatRange,
@@ -484,15 +488,40 @@ private fun RangeChips(
     allLabel: String = StatRange.ALL.label,
 ) {
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
     ) {
         StatRange.entries.forEach { range ->
-            EtaButton(
-                text = if (range == StatRange.ALL) allLabel else range.label,
-                style = if (range == selected) EtaButtonStyle.Primary else EtaButtonStyle.Secondary,
-                onClick = { onSelect(range) },
-            )
+            val chosen = range == selected
+            val interactionSource = remember { MutableInteractionSource() }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { onSelect(range) },
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                EtaText(
+                    text = if (range == StatRange.ALL) allLabel else range.label,
+                    style = if (chosen) EtaTheme.typography.bodyStrong else EtaTheme.typography.body,
+                    color = if (chosen) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = EtaTheme.spacing.sm),
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(if (chosen) EtaTheme.colors.accent else EtaTheme.colors.border),
+                )
+            }
         }
     }
 }

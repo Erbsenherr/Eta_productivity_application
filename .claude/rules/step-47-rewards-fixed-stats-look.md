@@ -52,6 +52,11 @@ Asked for: prettier, and boxes easier to tell apart. Nothing in
 - **"Zeit je Kategorie"** is one bar cut by `weight` into the three category
   colours, with the hours under it.
 - A share of nothing ("—") is drawn muted, not in its tint.
+- **The range picker is one fixed line of words** (`RangeChips`, asked for the
+  same evening): four quarters of the width, the chosen one in the accent with
+  a stroke under it. It was four `EtaButton`s in a `horizontalScroll` — boxes
+  among boxes, and a line that slid. "Fix" was read as *not scrolling
+  sideways*, not as pinned to the top of the page.
 
 **Verified by the compiler, the suite (694, none new — no rule of the domain
 changed), `assembleRelease` and `lint`.** Nobody has seen either screen; of the
