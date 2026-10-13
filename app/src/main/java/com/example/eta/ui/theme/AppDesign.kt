@@ -1,6 +1,10 @@
 package com.example.eta.ui.theme
 
 import android.content.Context
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,8 +59,19 @@ enum class Brightness(val label: String) {
 data class DesignChoice(
     val design: AppDesign = AppDesign.DEFAULT,
     val brightness: Brightness = Brightness.DEFAULT,
+    /**
+     * An accent of the user's own, as ARGB, in place of the design's — null is
+     * the design's. A third answer beside the other two: it goes over whichever
+     * design and whichever brightness are on.
+     */
+    val accent: Int? = null,
+    /** What the tab bar shows — a look, and so kept with the looks. */
+    val tabStyle: TabStyle = TabStyle.DEFAULT,
 ) {
-    fun colors(systemDark: Boolean): EtaColors = colorsOf(design, brightness.isDark(systemDark))
+    fun colors(systemDark: Boolean): EtaColors {
+        val base = colorsOf(design, brightness.isDark(systemDark))
+        return accent?.let { base.withAccent(Color(it)) } ?: base
+    }
 
     companion object {
         /**
@@ -75,8 +90,66 @@ data class DesignChoice(
                 brightness = storedBrightness ?: Brightness.DEFAULT,
             )
         }
+
+        /** The same, with the two answers of step 44 beside them. */
+        fun fromStored(design: String?, brightness: String?, accent: Int?, tabStyle: String?): DesignChoice =
+            fromStored(design, brightness).copy(
+                accent = accent,
+                tabStyle = TabStyle.entries.firstOrNull { it.name == tabStyle } ?: TabStyle.DEFAULT,
+            )
     }
 }
+
+/**
+ * What the tab bar draws for each destination: its name, an icon, or both.
+ *
+ * Names are the default and were the only answer until step 44 — the
+ * destinations are words this app can say in full. Icons alone make the bar
+ * short enough that most of it fits without scrolling.
+ */
+enum class TabStyle(val label: String) {
+    NAMES("Nur Namen"),
+    ICONS("Nur Icons"),
+    BOTH("Icons und Namen");
+
+    val showsIcon: Boolean get() = this != NAMES
+    val showsName: Boolean get() = this != ICONS
+
+    companion object {
+        val DEFAULT = NAMES
+    }
+}
+
+/**
+ * The palette with an accent of the user's choosing.
+ *
+ * Three tokens move together, or the accent would sit on tokens tuned for
+ * another colour: the accent itself, the wash behind accented things — the
+ * accent thinned onto the palette's own surface, so it is right by day and by
+ * night — and what is written **on** the accent, black or white by whichever
+ * the colour is far enough from. Nothing else changes: the category colours,
+ * the warnings and the launch screen are not the accent's.
+ */
+fun EtaColors.withAccent(accent: Color): EtaColors = copy(
+    accent = accent,
+    accentSoft = accent.copy(alpha = 0.16f).compositeOver(surface),
+    onAccent = if (accent.luminance() > 0.45f) Color(0xFF14142B) else Color.White,
+)
+
+/**
+ * The accents offered as swatches, beside the free choice of a hue.
+ *
+ * Mid-tones on purpose: each has to carry white text as a button and still be
+ * readable as text on white and on near-black.
+ */
+val ACCENT_PRESETS: List<Int> = listOf(
+    0xFFE5322D, 0xFFE0662B, 0xFFC99A1E, 0xFF4E9F3D, 0xFF1F9E8F, 0xFF2A8FD0,
+    0xFF4F5BD5, 0xFF8A4FD5, 0xFFC94FB0, 0xFFD5456E, 0xFF6B7280,
+).map { it.toInt() }
+
+/** A hue of the user's own, at the saturation and value the presets sit at. */
+fun accentOfHue(hue: Float): Int =
+    Color.hsv(hue.coerceIn(0f, 359.9f), 0.72f, 0.82f).toArgb()
 
 fun colorsOf(design: AppDesign, dark: Boolean): EtaColors = when (design) {
     AppDesign.ETA -> if (dark) EtaRedDarkColors else EtaRedColors
@@ -105,6 +178,8 @@ class DesignStore(context: Context) {
         DesignChoice.fromStored(
             design = prefs.getString(KEY_DESIGN, null),
             brightness = prefs.getString(KEY_BRIGHTNESS, null),
+            accent = if (prefs.contains(KEY_ACCENT)) prefs.getInt(KEY_ACCENT, 0) else null,
+            tabStyle = prefs.getString(KEY_TAB_STYLE, null),
         ),
     )
     val choice: StateFlow<DesignChoice> = _choice.asStateFlow()
@@ -113,10 +188,17 @@ class DesignStore(context: Context) {
 
     fun select(brightness: Brightness) = store(_choice.value.copy(brightness = brightness))
 
+    /** An accent of the user's own, or null for the design's. */
+    fun selectAccent(accent: Int?) = store(_choice.value.copy(accent = accent))
+
+    fun select(tabStyle: TabStyle) = store(_choice.value.copy(tabStyle = tabStyle))
+
     private fun store(choice: DesignChoice) {
         prefs.edit()
             .putString(KEY_DESIGN, choice.design.name)
             .putString(KEY_BRIGHTNESS, choice.brightness.name)
+            .putString(KEY_TAB_STYLE, choice.tabStyle.name)
+            .apply { if (choice.accent == null) remove(KEY_ACCENT) else putInt(KEY_ACCENT, choice.accent) }
             .apply()
         _choice.value = choice
     }
@@ -125,5 +207,7 @@ class DesignStore(context: Context) {
         const val PREFS = "design"
         const val KEY_DESIGN = "design"
         const val KEY_BRIGHTNESS = "brightness"
+        const val KEY_ACCENT = "accent"
+        const val KEY_TAB_STYLE = "tabStyle"
     }
 }

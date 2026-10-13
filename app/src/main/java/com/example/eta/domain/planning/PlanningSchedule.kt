@@ -59,7 +59,7 @@ private fun nextWeekly(setup: UserSetup, after: LocalDateTime): LocalDateTime {
 }
 
 /** What a tap on the wake alarm's snooze buys. Longer than the planning one. */
-val WAKE_SNOOZE: Duration = 9.minutes
+val WAKE_SNOOZE: Duration = 10.minutes
 
 /**
  * When the wake alarm is next due, or null when the user has not asked for one.

@@ -4,6 +4,31 @@ import com.example.eta.domain.tutorial.TutorialId
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import com.example.eta.alarm.ClockApp
+import com.example.eta.alarm.ClockAppAlarms
+import com.example.eta.domain.setup.clockAlarms
+import com.example.eta.ui.components.EtaIcon
+import com.example.eta.ui.components.EtaIconImage
+import com.example.eta.ui.format.formatWeekdays
+import com.example.eta.ui.theme.ACCENT_PRESETS
+import com.example.eta.ui.theme.TabStyle
+import com.example.eta.ui.theme.accentOfHue
+import com.example.eta.ui.theme.colorsOf
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -105,6 +130,11 @@ fun SettingsScreen(
     onDesignChange: (AppDesign) -> Unit,
     onBrightnessChange: (Brightness) -> Unit,
     modifier: Modifier = Modifier,
+    /** An accent of the user's own, or null for the design's. */
+    onAccentChange: (Int?) -> Unit = {},
+    onTabStyleChange: (TabStyle) -> Unit = {},
+    /** The tabs as the bar shows them, for the Navigation page to list. */
+    tabs: List<Pair<String, EtaIcon>> = emptyList(),
     onDebugReset: (() -> Unit)? = null,
     onOpenVacation: () -> Unit = {},
     /**
@@ -139,14 +169,20 @@ fun SettingsScreen(
     // Back leaves a page for the menu before it leaves the tab.
     BackHandler(enabled = page != null) { pageName = null }
 
+    // Where the menu is scrolled to — its own, so a page and back does not
+    // start it at the top again.
+    val menuScroll = rememberScrollState()
+
     EtaScreen(modifier = modifier, bottomInset = false) {
         // Keyed by the page, so each opens at its top rather than wherever the
-        // menu happened to be scrolled to.
+        // menu happened to be scrolled to. The menu's own position is held
+        // outside the key: coming back from a page lands where it was left.
         key(page) {
+            val pageScroll = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(if (page == null) menuScroll else pageScroll)
                     .padding(EtaTheme.spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
             ) {
@@ -191,7 +227,8 @@ fun SettingsScreen(
                         onDiscard = viewModel::discard,
                     )
 
-                    SettingsPage.DESIGN -> DesignBox(design, onDesignChange, onBrightnessChange)
+                    SettingsPage.DESIGN -> DesignBox(design, onDesignChange, onBrightnessChange, onAccentChange)
+                    SettingsPage.NAVIGATION -> NavigationBox(design.tabStyle, onTabStyleChange, tabs)
                     SettingsPage.ALARMS -> AlarmBox(alarms)
                     SettingsPage.CALENDAR -> CalendarSettingsBox(calendarViewModel)
                     SettingsPage.DATA -> DataBox(
@@ -234,7 +271,10 @@ fun SettingsScreen(
                                 MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
                             }
 
-                            SettingsPage.WAKE -> WakeAlarmBox(setup, viewModel::update)
+                            SettingsPage.WAKE -> {
+                                WakeAlarmBox(setup, viewModel::update)
+                                ClockAlarmsBox(setup = setup, dirty = dirty)
+                            }
                             SettingsPage.STILL_ACTIVE -> StillActiveBox(setup, viewModel::update)
                             SettingsPage.ANNOUNCEMENT -> TaskAnnouncementBox(setup, viewModel::update)
                             SettingsPage.PLANNING -> PlanningStep(setup, viewModel::update)
@@ -287,6 +327,7 @@ fun SettingsScreen(
  */
 private enum class SettingsPage(val title: String, val section: SettingsSection) {
     DESIGN("Design", SettingsSection.APP),
+    NAVIGATION("Navigation", SettingsSection.APP),
     ALARMS("Alarme", SettingsSection.APP),
     CALENDAR("Google Kalender", SettingsSection.APP),
     DATA("Deine Daten", SettingsSection.APP),
@@ -397,6 +438,7 @@ private fun DesignBox(
     choice: DesignChoice,
     onDesignChange: (AppDesign) -> Unit,
     onBrightnessChange: (Brightness) -> Unit,
+    onAccentChange: (Int?) -> Unit,
 ) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
@@ -424,6 +466,242 @@ private fun DesignBox(
                     onClick = { onBrightnessChange(choice.brightness.next()) },
                 )
             }
+
+            AccentField(choice = choice, onAccentChange = onAccentChange)
+        }
+    }
+}
+
+/**
+ * The accent: the design's own, one of the swatches, or any hue off the bar.
+ *
+ * Applied at once, like the rest of the card. The first swatch is the design's
+ * own colour and takes the choice back — it shows that colour rather than a
+ * word, so what a tap would give is on the button.
+ */
+@Composable
+private fun AccentField(choice: DesignChoice, onAccentChange: (Int?) -> Unit) {
+    val own = colorsOf(choice.design, choice.brightness.isDark(isSystemInDarkTheme())).accent
+    val change by rememberUpdatedState(onAccentChange)
+
+    EtaField(
+        label = "Akzentfarbe",
+        hint = "Gilt sofort, in jedem Design. Das erste Feld ist die Farbe des Designs " +
+            "selbst. Das Widget und der Startbildschirm behalten ihre Farbe.",
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+            ) {
+                Swatch(color = own, selected = choice.accent == null, onClick = { onAccentChange(null) })
+                ACCENT_PRESETS.forEach { preset ->
+                    Swatch(
+                        color = Color(preset),
+                        selected = choice.accent == preset,
+                        onClick = { onAccentChange(preset) },
+                    )
+                }
+            }
+
+            EtaText(
+                text = "Oder ein eigener Farbton — tippen oder ziehen:",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            // Every hue side by side. The gesture reads the callback through
+            // State: `pointerInput(Unit)` keeps the lambda it was launched with.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures { change(accentOfHue(it.x / size.width * 360f)) }
+                    }
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures { input, _ ->
+                            change(accentOfHue(input.position.x / size.width * 360f))
+                        }
+                    },
+            ) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        (0..12).map { Color(accentOfHue(it * 30f)) },
+                    ),
+                    cornerRadius = CornerRadius(8.dp.toPx()),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) EtaTheme.colors.textPrimary else EtaTheme.colors.border,
+                shape = CircleShape,
+            )
+            .padding(5.dp)
+            .background(color, CircleShape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+    )
+}
+
+/**
+ * What the tab bar shows, and which icon stands for which tab.
+ *
+ * The icons are the app's own choice, one per destination; what the user picks
+ * is whether to see them, the names, or both. Applied at once and kept with the
+ * design — it is a look, and it has to be known before the first frame.
+ */
+@Composable
+private fun NavigationBox(
+    style: TabStyle,
+    onStyleChange: (TabStyle) -> Unit,
+    tabs: List<Pair<String, EtaIcon>>,
+) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Navigation", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Was die Leiste am unteren Rand zeigt. Gilt sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            EtaChoice(
+                options = TabStyle.entries.map { it to it.label },
+                selected = style,
+                onSelect = onStyleChange,
+            )
+            if (style == TabStyle.ICONS) {
+                EtaText(
+                    text = "Nur mit Icons passen die meisten Reiter ohne Wischen in die Leiste.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+
+            EtaText(text = "Die Icons", style = EtaTheme.typography.bodyStrong)
+            tabs.forEach { (name, icon) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EtaIconImage(icon = icon, color = EtaTheme.colors.accent)
+                    Spacer(Modifier.size(EtaTheme.spacing.md))
+                    EtaText(text = name, style = EtaTheme.typography.body)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The morning alarm, handed to the phone's clock app.
+ *
+ * A button rather than a switch, because that is all Android offers: an alarm
+ * can be created in a clock app and neither changed nor removed afterwards —
+ * see `ClockAppAlarms`. So the box says what would be made, makes it when
+ * asked, and says what stays the user's to do.
+ */
+@Composable
+private fun ClockAlarmsBox(setup: UserSetup, dirty: Boolean) {
+    val context = LocalContext.current
+    val apps = remember { ClockAppAlarms.available(context) }
+    var app by remember { mutableStateOf(ClockAppAlarms.chosen(context).takeIf { it in apps } ?: ClockApp.SYSTEM) }
+    var result by remember { mutableStateOf<Boolean?>(null) }
+    val alarms = remember(setup) { setup.clockAlarms() }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Wecker in der Uhr-App", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Statt selbst zu klingeln, kann Eta deine Aufstehzeiten als Wecker in " +
+                    "der Uhr-App des Handys anlegen — die ist auf den meisten Geräten vom " +
+                    "Akkusparen ausgenommen und damit am zuverlässigsten.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+
+            if (apps.isEmpty()) {
+                EtaText(
+                    text = "Auf diesem Handy wurde keine Uhr-App gefunden, die Wecker annimmt.",
+                    style = EtaTheme.typography.body,
+                    color = EtaTheme.colors.warning,
+                )
+                return@Column
+            }
+
+            if (apps.size > 1) {
+                EtaField(label = "Uhr-App") {
+                    EtaChoice(
+                        options = apps.map { it to it.label },
+                        selected = app,
+                        onSelect = {
+                            app = it
+                            ClockAppAlarms.choose(context, it)
+                        },
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+                EtaText(
+                    text = if (alarms.size == 1) "Angelegt wird ein Wecker:" else "Angelegt werden ${alarms.size} Wecker:",
+                    style = EtaTheme.typography.bodyStrong,
+                )
+                alarms.forEach { alarm ->
+                    EtaText(
+                        text = "· ${alarm.time.formatClock()} — ${formatWeekdays(alarm.days)}",
+                        style = EtaTheme.typography.body,
+                        color = EtaTheme.colors.textSecondary,
+                    )
+                }
+            }
+
+            EtaButton(
+                text = "Wecker anlegen",
+                enabled = !dirty,
+                onClick = { result = ClockAppAlarms.setUp(context, alarms, app) },
+            )
+            when {
+                dirty -> EtaText(
+                    text = "Sichere zuerst deine Änderungen — angelegt werden die gesicherten Zeiten.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+
+                result == true -> EtaText(
+                    text = "An die Uhr-App übergeben. Sieh dort einmal nach, ob die Wecker stehen.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.success,
+                )
+
+                result == false -> EtaText(
+                    text = "Die Uhr-App hat nicht geantwortet.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
+
+            if (setup.wakeAlarm) {
+                EtaText(
+                    text = "Etas eigener Weckruf ist noch an. Schalte ihn oben aus und sichere, " +
+                        "sonst klingelt es morgens doppelt.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
+            EtaText(
+                text = "Android lässt Apps Wecker nur anlegen, nicht ändern oder löschen. " +
+                    "Änderst du später deine Aufstehzeiten, lösche die alten Wecker in der " +
+                    "Uhr-App und lege sie hier neu an. Eine Nacht, die du nur für einen Tag " +
+                    "verschoben hast, kommt dort nicht an.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
         }
     }
 }
@@ -1235,7 +1513,7 @@ private fun WakeAlarmBox(setup: UserSetup, onChange: OnSetupChange) {
             EtaText(
                 text = "Eta weckt dich $hours — dieselbe " +
                     "Aufstehzeit, die oben im Schlaf steht. Der Weckruf klingelt über den " +
-                    "Sperrbildschirm und läutet, bis du ihn beendest oder neun Minuten " +
+                    "Sperrbildschirm und läutet, bis du ihn beendest oder zehn Minuten " +
                     "schlummerst.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
@@ -1286,8 +1564,12 @@ private fun AlarmBox(alarms: AlarmSchedule) {
             EtaText(text = "Alarme", style = EtaTheme.typography.heading)
             var ignoreDnd by remember { mutableStateOf(EtaSound.ignoresDoNotDisturb(context)) }
             val dndOn = remember(probe) { EtaSound.isDoNotDisturbOn(context) }
+            val muted = remember(probe) { EtaSound.isRingerMuted(context) }
             EtaText(
                 text = when {
+                    !dndOn && muted ->
+                        "Das Handy ist gerade stumm oder auf Vibration — solange bleiben " +
+                            "Etas Töne still. Benachrichtigungen erscheinen trotzdem."
                     dndOn && ignoreDnd ->
                         "„Nicht stören“ ist gerade an — Etas Töne spielen trotzdem, " +
                             "solange das Handy Wecker durchlässt."
@@ -1296,10 +1578,12 @@ private fun AlarmBox(alarms: AlarmSchedule) {
                             "Benachrichtigungen erscheinen trotzdem."
                     ignoreDnd ->
                         "Etas Töne laufen über die Wecker-Lautstärke, unabhängig von der " +
-                            "Lautstärke für Benachrichtigungen, auch bei „Nicht stören“."
+                            "Lautstärke für Benachrichtigungen, auch bei „Nicht stören“. Steht " +
+                            "das Handy stumm oder auf Vibration, bleiben sie still."
                     else ->
                         "Etas Töne laufen über die Wecker-Lautstärke, unabhängig von der " +
-                            "Lautstärke für Benachrichtigungen. Still sind sie nur bei „Nicht stören“."
+                            "Lautstärke für Benachrichtigungen. Still sind sie bei „Nicht stören“ " +
+                            "und wenn das Handy stumm oder auf Vibration steht."
                 },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,

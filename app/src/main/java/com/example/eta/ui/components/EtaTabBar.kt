@@ -30,12 +30,17 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.TabStyle
 
 /** One destination in the bar. */
 data class EtaTabItem(
     val id: String,
     val label: String,
+    /** Drawn where the style asks for icons; null is a destination without one. */
+    val icon: EtaIcon? = null,
 )
 
 /**
@@ -62,6 +67,8 @@ fun EtaTabBar(
     selectedId: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Names, icons or both — the Navigation page of the settings. */
+    style: TabStyle = TabStyle.DEFAULT,
 ) {
     val scrollState = rememberScrollState()
     // Measured rather than estimated: the labels are different lengths, so the
@@ -102,6 +109,7 @@ fun EtaTabBar(
                 EtaTab(
                     item = item,
                     selected = item.id == selectedId,
+                    style = style,
                     onClick = { onSelect(item.id) },
                     onBounds = { positions[item.id] = it },
                 )
@@ -114,19 +122,28 @@ fun EtaTabBar(
 private fun EtaTab(
     item: EtaTabItem,
     selected: Boolean,
+    style: TabStyle,
     onClick: () -> Unit,
     onBounds: (IntRange) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emphasis by animateFloatAsState(if (selected) 1f else 0.55f, label = "tabEmphasis")
+    val icon = item.icon?.takeIf { style.showsIcon }
+    // A destination without an icon keeps its name, whatever the style says.
+    val named = style.showsName || icon == null
+    val tint = if (selected) EtaTheme.colors.accent else EtaTheme.colors.textSecondary
+    val spoken = item.label
 
     Column(
         modifier = modifier
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             // Wide enough that a short word is still a comfortable target, and
-            // free to grow past that rather than clipping a long one.
-            .widthIn(min = 72.dp)
+            // free to grow past that rather than clipping a long one. An icon
+            // alone needs less, which is what lets the whole bar fit.
+            .widthIn(min = if (named) 72.dp else 56.dp)
+            // An icon alone says nothing to a screen reader; its name does.
+            .semantics { if (!named) contentDescription = spoken }
             .padding(vertical = EtaTheme.spacing.sm, horizontal = EtaTheme.spacing.md)
             .onGloballyPositioned { coordinates ->
                 val left = coordinates.positionInParent().x.toInt()
@@ -144,15 +161,20 @@ private fun EtaTab(
                 ),
         )
         Box(Modifier.height(EtaTheme.spacing.xs))
-        EtaText(
-            text = item.label,
-            style = if (selected) EtaTheme.typography.label else EtaTheme.typography.caption,
-            color = if (selected) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
-            textAlign = TextAlign.Center,
-            // One line, and never clipped: inside a horizontal scroll the width
-            // is unbounded, so a long label is measured whole rather than cut.
-            maxLines = 1,
-            modifier = Modifier.alpha(emphasis),
-        )
+        if (icon != null) {
+            EtaIconImage(icon = icon, color = tint, modifier = Modifier.alpha(emphasis))
+        }
+        if (named) {
+            EtaText(
+                text = item.label,
+                style = if (selected) EtaTheme.typography.label else EtaTheme.typography.caption,
+                color = tint,
+                textAlign = TextAlign.Center,
+                // One line, and never clipped: inside a horizontal scroll the width
+                // is unbounded, so a long label is measured whole rather than cut.
+                maxLines = 1,
+                modifier = Modifier.alpha(emphasis),
+            )
+        }
     }
 }

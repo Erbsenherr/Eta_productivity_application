@@ -19,8 +19,10 @@ import androidx.core.content.getSystemService
 /**
  * Every sound Eta makes, played by Eta rather than by a notification channel.
  *
- * The user's rule, and it is a different rule from Android's: **only "Nicht
- * stören" silences the app.** A notification channel's sound rides whatever
+ * The user's rule, and it is a different rule from Android's: **"Nicht stören"
+ * silences the app, and so does a phone switched to silent or vibrate** (the
+ * second since step 44) — the notification *volume* does not. A notification
+ * channel's sound rides whatever
  * stream its usage names and is scaled by that stream's volume, so turning the
  * notification volume down to nothing used to silence the task start along with
  * every chat app — which is exactly what the user does *not* want to happen.
@@ -85,16 +87,38 @@ object EtaSound {
         prefs(context).edit().putBoolean(KEY_IGNORE_DND, ignore).apply()
     }
 
-    /** Whether a sound should stay unplayed right now: quiet was asked for, and is respected. */
+    /**
+     * Whether the phone's ringer is switched to silent or to vibrate.
+     *
+     * The alarm stream these sounds play on has a slider of its own and ignores
+     * that switch — which is why an alarm clock rings on a muted phone, and why
+     * Eta's sounds did too. The user called that a bug, and for a task
+     * announcement it is one: muting the phone is asking it to be quiet.
+     */
+    fun isRingerMuted(context: Context): Boolean {
+        val audio: AudioManager = context.getSystemService() ?: return false
+        return audio.ringerMode != AudioManager.RINGER_MODE_NORMAL
+    }
+
+    /**
+     * Whether a sound should stay unplayed right now: quiet was asked for, and
+     * is respected.
+     *
+     * Two ways of asking. **Do-Not-Disturb**, which the user may tell Eta to
+     * play through ([ignoresDoNotDisturb]) — and while it is on, that switch
+     * alone decides, since most phones report the ringer as silent under it and
+     * the switch would otherwise do nothing. And the **ringer on silent or
+     * vibrate**, which has no way round it. The wake alarm asks neither.
+     */
     fun isSilenced(context: Context): Boolean =
-        isDoNotDisturbOn(context) && !ignoresDoNotDisturb(context)
+        if (isDoNotDisturbOn(context)) !ignoresDoNotDisturb(context) else isRingerMuted(context)
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences("sound", Context.MODE_PRIVATE)
 
     private const val KEY_IGNORE_DND = "ignoreDoNotDisturb"
 
-    /** Plays [sound] once, unless silenced by Do-Not-Disturb. Never throws. */
+    /** Plays [sound] once, unless the phone was asked for quiet — see [isSilenced]. Never throws. */
     fun play(context: Context, @RawRes sound: Int) {
         val app = context.applicationContext
         if (isSilenced(app)) return

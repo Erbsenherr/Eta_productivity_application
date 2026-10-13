@@ -1,26 +1,11 @@
-Changes:
--Timertasks, deren Timer nie gestartet wurde, die aber am Abend abgehakt werden, sollen eine Nachfrage prompten, ob sie tatsächlich als voll gewertet werden sollen, da eben kein Timer gestartet wurde.
--Ebenfalls Timertasks, Hinsichtlich später Start: Der Timer soll nie in leere Zeit laufen. Wenn spät gestartet ist und anschließend die Zeit frei ist, soll gefragt werden, ob die Task verlängert werden soll. Wenn der Nutzer dazu nein sagt, dann Stopt der Timer mit dem Ende des Zeitblocks.
--Zu Absagen: Wenn man absagen gedrückt hält für höhere Gewalt, soll zuerst noch ein Bestätigungsfenster kommen, bevor es endgültig wegen höherer Gewalt abgesagt wird.
-Features:
--Während +/- 1 Stunden ausgehend vom Start der Morgenzeit soll es in der "Gerade" Box im Dashboard zusätzliche Interaktion geben: Ihr Name soll umbenannt werden zu: "Guten Morgen!". Der Nutzer soll dort die Optionen "Bin (Jetzt/Pünktlich/Um [...] Uhr) aufgestanden". Diese Zeit soll für die Statistik (s.u.) gemerkt werden. Steht der Nutzer pünktlich (dh. maximal 5 Minuten nach Aufstehzeit) auf, bekommt er einen halben Punkt für diesen Tag.
--Während der "Bettfertig machen" Zeit soll es in der "Gerade" Box im Dashboard zusätzliche Interaktion geben: Ihr Name soll umbenannt werden zu: "Gute Nacht!". Der Nutzer kann in der Box wählen: "Gehe nun Schlafen". Drückt er den Knopf, bekommt er einen halben Punkt am Folgetag. Drückt er den Knopf nicht, bekommt er im Dashboard des nächsten Tages (so lange stehen bleibend, bis er damit interagiert oder der Tag zuende geht) eine Box "Schlafenszeit - Vortag". Dort kann er zwischen "Pünktlich" und "Unpünktlich" wählen. In der Box soll es einen Infobutton geben, der besagt, dass "Pünktlich" innerhalb der Bettgehzeit im Bett liegen und zu schlafen versuchen bedeutet. Wählt er pünktlich, bekommt er den halben Punkt nachträglich.
+Bugfixes:
+-Schlummern zeit sind 9 Minuten, setze auf 10
+-Wenn im Menü gescrollt wird (zB. Einstellungen, dann ein child Menü aufgerufen wird und zurück gegangen wird, dann startet die App in dem Parent Menü wieder ganz oben anstatt an der ursprünglichen Position
+-Wenn Handy auf Stumm ist (nicht "Nicht Stören"), dann kommen akustische Benachrichtigungen scheinbar trotzdem durch.
 
--Füge einen neuen Reiter: "Statistiken" hinzu. Hier soll man verschiedene Infos bekommen:
-	In den Einstellungen unter "Statistiken" soll man per checkbox die einzelnen Inhalte an und auswählen können. Auch soll man den gesamten Statistik-Reiter aktivieren/deaktivieren können.
-	Infobox:
-	(es soll ausgewählt werden, ob innerhalb der letzten 7 Tage, des letzten Monats, des letzen Jahres, seit Beginn)
-	Wieviel % der Zeit kam man pünktlich aus dem Bett?
-	Wieviel % der Zeit ging man püntklich ins Bett?
-	Wieviel % der Zeit wurde eingeplant?
-	wieviel % der vorgenommen Tasks wurden abgeschlossen?	
-	Klappmenü: Wiederkehrende Tasks
-	-> hier werden alle wiederkehrenden Tasks aufgelistet, jede hat ihr eigenes Klappmenü. Dort kann man auch wieder den Zeitraum wählen. Darin steht dann
-		- Gesamtstunden, die man damit verbracht hat
-		- Wahrscheinlichkeit in der Vergangenheit, dass man es ausfallen lässt
-		- Wahrscheinlichkeit in der Vergangenheit, dass man etwas am Plan ändert (also zB. die Zeit verlängert oder verkürzt, etwa durch manuelle veränderung oder dadurch, dass eine andere Task scih mit dieser überschnitten hat, 			und diese Task dafür verkürzt wurde.
-		- Wahrscheinlichkeit in der Vergangenheit, dass man die Task planmäßig abschließt
-	Klappmenü: Timer- und Inkrement Tasks
-	-> ähnliche Box wie bei Wiederkehrenden Tasks, mit der Ausnahme, das man hier noch einen Button hat, der plottet, wie sich das Pensum über die letzte [ZEITRAUM] verändert hat (auch hier wieder 7 Tage, Monat, Jahr, seit Erstellung). Auf der x-Achse sollen für 7 Tage und Monate Tage liegen, für Jahr soll es auch Tage sein, die Achsenbeschriftung soll aber nur die Monate anzeigen. Seit Erstellung soll immer das nehmen, was besser passt.
+Changes
+-Kann die App auf die Android Uhr zugreifen? Wenn ja, soll die App bitte ihren Wecker (also den am Morgen) über die Android Uhr einrichten. Je nach Einstellungen sollen dann entweder ein Wecker für alle Tage, Ein Wecker für das Wochenende/Ein Wecker für die Woche oder für jeden Tag ein eigener Wecker erstellt werden. Best case: Der Nutzer kann eine Wecker App auswählen (Fürs erste die Google-Wecker app und die Android wecker app), in der der Wecker gesetzt wird
 
--Füge einen neuen (optionalen, also über die Einstellungen "Advanced Features" hinzufügbaren) Reiter: Notiz-Merger hinzu. Hier soll der Nutzer Notizen anlegen und Filtern können (Nach Datum, Alphabetisch, absteigen/aufsteigend). Eine Notiz besteht aus einem Titel und dem Text. Diese Notizen können gespeichert werden. Wenn der Nutzer aus dem Erstellungsmenü wegklickt ohne zu speichern, soll er gefragt werden, ob er denn gespeichert werden möchte. Am Ende einer jeden Notiz soll es einen "Taskify" button geben. Dieser erstellt dann eine ToDo mit dem bestehenden Titel und der Notiz. Der Nutzer kann entscheiden, ob diese Task in die Sammelliste geschoben und später konkretisiert werden soll, oder jetzt direkt.
+Features
+-Akzentfarben selbst einstellen (zusätzlich zu dem Standard-Theme)
+-In den Option, neue Einstellung "Navigation", dort können dann neben den Namen der Reiter (unteres Menü) auch Icons gewählt werden. Suche dir für jeden der advanced-feature reiter (und Rest) ein passendes Icon aus.

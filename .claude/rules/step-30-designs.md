@@ -25,6 +25,9 @@ branches.
   `LegacyLightColors` / `LegacyDarkColors` (the old `Light…`/`Dark…` palettes under
   a new name) and the default `EtaShapes()`. The same thing in indigo.
 
+**An accent of the user's own is a third answer** (`DesignChoice.accent`, step
+44), and the tab bar's `TabStyle` a fourth kept beside them — see *Step 44*.
+
 **Day or night is a second answer, `Brightness`**, and applies to whichever design is
 on: `SYSTEM` (the default) follows the phone, `LIGHT` and `DARK` hold whatever it
 says. `DesignChoice` is the pair, and `choice.colors(systemDark)` the one place the

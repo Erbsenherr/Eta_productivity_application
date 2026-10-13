@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Setting the morning alarm in the phone's clock app; granted at install. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!--
         Exact alarms, in the two shapes Android wants them.
@@ -41,6 +43,10 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- The clock apps the morning alarm can be handed to: seen for the same reason. -->
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
         </intent>
     </queries>
 

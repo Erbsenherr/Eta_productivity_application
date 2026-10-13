@@ -66,6 +66,9 @@ sound from a resource or a content URI, so they are **copied** into
 `app/src/main/res/raw/` — `sounds/` stays the source folder, `res/raw/` is what
 ships. Re-copy after changing one; nothing watches the folder.
 
+**Since step 44 a phone on silent or vibrate silences Eta as well** — see
+*Step 44*; the paragraph below is the rule as it stood, and still describes DND.
+
 **Only Do-Not-Disturb silences Eta — and since step 30 not even that, if the user
 says so.** "Bei „Nicht stören“ → Trotzdem spielen" in the Alarme card sets
 `EtaSound.ignoresDoNotDisturb`, and `isSilenced` — what `play` and `EtaSpeech.speak`
@@ -180,6 +183,9 @@ which the speech engine being a *bound* service makes likely but not certain on 
 sleeping phone. If long notes are cut off, a short foreground service is the fix.
 
 ### The wake alarm
+
+**Since step 44 the hours can also be handed to the phone's clock app** — a
+button on the same settings page; see *Step 44*.
 
 `UserSetup.wakeAlarm` is the switch, `wakeTime` the hour. **No second time**,
 deliberately: the hour the planner shades as the end of the night and the hour the

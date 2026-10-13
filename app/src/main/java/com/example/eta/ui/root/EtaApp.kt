@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +36,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.TimeZone
 import com.example.eta.domain.planning.PlanningPhase
 import com.example.eta.ui.components.EtaScreen
+import com.example.eta.ui.components.EtaIcon
 import com.example.eta.ui.components.EtaTabBar
 import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.calendar.CalendarStepScreen
@@ -195,6 +197,11 @@ private fun MainScaffold(
     val tutorialState by container.tutorialStore.state.collectAsStateWithLifecycle()
 
     var savedTab by rememberSaveable(stateSaver = TAB_SAVER) { mutableStateOf(EtaTab.Today) }
+    // What each tab had on screen — how far it was scrolled, which page of it
+    // was open — kept while another tab or a flow is in front. Without it a
+    // screen that leaves the composition comes back at its top: `rememberSaveable`
+    // survives a rotation by itself, but not being taken off the screen.
+    val tabState = rememberSaveableStateHolder()
     // The tabs of the features that are switched on. One that was open when its
     // feature went — or was saved before a restart — falls back to the first.
     val features = LocalFeatures.current
@@ -340,6 +347,7 @@ private fun MainScaffold(
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
+            tabState.SaveableStateProvider(tab.name) {
             when (tab) {
                 EtaTab.Today -> DashboardScreen(
                     viewModel = viewModel(key = "dashboard-$dateKey", factory = dashboardViewModelFactory(container)),
@@ -432,15 +440,20 @@ private fun MainScaffold(
                         container.designStore.select(chosen)
                         QuickAddWidgetProvider.refresh(context)
                     },
+                    onAccentChange = container.designStore::selectAccent,
+                    onTabStyleChange = { chosen -> container.designStore.select(chosen) },
+                    tabs = tabs.map { it.label to it.icon },
                     onDebugReset = rootViewModel::resetEverything,
                     onOpenVacation = { flow = AppFlow.Vacation },
                     onStartTutorial = { id -> container.tutorialStore.request(id?.name) },
                 )
             }
+            }
         }
 
         EtaTabBar(
-            items = tabs.map { EtaTabItem(it.name, it.label) },
+            items = tabs.map { EtaTabItem(it.name, it.label, it.icon) },
+            style = design.tabStyle,
             selectedId = tab.name,
             onSelect = { id -> savedTab = EtaTab.valueOf(id) },
         )
@@ -474,32 +487,32 @@ private fun currentDate(): LocalDate =
  * Erinnerungen is a tab rather than a flow: a list of what is still to come is a
  * place to look things up, not something one is in the middle of.
  */
-private enum class EtaTab(val label: String) {
+private enum class EtaTab(val label: String, val icon: EtaIcon) {
     /**
      * Called "Heute" until it grew tabs of its own, one of which carries that
      * name now. The entry keeps its, being what a saved tab is restored by.
      */
-    Today("Dashboard"),
-    Lists("Listen"),
-    Contracts("Verträge"),
-    Reminders("Erinnerungen"),
+    Today("Dashboard", EtaIcon.HOME),
+    Lists("Listen", EtaIcon.LIST),
+    Contracts("Verträge", EtaIcon.CONTRACT),
+    Reminders("Erinnerungen", EtaIcon.BELL),
 
     /**
      * Its own tab because of the one thing it has that no list can express: the
      * **order** growth tasks hold, which is what settles a slot two of them both
      * want.
      */
-    Growth("Ziele"),
+    Growth("Ziele", EtaIcon.TARGET),
 
     /** Long-term rewards, filled by the evening. Before the settings, which stay last. */
-    Rewards("Belohn-o-mat"),
+    Rewards("Belohn-o-mat", EtaIcon.GIFT),
 
     /** Step 43: what the days add up to, and notes that can become ToDos. */
-    Statistics("Statistiken"),
-    Notes("Notiz-Merger"),
+    Statistics("Statistiken", EtaIcon.CHART),
+    Notes("Notiz-Merger", EtaIcon.NOTE),
 
     /** Far right, as the user asked: it is the tab opened least. */
-    Settings("Einstellungen"),
+    Settings("Einstellungen", EtaIcon.SLIDERS),
 }
 
 /** Whether the tab's feature is switched on; most tabs have none and always are. */

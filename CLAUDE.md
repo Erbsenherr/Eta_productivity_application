@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (677 tests
-as of step 43), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (684 tests
+as of step 44), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -385,6 +385,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-41-overlap-kinds.md` | *Step 41*: something new on occupied time asks (`OverlapPrompt`, `PlacementSpan`, `fittedSpan`, `planRelief`, `removalFate`), one revolver — a box asks what it is (`NewEntryKindDialog`: Neues ToDo · Pause · Custom), and a note when a card is made |
 | `step-42-timer-tasks.md` | *Step 42*: Timer-Tasks (`Item.timerTask`, `timerBuffer` inside `estimatedDuration`, `timerDuration`, `withBufferAdded`, `ItemExtras.timer`), the timer on the block (`TaskTimer.kt`: `timerGoal` / `timerWorked` / `timerRunningSince`, `timerPhase`, `timerSignals`, `workedInFull`), its buttons on the dashboard (`TimerControls`, the late start, ticking one off by hand), a Growth-Task as a Timer-Task with a "Zielzeit", and the "Ziele" tab |
 | `step-43-sleep-stats-notes.md` | *Step 43*: getting up and going to bed (`SleepLog`, `sleepPrompts`, "Guten Morgen!" / "Gute Nacht!" in the "Gerade" box, the two half points in the settlement), a late timer that lengthens its block (`timerExtension`), what is stamped for the statistics (`originalStart` / `originalDuration`, `quantityDone`), the Statistiken tab (`StatRange`, `StatSection`, `overview`, `taskStats`, `PensumChart`) and the Notiz-Merger (`Note`, Taskify) |
+| `step-44-clock-accent-navigation.md` | *Step 44*: a muted phone silences Eta (`isRingerMuted`), scroll positions that survive (`menuScroll`, `rememberSaveableStateHolder`), the morning alarm handed to the clock app (`ClockAppAlarms`, `clockAlarms`, `ClockApp`), an accent of one's own (`DesignChoice.accent`, `withAccent`), and names, icons or both in the tab bar (`TabStyle`, `EtaIcon`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -399,7 +400,10 @@ These came out of discussion with the user and are not all derivable from `Eta_d
   unless the user fixes them light or dark — one button in the Design card that
   steps through the three. Legacy is the same thing in indigo. See *Step 30*.
 - **Eta may play through "Nicht stören"**, off by default — see *Sounds, and the
-  alarms that announce a task*.
+  alarms that announce a task*. **A phone on silent or vibrate silences it**
+  (step 44), the wake alarm excepted.
+- **An accent of the user's own, and icons in the tab bar**, both beside the
+  design in `DesignStore` (step 44). See *Step 44*.
 - **The strict rules are the default, and loosening one is a setting**
   (Flexibilität, step 39): skipping a priority tier by hand, and making a ToDo
   in the planner while the week list still holds one that could be planned.
@@ -460,7 +464,8 @@ is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
 Flexibilität · 40. Nights changed by hand, a night per weekday, and the
 Pausenchecker · 41. An overlap that is asked about, one revolver, and a note at
 creation · 42. Timer-Tasks, and the "Ziele" tab · 43. Getting up and going to bed,
-Statistiken, and the Notiz-Merger.
+Statistiken, and the Notiz-Merger · 44. Silence, the clock app, an accent of one's
+own, and icons.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

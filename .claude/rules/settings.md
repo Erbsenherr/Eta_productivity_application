@@ -50,7 +50,9 @@ count, `UserSetup.conflicts()` having described answers that no longer describe 
 schedule.
 
 The **Design** card at the top chooses the look and applies at once, outside the
-draft — see *Step 30*. The tab also holds the Alarme card (*The planning alarm*), the ignored calendar
+draft — see *Step 30*; since step 44 it holds the accent, and **Navigation** is a
+page of its own below it. **The menu keeps its scroll position** across a page
+and back (`menuScroll`, *Step 44*). The tab also holds the Alarme card (*The planning alarm*), the ignored calendar
 events, vacation mode, the open-days catch-up and the debug reset.
 
 **Where the data lives.** `BackupService` writes the whole database to a file the

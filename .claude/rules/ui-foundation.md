@@ -74,7 +74,9 @@ links or a real back stack arrive, not before.
 phone width cut "Erinnerungen" and "Einstellungen" off, and a tab whose name is cut
 off is a tab the user has to guess at; each tab is now as wide as its own word
 inside a `horizontalScroll`, which is also the only shape that survives a seventh
-destination. The selected tab is measured and scrolled into view. Labels, **not
+destination. The selected tab is measured and scrolled into view. **Since step 44
+the user may have icons instead or as well** (`TabStyle`, *Step 44*); names are
+the default. Labels, **not
 icons** — a Sperrliste or a self-contract has no icon that would not have to be
 invented and then explained. Tab screens pass `bottomInset = false` to `EtaScreen`:
 the bar already sits over the navigation bar, and insetting twice leaves a gap.
