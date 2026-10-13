@@ -50,14 +50,16 @@ warnings and hints — since step 18, when every `notify` started going through
 explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
-**Almost nothing in this app has been seen running.** Since step 44 there can be
-an emulator (`adb devices` shows `emulator-5554` while the user has one open in
-Android Studio) — look before assuming there is none: `adb logcat -b crash -d`
-is what found the settings crash, and `uiautomator dump` plus `input tap` is
-enough to open a screen and read what it says. So far that has confirmed only
-that the settings tab opens, its Design and Navigation pages draw, and the menu
+**Almost nothing in this app has been seen running by whoever wrote it.** The
+user tests on an emulator and on the phone themselves, and has said so plainly:
+**do not install on, drive or otherwise touch the emulator unless asked to** —
+no `adb install`, no `am force-stop`, no `input tap`. An install over the running
+app and a force-stop land in the middle of whatever they are testing. It was
+used once, to find and confirm the settings crash of step 44 (the crash buffer,
+`adb logcat -b crash -d`, named the line); that is the whole of what has been
+seen: the settings tab opens, its Design and Navigation pages draw, and the menu
 keeps its scroll position. Everything else is still verified by compilation, the unit suite (684 tests
-as of step 44), `assembleRelease` and `lint` — and the sounds not at all: channel
+as of step 45), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -477,7 +479,8 @@ Flexibilität · 40. Nights changed by hand, a night per weekday, and the
 Pausenchecker · 41. An overlap that is asked about, one revolver, and a note at
 creation · 42. Timer-Tasks, and the "Ziele" tab · 43. Getting up and going to bed,
 Statistiken, and the Notiz-Merger · 44. Silence, the clock app, an accent of one's
-own, and icons.
+own, and icons · 45. "Aktuell" on the week timetable changes one
+occurrence.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

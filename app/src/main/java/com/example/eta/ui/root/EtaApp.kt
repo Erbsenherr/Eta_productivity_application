@@ -370,6 +370,11 @@ private fun MainScaffold(
                                 key = "week-tab-$dateKey",
                                 factory = weekTabViewModelFactory(container),
                             ),
+                            // The same instance the dashboard's list edits through.
+                            plannerViewModel = viewModel(
+                                key = "planner-today-$dateKey",
+                                factory = plannerViewModelFactory(container, PlannerDay.TODAY),
+                            ),
                         )
                     },
                 )

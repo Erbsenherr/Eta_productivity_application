@@ -58,6 +58,8 @@ import com.example.eta.ui.format.formatVeryShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.lists.RecurringCreateDialog
 import com.example.eta.ui.lists.RecurringGroupEditDialog
+import com.example.eta.ui.planner.BlockEditDialog
+import com.example.eta.ui.planner.DayPlannerViewModel
 import com.example.eta.ui.planner.DayTimeline
 import com.example.eta.ui.planner.HOUR_HEIGHT
 import com.example.eta.ui.subtasks.foldCandidatesExcept
@@ -75,13 +77,24 @@ private const val OPENING_HOUR = 6.5f
  *
  * The day planner's own [DayTimeline] draws it, so a block here looks and
  * behaves like a block there — tap for the name, hold to edit, and once the
- * lock is open, drag and pinch. What differs is what is written: here it is
- * always the **standing task**, never the one day. See [WeekTabViewModel].
+ * lock is open, drag and pinch. What is written depends on the view: the
+ * **standing task** in "Generell", **this week's one occurrence** in "Aktuell".
+ * See [WeekTabViewModel].
  *
  * Not a screen of its own: it is mounted under the dashboard's three tabs.
  */
 @Composable
-fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
+fun WeekTabScreen(
+    viewModel: WeekTabViewModel,
+    modifier: Modifier = Modifier,
+    /**
+     * The day planner's own view model, for the window a long press opens in
+     * "Aktuell" — the planner's "Bearbeiten", wired to the one implementation of
+     * edit, call off and copy, as the dashboard's list is. Null leaves that
+     * long press with a sentence instead.
+     */
+    plannerViewModel: DayPlannerViewModel? = null,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -108,6 +121,8 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
     var creating by remember { mutableStateOf<Pair<DayOfWeek, TimelineDraft>?>(null) }
     // Held as an id and resolved against the tasks as they are now.
     var editingId by remember { mutableStateOf<String?>(null) }
+    // The same for one occurrence, in "Aktuell": a block id.
+    var editingBlockId by remember { mutableStateOf<String?>(null) }
     // The weekday whose night a long press landed in — the day it ends on.
     var editingNight by remember { mutableStateOf<DayOfWeek?>(null) }
 
@@ -140,9 +155,12 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
                 style = EtaTheme.typography.heading,
             )
             EtaText(
-                text = if (unlocked) {
+                text = if (unlocked && view == WeekView.CURRENT) {
                     "Entsperrt: wiederkehrende Tasks verschieben, mit zwei Fingern länger oder " +
-                        "kürzer ziehen. Geändert wird die Task selbst, nicht nur dieser Tag."
+                        "kürzer ziehen. Geändert wird nur dieser eine Termin."
+                } else if (unlocked) {
+                    "Entsperrt: wiederkehrende Tasks verschieben, mit zwei Fingern länger oder " +
+                        "kürzer ziehen. Geändert wird die Task selbst — alle künftigen Termine."
                 } else {
                     "Tippen zeigt den Namen, gedrückt halten bearbeitet. Leere Stelle gedrückt " +
                         "halten: neue wiederkehrende Task."
@@ -178,10 +196,24 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
                     sleepLabels = true,
                     editable = true,
                     subtasks = state.subtasks,
-                    movable = { unlocked && state.canReschedule(it) },
+                    movable = {
+                        unlocked && when (view) {
+                            WeekView.CURRENT -> state.canMoveOccurrence(it)
+                            WeekView.GENERAL -> state.canReschedule(it)
+                        }
+                    },
                     onBlockLongPress = { entry, _ ->
                         when {
                             !state.isStanding(entry) -> viewModel.refuseOneOff(entry.item.name)
+                            // "Aktuell": this one occurrence, in the planner's
+                            // own window — the settings' two tasks included,
+                            // since a single day is theirs to change as well.
+                            view == WeekView.CURRENT && plannerViewModel != null -> when {
+                                state.canMoveOccurrence(entry) -> editingBlockId = entry.block.id
+                                entry.block.isOpen -> viewModel.refusePast(entry.item.name)
+                                else -> Unit
+                            }
+
                             isOwnedBySettings(entry.item.id) -> viewModel.refuseSettingsOwned(entry.item.name)
                             else -> editingId = entry.item.id
                         }
@@ -190,15 +222,23 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
                     // occurrence's: the task behind it is looked up in the day
                     // as it stands now, not in whatever the gesture closed over.
                     onBlockMoved = { blockId, minute ->
-                        state.blocksOn(pageDay, view, unlocked)
-                            .firstOrNull { it.block.id == blockId }
-                            ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute = minute) }
+                        if (view == WeekView.CURRENT) {
+                            viewModel.moveOccurrence(blockId, startMinute = minute)
+                        } else {
+                            state.blocksOn(pageDay, view, unlocked)
+                                .firstOrNull { it.block.id == blockId }
+                                ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute = minute) }
+                        }
                     },
                     onBlockResized = if (unlocked) {
                         { blockId, startMinute, durationMinutes ->
-                            state.blocksOn(pageDay, view, unlocked)
-                                .firstOrNull { it.block.id == blockId }
-                                ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute, durationMinutes) }
+                            if (view == WeekView.CURRENT) {
+                                viewModel.moveOccurrence(blockId, startMinute, durationMinutes)
+                            } else {
+                                state.blocksOn(pageDay, view, unlocked)
+                                    .firstOrNull { it.block.id == blockId }
+                                    ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute, durationMinutes) }
+                            }
                         }
                     } else {
                         null
@@ -265,6 +305,45 @@ fun WeekTabScreen(viewModel: WeekTabViewModel, modifier: Modifier = Modifier) {
                 onMoveAnyway = { viewModel.answerClashes(moveAnyway = true) },
                 onLeaveOut = { viewModel.answerClashes(moveAnyway = false) },
                 onDismiss = viewModel::dismissPending,
+            )
+        }
+    }
+
+    editingBlockId?.let { id ->
+        // Resolved against the week as it stands: called off or ticked from
+        // elsewhere while the window stood open, there is nothing left to edit.
+        val entry = state.occurrence(id)?.takeIf { state.canMoveOccurrence(it) }
+        if (entry == null || plannerViewModel == null) {
+            editingBlockId = null
+        } else {
+            BlockEditDialog(
+                entry = entry,
+                subtasks = state.subtasks[entry.item.id].orEmpty(),
+                foldCandidates = state.foldable.foldCandidatesExcept(entry.item.id),
+                onSubtasks = { plannerViewModel.saveSubtasks(entry.block.id, it) },
+                onDismiss = { editingBlockId = null },
+                onSave = { n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex ->
+                    plannerViewModel.edit(
+                        entry, n, cat, start, dur, bNote, iNote, travel, back, pause, sound, rate, flex,
+                    )
+                    editingBlockId = null
+                },
+                // A standing occurrence cannot be taken off its day; the button is not drawn.
+                onRemove = { editingBlockId = null },
+                onCancelBlock = {
+                    plannerViewModel.cancel(entry)
+                    editingBlockId = null
+                },
+                onCancelExcused = {
+                    plannerViewModel.cancel(entry, forceMajeure = true)
+                    editingBlockId = null
+                },
+                onCopyToWeek = {
+                    plannerViewModel.copyToWeek(entry)
+                    editingBlockId = null
+                },
+                // Only today is a promise already being lived; the days ahead are still planning.
+                cancellationCosts = entry.block.date == state.today,
             )
         }
     }
@@ -544,10 +623,17 @@ private fun WeekInfoDialog(onDismiss: () -> Unit) {
         )
         EtaText(
             text = "Mit dem Schloss entsperrst du die wiederkehrenden Tasks. Dann lassen sie " +
-                "sich verschieben und mit zwei Fingern verlängern oder verkürzen — in " +
-                "beiden Ansichten ändert das die Task selbst, also alle künftigen " +
-                "Termine. Heute, und morgen, wenn die Planung schon bestätigt ist, bleiben " +
-                "wie geplant; einen einzelnen Tag änderst du im Tagesplaner.",
+                "sich verschieben und mit zwei Fingern verlängern oder verkürzen; gedrückt " +
+                "halten öffnet das Bearbeiten-Fenster.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        EtaText(
+            text = "In »Aktuell« ändert das nur den einen Termin dieser Woche — wie im " +
+                "Tagesplaner. Der Donnerstag dieser Woche ist dann anders, alle anderen " +
+                "Donnerstage bleiben. In »Generell« ändert es die Task selbst, also alle " +
+                "künftigen Termine; heute, und morgen, wenn die Planung schon bestätigt " +
+                "ist, bleiben dabei wie geplant.",
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )

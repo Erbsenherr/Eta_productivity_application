@@ -18,7 +18,9 @@ import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.minuteToLocalTime
+import com.example.eta.domain.planning.claimsItsSlot
 import com.example.eta.domain.planning.occupiesTime
+import com.example.eta.domain.planning.overlaps
 import com.example.eta.domain.planning.sleepStretches
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.groupRecurring
@@ -100,12 +102,28 @@ data class WeekTabUiState(
 
         WeekView.CURRENT -> blocks[dateOf(day)].orEmpty().map { entry ->
             if (isStanding(entry)) {
-                entry.copy(block = entry.block.copy(flexible = unlocked && canReschedule(entry)))
+                entry.copy(block = entry.block.copy(flexible = unlocked && canMoveOccurrence(entry)))
             } else {
                 entry
             }
         }
     }
+
+    /** The block behind an id, wherever in this week it stands. */
+    fun occurrence(blockId: String): BlockWithItem? =
+        blocks.values.firstNotNullOfOrNull { day -> day.firstOrNull { it.block.id == blockId } }
+
+    /**
+     * Whether **this one occurrence** may be changed in "Aktuell".
+     *
+     * Wider than [canReschedule] in one way and narrower in another. The two
+     * tasks the settings own are in: what is changed is this day's block, and
+     * no later save there takes that back. Days already past are out: what
+     * stood on Monday is Monday's record by Thursday, and the day planner
+     * cannot reach back there either.
+     */
+    fun canMoveOccurrence(entry: BlockWithItem): Boolean =
+        isStanding(entry) && entry.block.isOpen && entry.block.date >= today
 
     /** Whether a live standing task is behind this block — the only kind the timetable edits. */
     fun isStanding(entry: BlockWithItem): Boolean =
@@ -151,23 +169,26 @@ data class PendingReschedule(
 )
 
 /**
- * The "Woche" page of the dashboard: the week as a timetable, and the standing
- * tasks changed by hand on it.
+ * The "Woche" page of the dashboard: the week as a timetable, changed by hand.
  *
- * Everything written here is written to a **definition** — in "Aktuell" as much
- * as in "Generell": dragging this Thursday's Sport changes Sport, not this
- * Thursday. A single day is changed where it always was, in the day planner.
+ * **What is written depends on the view**, since step 45. In "Generell" it is
+ * the **definition**: dragging Sport there changes Sport ([reschedule]). In
+ * "Aktuell" it is **this week's occurrence** and nothing else: dragging this
+ * Thursday's Sport changes this Thursday ([moveOccurrence]) — what the day
+ * planner does to a standing task's block, reachable for the whole week. Until
+ * step 45 both views wrote the definition, which made "Aktuell" a second way of
+ * doing the same thing and left no way to change one coming day from here.
  */
 class WeekTabViewModel(
     private val nightService: NightService,
     private val wakeAlarmCoordinator: WakeAlarmCoordinator,
     private val taskStartCoordinator: TaskStartCoordinator,
     private val recurringTaskService: RecurringTaskService,
-    planRepository: PlanRepository,
+    private val planRepository: PlanRepository,
     setupRepository: SetupRepository,
     subtaskRepository: SubtaskRepository,
     itemRepository: ItemRepository,
-    clock: Clock = Clock.System,
+    private val clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
 
@@ -243,6 +264,62 @@ class WeekTabViewModel(
             durationMinutes = wanted,
         )
         if (group.weekdays.size <= 1) apply(request, setOf(day)) else _pending.value = request
+    }
+
+    /**
+     * One occurrence of this week dragged or pinched in "Aktuell".
+     *
+     * Written to the **block**, as the day planner's edit window writes it: the
+     * task and its other days are not touched. Nothing is asked — there is one
+     * day in play, so there is no "which days". A collision is said, not
+     * refused, as everywhere on this page; the Überschneidungs-Box reports it
+     * for today and a confirmed tomorrow as well.
+     *
+     * Refused for a task placed dynamically: its hour is worked out again at
+     * every top-up, and the block would simply move back.
+     */
+    fun moveOccurrence(blockId: String, startMinute: Int, durationMinutes: Int? = null) {
+        val state = uiState.value
+        val entry = state.occurrence(blockId) ?: return
+        if (!state.canMoveOccurrence(entry)) return
+        if (entry.item.isGrowthTask && entry.item.growthDynamic && !entry.block.flexible) {
+            _notice.value = "»${entry.item.name}« wird dynamisch eingeplant und rückt von selbst " +
+                "an ihren Platz. Mach den Termin im Tagesplaner »Flexibel«, um ihn zu verschieben."
+            return
+        }
+        val start = minuteToLocalTime(startMinute)
+        val duration = durationMinutes?.minutes ?: entry.block.plannedDuration
+        if (entry.block.start == start && entry.block.plannedDuration == duration) return
+
+        viewModelScope.launch {
+            // Read fresh: the gesture's copy may be older than the last edit.
+            val block = planRepository.findBlock(blockId)?.takeIf { it.isOpen } ?: return@launch
+            val moved = block.copy(
+                start = start,
+                plannedDuration = duration,
+                actualDuration = null,
+                updatedAt = clock.now(),
+            )
+            planRepository.addBlock(moved)
+            taskStartCoordinator.reschedule()
+
+            val inTheWay = state.blocks[block.date].orEmpty()
+                .filter { it.block.id != blockId && it.claimsItsSlot() && it.block.overlaps(moved) }
+                .map { it.item.name }
+                .distinct()
+            _notice.value = if (inTheWay.isEmpty()) {
+                null
+            } else {
+                "»${entry.item.name}« überschneidet sich jetzt mit " +
+                    inTheWay.joinToString(", ") { "»$it«" } + "."
+            }
+        }
+    }
+
+    /** A long press in "Aktuell" on a day that is already over. */
+    fun refusePast(name: String) {
+        _notice.value = "»$name« liegt an einem vergangenen Tag und lässt sich hier nicht mehr " +
+            "ändern. Unter »Generell« änderst du die Task für die Zukunft."
     }
 
     /** The first answer: only the day it was made on, or every day of the task. */

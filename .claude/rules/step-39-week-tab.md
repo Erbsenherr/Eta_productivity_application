@@ -23,8 +23,9 @@ Five items from `update.txt`, four questions put first. Database **version 28**
   many were passed, and the bar says so. `fits` is `fitsSomewhere` from minute 0
   with the journeys and **without** the break — the break is the part that
   yields. A tier with one card that fits holds, the others of it included.
-- **The week timetable is edited in both views**, and what is written is always
-  the **standing task**, never the one day.
+- **The week timetable is edited in both views.** Until step 45 what was written
+  was always the standing task; **since step 45 "Aktuell" writes this week's one
+  occurrence** and only "Generell" the task — see the section at the end.
 - **A move on a task of several weekdays asks**: "Nur Dienstag" or "Alle Tage".
   All days, and some of the *other* days then collide: a second question —
   move them anyway, or leave exactly those days where they are.
@@ -174,3 +175,39 @@ against `28.json`.** Nobody has seen any of it, and more than usual rests on
 that: every gesture here — the pinch on the initial pass, a long press reaching
 the timeline past its blocks, a pager inside a tab around a vertical scroll —
 is reasoning about Compose's pointer dispatch that only a finger can confirm.
+
+#### Step 45: "Aktuell" changes one occurrence
+
+At the user's request: editing Thursday in "Aktuell" is to touch this week's
+Thursday and no other — what the day planner does to a standing task's block,
+reachable for the whole week. "Generell" is unchanged and is now the only view
+that writes a definition. No schema change.
+
+- **A drag or a pinch** (lock open) → `WeekTabViewModel.moveOccurrence(blockId,
+  start, duration?)`: start and `plannedDuration` on the **block**, read fresh by
+  id. No "which days" question — one day is in play. A collision is said in the
+  notice bar, not refused.
+- **A long press** → the planner's own `BlockEditDialog`, wired to the
+  `DayPlannerViewModel` the dashboard's list uses (`plannerViewModel`, the
+  instance keyed `planner-today-…`; its `edit`, `cancel`, `copyToWeek` and
+  `saveSubtasks` take an entry or an id and do not care which day it is).
+  `cancellationCosts` only for today. As in the planner, name and category in
+  that window are the **task's** and say so.
+- **`canMoveOccurrence`** replaces `canReschedule` for this view: a live standing
+  task, an open block, **today or later**. The two tasks the settings own are
+  *in* — one day of theirs is the user's to change — and past days are *out*
+  (`refusePast`): by Thursday, Monday is a record.
+- **Refused: a dynamically placed task that was not made "Flexibel"** — the next
+  top-up would move it back.
+- A ToDo or an appointment is still answered with the sentence about the day
+  planner; a long press on an empty stretch still makes a standing task, and
+  one on the night still changes the weekday's standing night, in both views.
+- **Known limit, the one "Flexibel" has:** an edit to the standing task relays
+  its open occurrences after today and a confirmed tomorrow, so an occurrence
+  changed here for Friday is laid down again at the task's own hour if the task
+  itself is edited on Tuesday.
+- A changed occurrence reads as "Plan geändert" in the statistics, which is
+  what it is.
+
+**Verified by the compiler, the suite (684), `assembleRelease` and `lint`.**
+Nobody has seen it.
