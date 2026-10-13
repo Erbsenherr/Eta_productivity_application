@@ -74,4 +74,4 @@ fun Item.withBufferAdded(): Item {
  * therefore shorter than the plan, and that is the whole test.
  */
 val PlannedBlock.workedInFull: Boolean
-    get() = actualDuration?.let { it >= plannedDuration } ?: true
+    get() = actualDuration?.let { it >= plannedDuration - (timerExtension ?: Duration.ZERO) } ?: true

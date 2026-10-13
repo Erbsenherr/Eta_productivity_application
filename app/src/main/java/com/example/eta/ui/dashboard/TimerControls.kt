@@ -189,8 +189,8 @@ fun TimerTickDialog(
     EtaDialog(title = "Wirklich abhaken?", onDismiss = onDismiss) {
         EtaText(
             text = "»${entry.item.name}« ist eine Timer-Task: Sie zählt die Zeit, die du " +
-                "investierst — ${goal.formatShort()} sind vorgesehen. Du hast sie nicht in " +
-                "der App gestartet.",
+                "investierst — ${goal.formatShort()} sind vorgesehen. Der Timer wurde nie " +
+                "gestartet. Soll sie trotzdem als voll gewertet werden?",
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )
@@ -231,29 +231,59 @@ fun TimerTickDialog(
 }
 
 /**
- * Started too late: the timer would run into the next task.
+ * Started too late: the timer would run past the end of its block.
  *
- * The two answers the user named — the timer stops early today, or the next
- * task begins later — each with the hour it would mean, and each only where the
- * arithmetic allows it.
+ * It never runs into time nobody planned, so the block is lengthened — pushing
+ * back what stands behind it, where something does — or the timer stops when
+ * the block does. Each answer says the hour it would mean, and is offered only
+ * where the arithmetic allows it.
  */
 @Composable
 fun TimerOverflowDialog(
     prompt: TimerOverflowPrompt,
     onShorten: () -> Unit,
-    onPushNext: () -> Unit,
+    onExtend: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     EtaDialog(title = "Spät dran", onDismiss = onDismiss) {
         EtaText(
-            text = "Mit der vollen Zeit würde »${prompt.name}« bis ${prompt.projectedEnd.formatClock()} " +
-                "laufen — »${prompt.nextName}« beginnt aber schon um ${prompt.nextStart.formatClock()}.",
+            text = "Mit der vollen Zeit würde »${prompt.name}« bis " +
+                "${prompt.projectedEnd.formatClock()} laufen — der Block endet aber um " +
+                "${prompt.frameEnd.formatClock()}." +
+                (prompt.nextName?.let { " Dahinter steht »$it«." } ?: " Dahinter ist frei."),
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(
-                text = "Heute früher aufhören",
+                text = "Task verlängern",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = prompt.canExtend,
+                onClick = onExtend,
+            )
+            EtaText(
+                text = when {
+                    !prompt.canExtend && prompt.nextName != null ->
+                        "Geht nicht: Von »${prompt.nextName}« bliebe nichts übrig, oder es " +
+                            "ist ein Kalendertermin."
+
+                    !prompt.canExtend -> "Geht nicht: Der Tag ist vorher zu Ende."
+                    prompt.nextName != null && prompt.pushedStart != null ->
+                        "Der Block läuft dann bis ${prompt.projectedEnd.formatClock()}. " +
+                            "»${prompt.nextName}« beginnt erst um " +
+                            "${prompt.pushedStart.formatClock()} und endet wie geplant."
+
+                    else -> "Der Block läuft dann bis ${prompt.projectedEnd.formatClock()}, " +
+                        "mit der vollen Timer-Zeit."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Am Blockende aufhören",
                 style = EtaButtonStyle.Secondary,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = prompt.shortenedGoal != null,
@@ -261,26 +291,10 @@ fun TimerOverflowDialog(
             )
             EtaText(
                 text = prompt.shortenedGoal?.let {
-                    "Der Timer läuft dann ${it.formatShort()} statt ${prompt.goal.formatShort()}. " +
-                        "Zählt nicht als voll absolviert."
-                } ?: "»${prompt.nextName}« läuft bereits — es ist keine Zeit mehr davor.",
-                style = EtaTheme.typography.caption,
-                color = EtaTheme.colors.textMuted,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-            EtaButton(
-                text = "»${prompt.nextName}« später beginnen",
-                style = EtaButtonStyle.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = prompt.pushedStart != null,
-                onClick = onPushNext,
-            )
-            EtaText(
-                text = prompt.pushedStart?.let {
-                    "»${prompt.nextName}« beginnt dann um ${it.formatClock()} und endet wie geplant."
-                } ?: "Von »${prompt.nextName}« bliebe dann nichts übrig, oder es ist ein " +
-                    "Kalendertermin.",
+                    "Der Timer läuft dann ${it.formatShort()} statt ${prompt.goal.formatShort()} " +
+                        "und stoppt um ${prompt.frameEnd.formatClock()}. Zählt nicht als voll " +
+                        "absolviert."
+                } ?: "Der Block ist bereits vorbei.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )

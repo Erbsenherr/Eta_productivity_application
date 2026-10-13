@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 30.** When changing an entity, diff the hand-written SQL against the
+**Version 31.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -42,6 +42,7 @@ Room stores enums by name in a TEXT column.
 | 27→28 | `user_setup.allowPrioritySkip` and `allowTodoBesideWeek` (`INTEGER NOT NULL DEFAULT 0`) — the Flexibilität switches, off for whoever upgrades as well; see *Step 39* |
 | 28→29 | `user_setup.nightsByDay` (`TEXT`, nullable: a night per weekday), `breakChecker` (`INTEGER NOT NULL DEFAULT 1`), `breakPerTwoHours` (900) and `breakMaxStretch` (10800, both seconds), and the tables `night_overrides` (keyed by the date a night ends on) and `planner_dismissals` (`date`, `kind`) — see *Step 40* |
 | 29→30 | `items.timerTask` (`INTEGER NOT NULL DEFAULT 0`, set to 1 for every growth task) and `timerBuffer`; `planned_blocks.timerGoal` / `timerWorked` / `timerRunningSince`, all nullable; `user_setup.allowPartialTimerGrowth` (0) — see *Step 42* |
+| 30→31 | the tables `sleep_logs` (keyed by the day an answer is about) and `notes`; `planned_blocks.timerExtension`, `originalStart`, `originalDuration`, `quantityDone`, all nullable; `user_setup.statistics` (1), `statsHidden` (`TEXT NOT NULL DEFAULT ''`) and `notes` (0) — see *Step 43* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

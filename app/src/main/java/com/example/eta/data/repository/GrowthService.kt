@@ -107,7 +107,15 @@ class GrowthService(
         // to its goal, or ticked off by hand without a shorter time being given
         // — unless the settings say otherwise. See `workedInFull`.
         val lenient = allowPartialGrowth()
-        val advanced = planRepository.completedOn(date)
+        val completed = planRepository.completedOn(date)
+        // The count each was done with, before it moves on: the definition only
+        // knows where it stands now, and the statistics draw where it stood.
+        planRepository.addBlocks(
+            completed
+                .filter { it.item.hasQuantity && it.block.quantityDone == null }
+                .map { it.block.copy(quantityDone = it.item.quantity) },
+        )
+        val advanced = completed
             .filter { it.item.isGrowthTask || it.item.hasQuantity }
             .distinctBy { it.item.familyKey }
             .associate { entry ->

@@ -136,6 +136,27 @@ data class PlannedBlock(
     val timerGoal: Duration? = null,
     val timerWorked: Duration? = null,
     val timerRunningSince: Instant? = null,
+    /**
+     * By how much a late start lengthened this block, so the timer does not run
+     * into time nobody planned. Part of [plannedDuration], and **not** part of
+     * what the timer counts or the evening bills — see `fullTimerGoal`.
+     */
+    val timerExtension: Duration? = null,
+    /**
+     * Where and how long this occurrence was laid down, for the statistics to
+     * tell "done as planned" from "done after the plan was changed". Stamped
+     * when a standing task's occurrence is materialized and never written
+     * again; null on a block that was not laid down by the schedule, and on
+     * every block older than step 43.
+     */
+    val originalStart: LocalTime? = null,
+    val originalDuration: Duration? = null,
+    /**
+     * The count a Mengen-Inkrement task was done with on this day, stamped when
+     * the evening confirms the completion. The definition only knows where the
+     * count stands *now*; this is what lets its history be drawn.
+     */
+    val quantityDone: Int? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

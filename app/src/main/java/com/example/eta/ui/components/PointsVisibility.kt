@@ -27,6 +27,9 @@ data class Features(
     val growthTasks: Boolean = true,
     val contracts: Boolean = true,
     val rewards: Boolean = true,
+    /** Step 43: the Statistiken tab (its own settings page) and the Notiz-Merger. */
+    val statistics: Boolean = true,
+    val notes: Boolean = true,
 )
 
 val LocalFeatures = staticCompositionLocalOf { Features() }

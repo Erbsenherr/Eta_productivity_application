@@ -66,13 +66,18 @@ fun PlannedBlock.timerCleared(): PlannedBlock =
     copy(timerGoal = null, timerWorked = null, timerRunningSince = null)
 
 /**
- * What a whole sitting counts down from: the block without the buffer behind it.
+ * What a whole sitting counts down from: the block without the buffer behind it
+ * — and without whatever a late start added to it ([PlannedBlock.timerExtension]).
  *
  * The block's own length rather than the definition's, so a sitting whose length
  * was changed for one day is measured against that day.
  */
 fun PlannedBlock.fullTimerGoal(buffer: Duration): Duration =
-    (plannedDuration - buffer).coerceAtLeast(MIN_TIMER_GOAL)
+    (plannedLength - buffer).coerceAtLeast(MIN_TIMER_GOAL)
+
+/** The block as it was planned, before a late start lengthened it. */
+private val PlannedBlock.plannedLength: Duration
+    get() = plannedDuration - (timerExtension ?: Duration.ZERO)
 
 /** A timer of nothing would be over before it began. */
 val MIN_TIMER_GOAL: Duration = 1.minutes
@@ -81,14 +86,14 @@ val MIN_TIMER_GOAL: Duration = 1.minutes
  * What a sitting ended at [now] is billed: the counted time plus the buffer,
  * and never more than the block was planned at.
  *
- * The buffer pays, by the user's rule — it is time held free for the task. So a
- * sitting worked in full bills exactly the planned length, which is what makes
- * `workedInFull` a comparison of two lengths the block already has.
+ * The buffer pays, by the user's rule — it is time held free for the task. The
+ * minutes a late start added do not: they are the lateness itself. So a sitting
+ * worked in full bills exactly the length it was planned at.
  */
 fun PlannedBlock.timerBilled(now: Instant, buffer: Duration): Duration {
     val counted = timerElapsed(now)
-    if (counted >= fullTimerGoal(buffer)) return plannedDuration
-    return (counted + buffer).coerceAtMost(plannedDuration)
+    if (counted >= fullTimerGoal(buffer)) return plannedLength
+    return (counted + buffer).coerceAtMost(plannedLength)
 }
 
 /** The phase of the pomodoro rhythm the timer is in, and how long it still runs. */
@@ -167,32 +172,37 @@ fun PlannedBlock.timerSignals(): List<TimerSignal> {
 }
 
 /**
- * A sitting begun so late that its time would run into the next task.
+ * A sitting begun so late that its time would run past the end of its block.
  *
  * The buffer exists to absorb a late start; this is what is left when it could
- * not. Two ways out, and the user picks: the timer gives way — [shortenedGoal],
- * ending where the next task begins — or the next task does — [pushedNext],
- * beginning once the timer is through and ending when it always did. Either may
- * be missing: no time left before the next task at all, or nothing worth
- * keeping of the next task behind the timer.
+ * not. **The timer never runs into time nobody planned**, so there are two ways
+ * on and the user picks:
+ *
+ * - **stop with the block** — [shortenedGoal], what is left until its end. Null
+ *   when the block is already over.
+ * - **lengthen the block** to [projectedEnd] — [canExtend]. Where another task
+ *   stands in that stretch ([next]) it has to give way: [pushedNext] is that
+ *   task beginning once the timer is through and ending when it always did, and
+ *   null when it cannot — an appointment out of the calendar, or nothing worth
+ *   keeping left of it.
  */
 data class TimerOverflow(
-    val next: BlockWithItem,
+    val projectedEnd: Int,
+    val next: BlockWithItem?,
     val shortenedGoal: Duration?,
     val pushedNext: PlannedBlock?,
-)
+) {
+    val canExtend: Boolean
+        get() = projectedEnd <= MINUTES_PER_DAY && (next == null || pushedNext != null)
+}
 
 /**
  * Whether starting [entry]'s timer at [nowMinute] with [goal] would run past
- * its own block and into another one — and what could be done about it.
+ * the end of its own block — and what could be done about it.
  *
- * Null is the ordinary case: it ends inside its frame, or what lies behind the
- * frame is free. Only the **first** block in the way is asked about; a timer
- * that would swallow it whole offers no "later", and the one answer left is to
- * stop where it begins.
- *
- * An appointment out of the calendar is never moved, so it only ever offers the
- * shortened timer.
+ * Null is the ordinary case: it ends inside its frame. Only the **first** block
+ * standing in the stretch behind the frame is asked about; a timer that would
+ * swallow it whole cannot be lengthened over it.
  */
 fun timerOverflow(
     blocks: List<BlockWithItem>,
@@ -202,22 +212,21 @@ fun timerOverflow(
 ): TimerOverflow? {
     // Rounded up: a goal of ninety seconds holds two minutes of the day.
     val projectedEnd = nowMinute + ((goal.inWholeSeconds + 59) / 60).toInt()
-    if (projectedEnd <= entry.block.endMinute()) return null
+    val frameEnd = entry.block.endMinute()
+    if (projectedEnd <= frameEnd) return null
 
     val next = blocks
         .filter { it.block.id != entry.block.id && it.claimsItsSlot() }
-        .filter { it.block.containerEndMinute() > nowMinute }
-        .filter { it.block.containerStartMinute() >= entry.block.startMinute() }
+        .filter { it.block.containerEndMinute() > frameEnd }
         .filter { it.block.containerStartMinute() < projectedEnd }
         .minByOrNull { it.block.containerStartMinute() }
-        ?: return null
 
-    val room = next.block.containerStartMinute() - nowMinute
     return TimerOverflow(
+        projectedEnd = projectedEnd,
         next = next,
-        shortenedGoal = room.takeIf { it >= MIN_TIMER_GOAL.inWholeMinutes }?.minutes,
-        pushedNext = next.block
-            .takeIf { it.origin != BlockOrigin.CALENDAR_IMPORT }
+        shortenedGoal = (frameEnd - nowMinute).takeIf { it >= MIN_TIMER_GOAL.inWholeMinutes }?.minutes,
+        pushedNext = next?.block
+            ?.takeIf { it.origin != BlockOrigin.CALENDAR_IMPORT }
             ?.trimmedAfter(projectedEnd),
     )
 }

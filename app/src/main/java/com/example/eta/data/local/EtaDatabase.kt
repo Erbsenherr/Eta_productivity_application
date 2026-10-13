@@ -14,11 +14,13 @@ import com.example.eta.domain.model.DayPlan
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.JournalEntry
 import com.example.eta.domain.model.NightOverride
+import com.example.eta.domain.model.Note
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.model.PlannerDismissal
 import com.example.eta.domain.model.PointsTransaction
 import com.example.eta.domain.model.Reminder
 import com.example.eta.domain.model.Reward
+import com.example.eta.domain.model.SleepLog
 import com.example.eta.domain.model.RewardTask
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
@@ -47,8 +49,10 @@ import com.example.eta.domain.setup.UserSetup
         RewardTask::class,
         NightOverride::class,
         PlannerDismissal::class,
+        SleepLog::class,
+        Note::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -67,6 +71,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun subtaskDao(): SubtaskDao
     abstract fun rewardDao(): RewardDao
     abstract fun plannerExtrasDao(): PlannerExtrasDao
+    abstract fun trackingDao(): TrackingDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -947,5 +952,37 @@ val MIGRATION_29_30 = object : Migration(29, 30) {
         connection.execSQL(
             "ALTER TABLE `user_setup` ADD COLUMN `allowPartialTimerGrowth` INTEGER NOT NULL DEFAULT 0",
         )
+    }
+}
+
+/**
+ * Step 43: the sleep log, the statistics and the Notiz-Merger.
+ *
+ * - `sleep_logs` (keyed by the day an answer is about) and `notes`.
+ * - `planned_blocks.timerExtension`, `originalStart` / `originalDuration` and
+ *   `quantityDone` — all null on every block there is. The statistics read a
+ *   null original as "not known", so nothing older is counted as changed.
+ * - `user_setup.statistics` (on for everyone), `statsHidden` (nothing hidden)
+ *   and `notes` (off — an Advanced Feature).
+ */
+val MIGRATION_30_31 = object : Migration(30, 31) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `sleep_logs` (`date` TEXT NOT NULL, `wokeAt` INTEGER, " +
+                "`wakeDue` INTEGER, `bedOnTime` INTEGER, `updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`date`))",
+        )
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notes` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                "`text` TEXT NOT NULL, `taskifiedAt` INTEGER, `createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `timerExtension` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `originalStart` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `originalDuration` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `quantityDone` INTEGER")
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `statistics` INTEGER NOT NULL DEFAULT 1")
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `statsHidden` TEXT NOT NULL DEFAULT ''")
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `notes` INTEGER NOT NULL DEFAULT 0")
     }
 }

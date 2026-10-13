@@ -31,6 +31,10 @@ enum class PointsReason {
     /** Free time given up, which pays. */
     FREE_TIME_FORGONE,
 
+    /** Half a point each for getting up, and for going to bed, on time. */
+    PUNCTUAL_WAKE,
+    PUNCTUAL_BED,
+
     /** Reward time claimed via a Custom Spend. */
     SPEND,
     MANUAL,

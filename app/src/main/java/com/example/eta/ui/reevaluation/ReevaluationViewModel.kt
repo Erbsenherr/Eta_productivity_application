@@ -11,6 +11,7 @@ import com.example.eta.data.repository.ReevaluationService
 import com.example.eta.data.repository.RewardOutlook
 import com.example.eta.domain.growth.timerBufferOrZero
 import com.example.eta.domain.model.Contract
+import com.example.eta.domain.planning.fullTimerGoal
 import com.example.eta.domain.planning.timerBilled
 import com.example.eta.domain.planning.timerPaused
 import com.example.eta.domain.planning.timerWasUsed
@@ -225,6 +226,24 @@ class ReevaluationViewModel(
             } else {
                 planRepository.complete(entry.block)
             }
+            refresh()
+        }
+    }
+
+    /**
+     * A Timer-Task whose timer was never started, ticked in the evening after
+     * the screen has asked. [worked] is the time the user says was put in, or
+     * null for all of it — stored as the dashboard stores it, so the increment
+     * and the yield are decided by the one rule.
+     */
+    fun completeTimerByHand(entry: BlockWithItem, worked: Duration?) {
+        viewModelScope.launch {
+            val block = entry.block
+            val buffer = entry.item.timerBufferOrZero
+            val billed = worked
+                ?.takeIf { it < block.fullTimerGoal(buffer) }
+                ?.let { (it + buffer).coerceAtMost(block.plannedDuration) }
+            planRepository.complete(block.copy(actualDuration = null), actualDuration = billed)
             refresh()
         }
     }

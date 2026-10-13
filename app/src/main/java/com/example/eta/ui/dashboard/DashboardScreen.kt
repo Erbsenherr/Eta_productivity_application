@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
+import com.example.eta.domain.planning.sleepPrompts
 import com.example.eta.domain.planning.timerWasUsed
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.LocalEtaClock
@@ -228,6 +229,27 @@ private fun TodayPage(
 
         CriticalBox(critical = state.critical)
 
+        // Getting up and going to bed: worked out against the ticking clock, so
+        // a window opens and closes at its minute.
+        val sleepCheck by viewModel.sleepCheck.collectAsStateWithLifecycle()
+        val sleep = sleepCheck?.let { check ->
+            remember(check, now.epochSeconds / 60) {
+                sleepPrompts(
+                    setup = check.setup,
+                    overrides = check.overrides,
+                    logs = check.logs,
+                    now = now.toLocalDateTime(TimeZone.currentSystemDefault()),
+                )
+            }
+        }
+        if (sleep != null) {
+            SleepCatchUpBoxes(
+                prompts = sleep,
+                onWake = viewModel::recordWake,
+                onBed = viewModel::recordBed,
+            )
+        }
+
         // Recomputed as the clock ticks, so "gerade" stays true without a refresh.
         val nowAndNext = remember(now, state.todayBlocks) {
             nowAndNext(state.todayBlocks, now.toLocalDateTime(TimeZone.currentSystemDefault()).time.minuteOfDay())
@@ -272,7 +294,7 @@ private fun TodayPage(
             TimerOverflowDialog(
                 prompt = prompt,
                 onShorten = { viewModel.answerTimerOverflow(shorten = true) },
-                onPushNext = { viewModel.answerTimerOverflow(shorten = false) },
+                onExtend = { viewModel.answerTimerOverflow(shorten = false) },
                 onDismiss = viewModel::dismissTimerOverflow,
             )
         }
@@ -290,6 +312,20 @@ private fun TodayPage(
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
             timer = timerActions,
+            greeting = when {
+                sleep?.morning == true -> "Guten Morgen!"
+                sleep?.eveningOf != null -> "Gute Nacht!"
+                else -> null
+            },
+            greetingContent = sleep?.takeIf { it.morning || it.eveningOf != null }?.let { prompts ->
+                {
+                    SleepGreeting(
+                        prompts = prompts,
+                        onWake = viewModel::recordWake,
+                        onBed = viewModel::recordBed,
+                    )
+                }
+            },
         )
 
         // Asked by the screen rather than inside the box: what is being agreed to is

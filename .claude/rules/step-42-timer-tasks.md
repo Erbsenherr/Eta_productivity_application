@@ -89,6 +89,9 @@ and four callbacks taking a block **id**).
 - **Ended short**: `TimerResultDialog` — and, when the frame had run out, the
   advice to make the buffer larger. Worked in full it is an ordinary completion
   and the follow-up question is put.
+- **Started late** — **changed in step 43, see there**: the question is now put
+  whenever the time would run past the block's own end, and the block can be
+  lengthened. What follows is how it stood in step 42.
 - **Started late** (`timerOverflow`): only when the time would run past the
   block's own end **and into another block**. `TimerOverflowDialog`: "Heute
   früher aufhören" (`timerGoal` = the time until the next container; not a full
@@ -100,7 +103,7 @@ and four callbacks taking a block **id**).
   own, stored the way the timer stores its count. Taking the tick back clears
   the timer (`timerCleared`).
 - **In the evening** a tick on a Timer-Task whose timer was started and never
-  ended bills what it counted; one never started is taken at its word.
+  ended bills what it counted; one never started asks first (step 43).
 
 #### The "Ziele" tab
 

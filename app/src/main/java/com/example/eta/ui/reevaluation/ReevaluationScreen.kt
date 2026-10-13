@@ -50,6 +50,8 @@ import com.example.eta.ui.components.LocalFeatures
 import kotlinx.coroutines.delay
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.planning.cancellationCharged
+import com.example.eta.domain.planning.timerWasUsed
+import com.example.eta.ui.dashboard.TimerTickDialog
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.reevaluation.DailySettlement
 import com.example.eta.domain.reevaluation.FREE_UNPLANNED_HOURS
@@ -240,6 +242,24 @@ fun ReevaluationScreen(
 /** Phase 1: what happened, and what deliberately did not. */
 @Composable
 private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewModel) {
+    // Held as an id and resolved against the list as it is now.
+    var tickingTimerId by remember { mutableStateOf<String?>(null) }
+    tickingTimerId?.let { id ->
+        val entry = state.blocks.firstOrNull { it.block.id == id && it.block.isOpen }
+        if (entry == null) {
+            tickingTimerId = null
+        } else {
+            TimerTickDialog(
+                entry = entry,
+                onDismiss = { tickingTimerId = null },
+                onConfirm = { worked ->
+                    viewModel.completeTimerByHand(entry, worked)
+                    tickingTimerId = null
+                },
+            )
+        }
+    }
+
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Wurde alles abgearbeitet?", style = EtaTheme.typography.heading)
@@ -262,7 +282,15 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                 BlockRow(
                     entry = entry,
                     mayDiscard = tutorialAllows(TutorialGate.REEVALUATION_DISCARD + entry.item.id),
-                    onToggle = { viewModel.toggleCompleted(entry) },
+                    onToggle = {
+                        // A Timer-Task that was never started is asked about
+                        // before it counts as worked in full.
+                        if (entry.item.timerTask && entry.block.isOpen && !entry.block.timerWasUsed) {
+                            tickingTimerId = entry.block.id
+                        } else {
+                            viewModel.toggleCompleted(entry)
+                        }
+                    },
                     onDiscard = { viewModel.discard(entry) },
                     onExcuse = { reason -> viewModel.excuse(entry, reason) },
                 )
@@ -700,6 +728,10 @@ private fun RewardStep(settlement: DailySettlement?) {
             }
             if (settlement.freeTimeForgone != 0.0) {
                 LedgerLine("Freizeit verzichtet", settlement.freeTimeForgone)
+            }
+            if (settlement.wakeBonus != 0.0) LedgerLine("Pünktlich aufgestanden", settlement.wakeBonus)
+            if (settlement.bedBonus != 0.0) {
+                LedgerLine("Pünktlich schlafen gegangen (Vortag)", settlement.bedBonus)
             }
             if (settlement.cancellationPenalty != 0.0) {
                 LedgerLine("Abgesagt", -settlement.cancellationPenalty)

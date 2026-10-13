@@ -57,7 +57,7 @@ is the point:
 
 - A **tab** is a place you can always get back to — Dashboard (called Heute until
   step 39, and with Heute · Morgen · Woche as tabs of its own inside), Listen, Verträge,
-  Erinnerungen, Ziele (the Growth-Tasks tab until step 42), Belohn-o-mat, Einstellungen, in that order since step 35;
+  Erinnerungen, Ziele (the Growth-Tasks tab until step 42), Belohn-o-mat, Statistiken, Notiz-Merger (both step 43), Einstellungen, in that order since step 35;
   Verträge, Ziele and Belohn-o-mat only while their feature is switched on (*Step 36*) — so `EtaTabBar` stays put beneath it.
 - A **flow** is something you are in the middle of: a planning phase, the
   concretizing step, the holiday editor. It covers the bar and leaves by finishing

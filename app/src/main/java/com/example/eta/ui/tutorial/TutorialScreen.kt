@@ -140,7 +140,7 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
                 // in a tutorial about one of them.
                 LocalPointsVisible provides true,
                 LocalFeatures provides tutorial.tutorial.advanced.let { on ->
-                    Features(growthTasks = on, contracts = on, rewards = on)
+                    Features(growthTasks = on, contracts = on, rewards = on, statistics = false, notes = false)
                 },
             ) {
                 StageScreen(step.stage, session, tutorial)

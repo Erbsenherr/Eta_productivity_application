@@ -131,6 +131,10 @@ fun expandRecurring(
                 returnAfter = item.returnAfter,
                 breakAfter = item.breakAfter,
                 origin = BlockOrigin.RECURRING,
+                // As the schedule laid it down — what "changed afterwards" is
+                // measured against. The definition's hour, not a holiday's.
+                originalStart = start,
+                originalDuration = duration,
                 createdAt = now,
                 updatedAt = now,
             ).stampedWith(item)

@@ -39,6 +39,9 @@ import com.example.eta.alarm.alarmReadiness
 import com.example.eta.data.backup.BACKUP_FILE_NAME
 import com.example.eta.domain.planning.STILL_ACTIVE_MAX_PER_DAY
 import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.stats.StatSection
+import com.example.eta.domain.stats.showsStat
+import com.example.eta.domain.stats.withStat
 import com.example.eta.domain.setup.WEEK
 import com.example.eta.domain.streak.CATCH_UP_PHRASE
 import com.example.eta.ui.components.EtaButton
@@ -241,6 +244,7 @@ fun SettingsScreen(
                             }
                             SettingsPage.FLEXIBILITY -> FlexibilityBox(setup, viewModel::setFeature)
                             SettingsPage.BREAKS -> BreakCheckerBox(setup, viewModel::setFeature)
+                            SettingsPage.STATISTICS -> StatisticsBox(setup, viewModel::setFeature)
                             SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
                             SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
                             else -> Unit
@@ -251,7 +255,8 @@ fun SettingsScreen(
                         // to save.
                         if (page != SettingsPage.FEATURES &&
                             page != SettingsPage.FLEXIBILITY &&
-                            page != SettingsPage.BREAKS
+                            page != SettingsPage.BREAKS &&
+                            page != SettingsPage.STATISTICS
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
                                 EtaButton(text = "Sichern", enabled = dirty, onClick = viewModel::save)
@@ -295,6 +300,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     FEATURES("Advanced Features", SettingsSection.SETUP),
     FLEXIBILITY("Flexibilität", SettingsSection.SETUP),
     BREAKS("Pausenchecker", SettingsSection.SETUP),
+    STATISTICS("Statistiken", SettingsSection.SETUP),
     INFLATION("Wertverfall", SettingsSection.SETUP),
     CANCELLATION("Absagen", SettingsSection.SETUP),
 
@@ -585,6 +591,67 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
                 label = "Belohn-o-mat",
                 hint = "Der Reiter, und die Seite am Abend, auf der sich die Belohnung füllt.",
             )
+            CheckRow(
+                checked = setup.notes,
+                onCheckedChange = { on -> onChange { it.copy(notes = on) } },
+                label = "Notiz-Merger",
+                hint = "Ein Reiter für Notizen mit Titel und Text, die sich per »Taskify« " +
+                    "in ToDos verwandeln lassen. Ausgeschaltet bleiben die Notizen erhalten.",
+            )
+        }
+    }
+}
+
+/**
+ * The Statistiken tab: on or off, and which of its contents it shows.
+ *
+ * Applied at once, like the switches of the pages around it. Hiding something
+ * stops nothing being counted — the tab works from the plan's own history, so a
+ * figure switched back on is complete from the first day.
+ */
+@Composable
+private fun StatisticsBox(setup: UserSetup, onChange: OnSetupChange) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Statistiken", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Gilt sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            CheckRow(
+                checked = setup.statistics,
+                onCheckedChange = { on -> onChange { it.copy(statistics = on) } },
+                label = "Reiter »Statistiken« anzeigen",
+                hint = "Ausgeschaltet verschwindet der ganze Reiter. Die Fragen nach " +
+                    "Aufstehen und Schlafengehen im Dashboard bleiben.",
+            )
+            if (setup.statistics) {
+                EtaText(text = "Inhalte", style = EtaTheme.typography.bodyStrong)
+                StatSection.entries.forEach { section ->
+                    key(section) {
+                        CheckRow(
+                            checked = setup.showsStat(section),
+                            onCheckedChange = { on -> onChange { it.withStat(section, on) } },
+                            label = section.label,
+                            hint = when (section) {
+                                StatSection.WAKE -> "Wie oft du pünktlich aus dem Bett gekommen bist."
+                                StatSection.BED -> "Wie oft du pünktlich ins Bett gegangen bist."
+                                StatSection.PLANNED -> "Wie viel deiner wachen Zeit verplant war."
+                                StatSection.COMPLETED ->
+                                    "Wie viele der vorgenommenen Aufgaben abgeschlossen wurden."
+
+                                StatSection.CATEGORIES -> "Stunden in Fokus, Nebenbei und Achtsam."
+                                StatSection.RECURRING ->
+                                    "Je wiederkehrender Aufgabe: Stunden, Ausfälle, Planänderungen."
+
+                                StatSection.GOALS ->
+                                    "Dasselbe für Timer- und Inkrement-Tasks, mit Verlauf des Pensums."
+                            },
+                        )
+                    }
+                }
+            }
         }
     }
 }

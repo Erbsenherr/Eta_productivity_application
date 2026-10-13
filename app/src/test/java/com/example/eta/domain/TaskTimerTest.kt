@@ -262,10 +262,16 @@ class TaskTimerTest {
     }
 
     @Test
-    fun `a late start with nothing behind it asks nothing either`() {
+    fun `a late start never runs into empty time - it stops with the block or the block grows`() {
         val lernen = entry(block("a"), buffer = 10.minutes)
 
-        assertNull(timerOverflow(listOf(lernen), lernen, nowMinute = 10 * 60 + 30, goal = 2.hours))
+        val overflow = timerOverflow(listOf(lernen), lernen, nowMinute = 10 * 60 + 30, goal = 2.hours)
+
+        // Nothing stands behind it, so lengthening is free; stopping is at 12:10.
+        assertNull(overflow?.next)
+        assertTrue(overflow?.canExtend == true)
+        assertEquals(12 * 60 + 30, overflow?.projectedEnd)
+        assertEquals(100.minutes, overflow?.shortenedGoal)
     }
 
     @Test
@@ -276,11 +282,37 @@ class TaskTimerTest {
         val overflow = timerOverflow(listOf(lernen, next), lernen, nowMinute = 10 * 60 + 30, goal = 2.hours)
 
         assertEquals("n", overflow?.next?.block?.id)
-        // The timer stops where the next task begins …
+        // The timer stops where its own block ends …
         assertEquals(100.minutes, overflow?.shortenedGoal)
         // … or the next task begins when the timer is through, and ends as planned.
+        assertTrue(overflow?.canExtend == true)
         assertEquals(LocalTime(12, 30), overflow?.pushedNext?.start)
         assertEquals(40.minutes, overflow?.pushedNext?.plannedDuration)
+    }
+
+    @Test
+    fun `a task standing after a gap is still in the way of a longer block`() {
+        val lernen = entry(block("a"), buffer = 10.minutes)
+        // Free from 12:10 to 12:20, then something else.
+        val next = entry(block("n", LocalTime(12, 20), 1.hours))
+
+        val overflow = timerOverflow(listOf(lernen, next), lernen, nowMinute = 10 * 60 + 30, goal = 2.hours)
+
+        // Stopping is with the block, not at the next task: the gap stays empty.
+        assertEquals(100.minutes, overflow?.shortenedGoal)
+        assertEquals(LocalTime(12, 30), overflow?.pushedNext?.start)
+    }
+
+    @Test
+    fun `a block lengthened by a late start is measured and billed without the extension`() {
+        // Twenty minutes late against ten of buffer: ten minutes longer.
+        val late = block(duration = 140.minutes).copy(timerExtension = 10.minutes)
+        assertEquals(2.hours, late.fullTimerGoal(10.minutes))
+
+        val running = late.timerStarted(2.hours, t0)
+        assertEquals(130.minutes, running.timerBilled(t0 + 2.hours, 10.minutes))
+        assertTrue(late.copy(actualDuration = 130.minutes).workedInFull)
+        assertFalse(late.copy(actualDuration = 100.minutes).workedInFull)
     }
 
     @Test
@@ -292,6 +324,7 @@ class TaskTimerTest {
 
         assertEquals(100.minutes, overflow?.shortenedGoal)
         assertNull(overflow?.pushedNext)
+        assertFalse(overflow?.canExtend == true)
     }
 
     @Test

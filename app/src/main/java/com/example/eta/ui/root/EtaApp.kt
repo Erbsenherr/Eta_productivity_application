@@ -57,7 +57,11 @@ import com.example.eta.ui.reevaluation.ReevaluationScreen
 import com.example.eta.ui.reevaluation.ReevaluationViewModel
 import com.example.eta.ui.reminders.RemindersScreen
 import com.example.eta.ui.reminders.RemindersViewModel
+import com.example.eta.ui.notes.NotesScreen
+import com.example.eta.ui.notes.NotesViewModel
 import com.example.eta.ui.rewards.RewardsScreen
+import com.example.eta.ui.stats.StatisticsScreen
+import com.example.eta.ui.stats.StatisticsViewModel
 import com.example.eta.ui.rewards.RewardsViewModel
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.Features
@@ -150,6 +154,8 @@ fun EtaApp(
                         growthTasks = stored.growthTasks,
                         contracts = stored.contracts,
                         rewards = stored.rewards,
+                        statistics = stored.statistics,
+                        notes = stored.notes,
                     ),
                 ) {
                     MainScaffold(
@@ -398,6 +404,20 @@ private fun MainScaffold(
                     ),
                 )
 
+                EtaTab.Statistics -> StatisticsScreen(
+                    viewModel = viewModel(
+                        key = "statistics-$dateKey",
+                        factory = statisticsViewModelFactory(container),
+                    ),
+                )
+
+                EtaTab.Notes -> NotesScreen(
+                    viewModel = viewModel(
+                        key = "notes-$dateKey",
+                        factory = notesViewModelFactory(container),
+                    ),
+                )
+
                 EtaTab.Settings -> SettingsScreen(
                     viewModel = viewModel(factory = settingsViewModelFactory(container)),
                     calendarViewModel = viewModel(
@@ -474,6 +494,10 @@ private enum class EtaTab(val label: String) {
     /** Long-term rewards, filled by the evening. Before the settings, which stay last. */
     Rewards("Belohn-o-mat"),
 
+    /** Step 43: what the days add up to, and notes that can become ToDos. */
+    Statistics("Statistiken"),
+    Notes("Notiz-Merger"),
+
     /** Far right, as the user asked: it is the tab opened least. */
     Settings("Einstellungen"),
 }
@@ -483,6 +507,8 @@ private fun EtaTab.isShown(features: Features): Boolean = when (this) {
     EtaTab.Contracts -> features.contracts
     EtaTab.Growth -> features.growthTasks
     EtaTab.Rewards -> features.rewards
+    EtaTab.Statistics -> features.statistics
+    EtaTab.Notes -> features.notes
     else -> true
 }
 
@@ -579,6 +605,9 @@ internal fun dashboardViewModelFactory(container: AppContainer): ViewModelProvid
                 subtaskRepository = container.subtaskRepository,
                 taskStartCoordinator = container.taskStartCoordinator,
                 clock = container.clock,
+                // Not in the practice app: its day is simulated.
+                sleepLogRepository = container.sleepLogRepository.takeIf { !container.sandbox },
+                nightService = container.nightService.takeIf { !container.sandbox },
             )
         }
     }
@@ -734,6 +763,31 @@ internal fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider
             RewardsViewModel(
                 rewardRepository = container.rewardRepository,
                 recurringTaskService = container.recurringTaskService,
+            )
+        }
+    }
+
+internal fun statisticsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            StatisticsViewModel(
+                planRepository = container.planRepository,
+                sleepLogRepository = container.sleepLogRepository,
+                recurringTaskService = container.recurringTaskService,
+                setupRepository = container.setupRepository,
+                nightService = container.nightService,
+                clock = container.clock,
+            )
+        }
+    }
+
+internal fun notesViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            NotesViewModel(
+                noteRepository = container.noteRepository,
+                itemRepository = container.itemRepository,
+                clock = container.clock,
             )
         }
     }

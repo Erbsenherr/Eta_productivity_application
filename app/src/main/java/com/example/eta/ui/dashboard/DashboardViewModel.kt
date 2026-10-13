@@ -11,6 +11,12 @@ import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.PointsRepository
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.data.repository.SubtaskRepository
+import com.example.eta.data.repository.NightService
+import com.example.eta.data.repository.SleepLogRepository
+import com.example.eta.domain.model.NightOverride
+import com.example.eta.domain.model.SleepLog
+import com.example.eta.domain.setup.UserSetup
+import kotlinx.datetime.minus
 import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.model.Item
@@ -59,6 +65,7 @@ import com.example.eta.domain.staging.daysUntilBan
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -124,8 +131,15 @@ data class DashboardUiState(
     val crowned: Boolean get() = legacyGrossPerDay > LEGACY_DAILY_CAP
 }
 
+/** The standing nights, the ones changed by hand, and what was said about yesterday and today. */
+data class SleepCheckState(
+    val setup: UserSetup,
+    val overrides: Map<LocalDate, NightOverride>,
+    val logs: Map<LocalDate, SleepLog>,
+)
+
 /**
- * A Timer-Task started so late that its time would run into the next task.
+ * A Timer-Task started so late that its time would run past its own block.
  *
  * What the dialog shows; the answer is worked out again when it is given.
  */
@@ -133,12 +147,16 @@ data class TimerOverflowPrompt(
     val blockId: String,
     val name: String,
     val goal: Duration,
+    /** When the block ends as planned, and when the full time would be through. */
+    val frameEnd: LocalTime,
     val projectedEnd: LocalTime,
-    val nextName: String,
-    val nextStart: LocalTime,
-    /** What the timer would count instead, or null when no time is left at all. */
+    /** What the timer would count if it stops with the block; null when that is over. */
     val shortenedGoal: Duration?,
-    /** When the next task would begin instead, or null when it cannot be moved. */
+    /** Whether the block can be lengthened to [projectedEnd]. */
+    val canExtend: Boolean,
+    /** What stands in the stretch behind the block, if anything does. */
+    val nextName: String?,
+    /** When that task would begin instead, where it can give way. */
     val pushedStart: LocalTime?,
 )
 
@@ -216,6 +234,13 @@ class DashboardViewModel(
     private val taskStartCoordinator: TaskStartCoordinator,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /**
+     * The two things the morning and night boxes are read from. Null in the
+     * tutorial's practice app, which has a simulated day and nothing to ask
+     * about anyone's sleep.
+     */
+    private val sleepLogRepository: SleepLogRepository? = null,
+    private val nightService: NightService? = null,
 ) : ViewModel() {
 
     private val today: LocalDate = clock.todayIn(timeZone)
@@ -588,6 +613,44 @@ class DashboardViewModel(
         }
     }
 
+    // --- getting up and going to bed -----------------------------------------
+
+    /**
+     * What "Guten Morgen!" and "Gute Nacht!" are worked out from. The screen
+     * does the working out, against its own ticking clock — a window opens and
+     * closes by the minute, and no row changes when it does.
+     */
+    val sleepCheck: StateFlow<SleepCheckState?> =
+        if (sleepLogRepository == null || nightService == null) {
+            MutableStateFlow(null)
+        } else {
+            combine(
+                setupRepository.observe(),
+                nightService.observeOverrides(),
+                sleepLogRepository.observe(today.minus(DatePeriod(days = 1)), today),
+            ) { setup, overrides, logs -> setup?.let { SleepCheckState(it, overrides, logs) } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        }
+
+    /**
+     * "Bin … aufgestanden". [at] is null for "jetzt"; [due] is the hour that
+     * applied this morning, stored beside the answer so a later change to the
+     * settings cannot turn an on-time morning into a late one.
+     */
+    fun recordWake(at: LocalTime?, due: LocalTime) {
+        val repository = sleepLogRepository ?: return
+        viewModelScope.launch {
+            val time = at ?: clock.now().toLocalDateTime(timeZone).time.let { LocalTime(it.hour, it.minute) }
+            repository.recordWake(today, time, due)
+        }
+    }
+
+    /** "Gehe nun schlafen", or the next day's answer about [day]'s evening. */
+    fun recordBed(day: LocalDate, onTime: Boolean) {
+        val repository = sleepLogRepository ?: return
+        viewModelScope.launch { repository.recordBed(day, onTime) }
+    }
+
     // --- Timer-Tasks ---------------------------------------------------------
 
     /** Today's entry by id, with the block read fresh — the list's copy may be older. */
@@ -611,7 +674,7 @@ class DashboardViewModel(
             val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
             val minute = nowMinute()
             val overflow = timerOverflow(uiState.value.todayBlocks, entry, minute, goal)
-                ?.takeIf { it.shortenedGoal != null || it.pushedNext != null }
+                ?.takeIf { it.shortenedGoal != null || it.canExtend }
             if (overflow == null) {
                 beginTimer(entry.block, goal)
                 return@launch
@@ -620,34 +683,47 @@ class DashboardViewModel(
                 blockId = blockId,
                 name = entry.item.name,
                 goal = goal,
-                projectedEnd = minuteToLocalTime(minute + ((goal.inWholeSeconds + 59) / 60).toInt()),
-                nextName = overflow.next.item.name,
-                nextStart = overflow.next.block.start,
+                frameEnd = minuteToLocalTime(entry.block.endMinute()),
+                projectedEnd = minuteToLocalTime(overflow.projectedEnd),
                 shortenedGoal = overflow.shortenedGoal,
+                canExtend = overflow.canExtend,
+                nextName = overflow.next?.item?.name,
                 pushedStart = overflow.pushedNext?.start,
             )
         }
     }
 
     /**
-     * The answer to a late start: the timer stops early ([shorten]), or the
-     * next task begins later. Worked out again from the day as it now stands —
-     * a minute has passed since the question was put.
+     * The answer to a late start: the timer stops with its block ([shorten]),
+     * or the block is lengthened — and whatever stands behind it begins later.
+     * Worked out again from the day as it now stands: a minute has passed since
+     * the question was put.
      */
     fun answerTimerOverflow(shorten: Boolean) {
         val prompt = _timerOverflow.value ?: return
         _timerOverflow.value = null
         viewModelScope.launch {
             val entry = timerEntry(prompt.blockId) ?: return@launch
-            if (!entry.block.isOpen || entry.block.timerWasUsed) return@launch
-            val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
+            val block = entry.block
+            if (!block.isOpen || block.timerWasUsed) return@launch
+            val goal = block.fullTimerGoal(entry.item.timerBufferOrZero)
             val overflow = timerOverflow(uiState.value.todayBlocks, entry, nowMinute(), goal)
             when {
-                overflow == null -> beginTimer(entry.block, goal)
-                shorten -> beginTimer(entry.block, overflow.shortenedGoal ?: goal)
+                overflow == null -> beginTimer(block, goal)
+                shorten -> beginTimer(block, overflow.shortenedGoal ?: goal)
+                !overflow.canExtend -> beginTimer(block, overflow.shortenedGoal ?: goal)
                 else -> {
                     overflow.pushedNext?.let { planRepository.addBlock(it.copy(updatedAt = clock.now())) }
-                    beginTimer(entry.block, goal)
+                    // Longer by exactly the lateness the buffer could not take:
+                    // the timer's own time stays what it was.
+                    val extension = (overflow.projectedEnd - block.endMinute()).minutes
+                    beginTimer(
+                        block.copy(
+                            plannedDuration = block.plannedDuration + extension,
+                            timerExtension = extension,
+                        ),
+                        goal,
+                    )
                 }
             }
         }
@@ -702,7 +778,9 @@ class DashboardViewModel(
             val full = counted >= goal
             planRepository.complete(
                 block.timerPaused(now).copy(actualDuration = null),
-                actualDuration = if (full) null else block.timerBilled(now, buffer),
+                // Null is "as planned" — which a block lengthened by a late
+                // start is not billed at, worked in full or not.
+                actualDuration = block.timerBilled(now, buffer).takeIf { it < block.plannedDuration },
             )
             taskStartCoordinator.reschedule()
 

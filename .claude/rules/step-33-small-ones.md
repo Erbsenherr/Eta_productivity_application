@@ -43,6 +43,8 @@ A tap is the ordinary, charged "Absagen".
 - **One write.** `PlanRepository.discard(block, forceMajeure)` sets both fields:
   `discard` followed by `excuse` would each save its own copy of the row, and the
   second would undo the first.
+- **It asks before it excuses** (step 43): the hold opens a `ConfirmDialog`
+  inside `BlockEditDialog`.
 - **No reason is asked**, unlike the evening's excuse, which demands a sentence.
   The user asked for it to be direct; the hold is the friction. The stored reason
   is `FORCE_MAJEURE_ON_THE_SPOT` ("beim Absagen angegeben"), so the evening row

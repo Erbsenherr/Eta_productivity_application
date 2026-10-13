@@ -31,6 +31,7 @@ import com.example.eta.ui.attributes.TodoAttributes
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.domain.model.BlockOrigin
+import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaChoice
 import com.example.eta.ui.components.EtaDurationPicker
@@ -179,6 +180,9 @@ fun BlockEditDialog(
     // else: a ToDo moves already, and an appointment is the calendar's to move.
     val canBeFlexible = entry.block.origin == BlockOrigin.RECURRING
     var flexible by remember(entry.block.id) { mutableStateOf(entry.block.flexible) }
+    // The hold is the gesture; this is the question behind it. An excuse waives
+    // a charge, and a thumb resting on a button should not be able to do that.
+    var confirmingExcuse by remember(entry.block.id) { mutableStateOf(false) }
 
     PlannerDialog(title = "Bearbeiten", onDismiss = onDismiss) {
         EtaField(label = "Name") {
@@ -331,7 +335,7 @@ fun BlockEditDialog(
                     text = "Absagen",
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onCancelBlock,
-                    onHold = onCancelExcused,
+                    onHold = { confirmingExcuse = true },
                 )
             } else {
                 EtaButton(
@@ -435,6 +439,21 @@ fun BlockEditDialog(
                 },
             )
         }
+    }
+
+    if (confirmingExcuse) {
+        ConfirmDialog(
+            title = "Wegen höherer Gewalt absagen?",
+            message = "»${entry.item.name}« wird abgesagt, ohne dass es etwas kostet. " +
+                "Höhere Gewalt ist, was du nicht in der Hand hattest — nicht, was dir " +
+                "gerade nicht passt.",
+            confirm = "Absagen",
+            onDismiss = { confirmingExcuse = false },
+            onConfirm = {
+                confirmingExcuse = false
+                onCancelExcused()
+            },
+        )
     }
 
     if (building) {

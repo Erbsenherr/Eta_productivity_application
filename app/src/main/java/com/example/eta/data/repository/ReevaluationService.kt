@@ -22,6 +22,8 @@ import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.planning.sleepStretches
 import kotlin.time.Clock
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.minus
 import kotlinx.datetime.LocalDate
 
 /**
@@ -45,6 +47,8 @@ class ReevaluationService(
     private val clock: Clock = Clock.System,
     /** Nights changed for one date; null where there are none to ask about. */
     private val nightService: NightService? = null,
+    /** What was said about getting up and going to bed; null books no bonus. */
+    private val sleepLogRepository: SleepLogRepository? = null,
 ) {
 
     /** Contracts that still owe an answer for [date]. */
@@ -94,6 +98,10 @@ class ReevaluationService(
             cancellationPenaltyPerHour = setup?.cancellationPenaltyPerHour
                 ?: DEFAULT_CANCELLATION_PENALTY,
             unplannedPenaltyPerHour = setup?.unplannedRate ?: UNPLANNED_PENALTY_PER_HOUR,
+            // This morning, and the night it woke from — filed under the day
+            // before, whose evening it was.
+            wokeOnTime = sleepLogRepository?.find(date)?.wokeOnTime == true,
+            bedOnTime = sleepLogRepository?.find(date.minus(DatePeriod(days = 1)))?.bedOnTime == true,
         )
     }
 
@@ -141,6 +149,12 @@ class ReevaluationService(
         }
         if (settlement.freeTimeForgone != 0.0) {
             pointsRepository.record(settlement.freeTimeForgone, PointsReason.FREE_TIME_FORGONE)
+        }
+        if (settlement.wakeBonus != 0.0) {
+            pointsRepository.record(settlement.wakeBonus, PointsReason.PUNCTUAL_WAKE, note = date.toString())
+        }
+        if (settlement.bedBonus != 0.0) {
+            pointsRepository.record(settlement.bedBonus, PointsReason.PUNCTUAL_BED, note = date.toString())
         }
         if (settlement.cancellationPenalty != 0.0) {
             pointsRepository.record(

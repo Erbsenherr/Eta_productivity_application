@@ -173,6 +173,13 @@ fun NowBox(
     onConfirm: (BlockWithItem) -> Unit = {},
     /** The timer of a Timer-Task, which stands where "Erledigt" would. */
     timer: TimerActions? = null,
+    /**
+     * "Guten Morgen!" or "Gute Nacht!": the box's name while one of the two
+     * windows is open, and what there is to answer in it. Above the pages, so it
+     * is there whichever of them is turned to.
+     */
+    greeting: String? = null,
+    greetingContent: (@Composable () -> Unit)? = null,
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
 
@@ -196,9 +203,9 @@ fun NowBox(
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 EtaText(
-                    text = if (pagerState.currentPage == 0) "Gerade" else "Als Nächstes",
-                    style = EtaTheme.typography.label,
-                    color = EtaTheme.colors.textSecondary,
+                    text = greeting ?: if (pagerState.currentPage == 0) "Gerade" else "Als Nächstes",
+                    style = if (greeting != null) EtaTheme.typography.heading else EtaTheme.typography.label,
+                    color = if (greeting != null) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
                 repeat(2) { page ->
@@ -216,6 +223,16 @@ fun NowBox(
                             ),
                     )
                 }
+            }
+
+            greetingContent?.invoke()
+            if (greeting != null) {
+                // The box has another name for now, so the page says its own.
+                EtaText(
+                    text = if (pagerState.currentPage == 0) "Gerade" else "Als Nächstes",
+                    style = EtaTheme.typography.label,
+                    color = EtaTheme.colors.textSecondary,
+                )
             }
 
             HorizontalPager(state = pagerState) { page ->

@@ -454,6 +454,15 @@ data class UserSetup(
      */
     val allowPartialTimerGrowth: Boolean = false,
     /**
+     * The Statistiken tab, and which of its contents are **hidden** — the names
+     * of `StatSection`s, comma-separated. Hidden rather than shown, so a section
+     * added later is on for everyone without a migration.
+     */
+    val statistics: Boolean = true,
+    val statsHidden: String = "",
+    /** The Notiz-Merger tab — an Advanced Feature, off until asked for. */
+    val notes: Boolean = false,
+    /**
      * The Pausenchecker: whether the day planner says when a day holds too
      * little rest, and what "too little" is — [breakPerTwoHours] of rest for
      * every full two hours of tasks, and no more than [breakMaxStretch] of

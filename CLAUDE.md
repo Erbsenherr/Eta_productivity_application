@@ -51,8 +51,8 @@ explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
 **Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (661 tests
-as of step 42), `assembleRelease` and `lint` — and the sounds not at all: channel
+this machine, so everything is verified by compilation, the unit suite (677 tests
+as of step 43), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -384,6 +384,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-40-nights-breaks.md` | *Step 40*: three ways of answering the nights (`NightMode`, `nightsByDay`, the weekend fixed to Friday and Saturday evening again), the advice about the sleep rhythm (`rhythmSpread`, `RHYTHM_ADVICE`), a long press on the shaded night (`onSleepLongPress`, `NightEditDialog`) — one night in the day planner (`NightOverride`, `NightService.overrideNight`, what moves with it), the weekday's standing night on the week timetable (`saveWeekdayNight`) — and the Pausenchecker (`checkBreaks`, `breakKind`, `PlannerWarning`, `PlannerDismissal`) |
 | `step-41-overlap-kinds.md` | *Step 41*: something new on occupied time asks (`OverlapPrompt`, `PlacementSpan`, `fittedSpan`, `planRelief`, `removalFate`), one revolver — a box asks what it is (`NewEntryKindDialog`: Neues ToDo · Pause · Custom), and a note when a card is made |
 | `step-42-timer-tasks.md` | *Step 42*: Timer-Tasks (`Item.timerTask`, `timerBuffer` inside `estimatedDuration`, `timerDuration`, `withBufferAdded`, `ItemExtras.timer`), the timer on the block (`TaskTimer.kt`: `timerGoal` / `timerWorked` / `timerRunningSince`, `timerPhase`, `timerSignals`, `workedInFull`), its buttons on the dashboard (`TimerControls`, the late start, ticking one off by hand), a Growth-Task as a Timer-Task with a "Zielzeit", and the "Ziele" tab |
+| `step-43-sleep-stats-notes.md` | *Step 43*: getting up and going to bed (`SleepLog`, `sleepPrompts`, "Guten Morgen!" / "Gute Nacht!" in the "Gerade" box, the two half points in the settlement), a late timer that lengthens its block (`timerExtension`), what is stamped for the statistics (`originalStart` / `originalDuration`, `quantityDone`), the Statistiken tab (`StatRange`, `StatSection`, `overview`, `taskStats`, `PensumChart`) and the Notiz-Merger (`Note`, Taskify) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -407,6 +408,9 @@ These came out of discussion with the user and are not all derivable from `Eta_d
   at what its timer counted — pomodoro pauses and the buffer included, pauses by
   hand not — and a "Zielzeit" grows only after a sitting worked in full, unless
   Flexibilität says otherwise. See *Step 42*.
+- **Getting up and going to bed on time pay half a point each, on the user's
+  word**, booked with the evening's settlement — the bedtime's with the
+  settlement of the day after (step 43). See *Step 43*.
 - **UI: Compose Foundation only, no Material3.** The revolver, drag-and-drop timeline
   and custom card shapes fight Material components.
 - **Persistence:** local Room only, but sync-friendly — UUID string keys and
@@ -455,7 +459,8 @@ is one · 35. The Belohn-o-mat, points out of sight, and three long presses ·
 38. The tutorial · 39. A dashboard with tabs, the week as a timetable, and
 Flexibilität · 40. Nights changed by hand, a night per weekday, and the
 Pausenchecker · 41. An overlap that is asked about, one revolver, and a note at
-creation · 42. Timer-Tasks, and the "Ziele" tab.
+creation · 42. Timer-Tasks, and the "Ziele" tab · 43. Getting up and going to bed,
+Statistiken, and the Notiz-Merger.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

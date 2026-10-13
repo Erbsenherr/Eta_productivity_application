@@ -36,6 +36,8 @@ abstract class ResetDao {
         clearRewards()
         clearNightOverrides()
         clearPlannerDismissals()
+        clearSleepLogs()
+        clearNotes()
         clearSetup()
     }
 
@@ -92,6 +94,12 @@ abstract class ResetDao {
 
     @Query("DELETE FROM planner_dismissals")
     abstract suspend fun clearPlannerDismissals()
+
+    @Query("DELETE FROM sleep_logs")
+    abstract suspend fun clearSleepLogs()
+
+    @Query("DELETE FROM notes")
+    abstract suspend fun clearNotes()
 
     @Query("DELETE FROM user_setup")
     abstract suspend fun clearSetup()

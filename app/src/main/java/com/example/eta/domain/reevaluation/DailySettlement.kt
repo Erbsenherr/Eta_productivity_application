@@ -4,6 +4,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.model.ItemRole
+import com.example.eta.domain.model.PUNCTUAL_SLEEP_POINTS
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.planning.containerEndMinute
 import com.example.eta.domain.planning.containerStartMinute
@@ -66,13 +67,20 @@ data class DailySettlement(
      */
     val droppedHours: Double,
     val unplannedPenalty: Double,
+    /**
+     * Half a point for having got up on time this morning, and half a point for
+     * having gone to bed on time **last night** — the night this day woke from.
+     * The user's own word in both cases; see `SleepLog`.
+     */
+    val wakeBonus: Double = 0.0,
+    val bedBonus: Double = 0.0,
 ) {
     /** Legacy contracts earned more than the cap allows — the dashboard's crown. */
     val crowned: Boolean get() = legacyGross > LEGACY_DAILY_CAP
 
     val total: Double
-        get() = harvest + contractPayout + legacyCredited + freeTimeForgone -
-            unplannedPenalty - cancellationPenalty
+        get() = harvest + contractPayout + legacyCredited + freeTimeForgone +
+            wakeBonus + bedBonus - unplannedPenalty - cancellationPenalty
 }
 
 /**
@@ -168,6 +176,9 @@ fun settleDay(
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
     /** Zero while the charge is switched off — `UserSetup.unplannedRate`. */
     unplannedPenaltyPerHour: Double = UNPLANNED_PENALTY_PER_HOUR,
+    /** Up on time this morning, and in bed on time the night before. */
+    wokeOnTime: Boolean = false,
+    bedOnTime: Boolean = false,
 ): DailySettlement {
     val harvest = blocks
         .filter { it.block.isCompleted }
@@ -219,5 +230,7 @@ fun settleDay(
         unplannedHours = unplannedHours,
         droppedHours = droppedHours,
         unplannedPenalty = chargeable * unplannedPenaltyPerHour.coerceAtLeast(0.0),
+        wakeBonus = if (wokeOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
+        bedBonus = if (bedOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
     )
 }
