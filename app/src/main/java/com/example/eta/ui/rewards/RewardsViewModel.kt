@@ -44,8 +44,9 @@ data class RewardsUiState(
  * The Belohn-o-mat tab.
  *
  * Nothing here fills a reward — that is the evening's, through
- * `ReevaluationService`. This screen makes them, orders them, binds them to
- * standing tasks and takes the ones that have been earned.
+ * `ReevaluationService`. This screen makes them — bound to standing tasks or
+ * not —, orders them, deletes them and takes the ones that have been earned.
+ * It does not change one.
  */
 class RewardsViewModel(
     private val rewardRepository: RewardRepository,
@@ -78,15 +79,8 @@ class RewardsViewModel(
         initialValue = RewardsUiState(),
     )
 
-    /** Creates a reward, or — with an [id] — changes the one that exists. */
-    fun save(id: String?, name: String, cost: Int, itemIds: Set<String>) {
-        viewModelScope.launch {
-            if (id == null) {
-                rewardRepository.create(name, cost.toDouble(), itemIds)
-            } else {
-                rewardRepository.update(id, name, cost.toDouble(), itemIds)
-            }
-        }
+    fun create(name: String, cost: Int, itemIds: Set<String>) {
+        viewModelScope.launch { rewardRepository.create(name, cost.toDouble(), itemIds) }
     }
 
     fun reorder(ids: List<String>) {

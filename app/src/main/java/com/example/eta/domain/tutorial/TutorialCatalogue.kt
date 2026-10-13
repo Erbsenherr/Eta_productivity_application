@@ -372,8 +372,8 @@ val REWARD_STEPS: List<TutorialStep> = listOf(
     text(
         TutorialStage.REWARDS,
         "Der Belohn-o-mat",
-        "Hier sammelst du Belohnungen, auf die du länger hinarbeitest — ein Buch, " +
-            "ein Konzert, ein freier Tag. Jede hat einen Namen und einen Preis in Punkten.",
+        "Hier sammelst du Belohnungen, auf die du länger hinarbeitest — ein großer " +
+            "Eisbecher, ein Buch, ein Konzert. Jede hat einen Namen und einen Preis in Punkten.",
     ),
     TutorialStep(
         stage = TutorialStage.REWARDS,
@@ -405,7 +405,7 @@ val REWARD_STEPS: List<TutorialStep> = listOf(
     text(
         TutorialStage.REWARDS,
         "Einlösen",
-        "Ist eine Belohnung voll, löst du sie hier ein und gönnst sie dir. Antippen " +
-            "bearbeitet eine Belohnung, gedrückt halten löscht sie. $WHERE_TO_SWITCH",
+        "Ist eine Belohnung voll, löst du sie hier ein und gönnst sie dir. Ändern " +
+            "lässt sich eine Belohnung nicht mehr; gedrückt halten löscht sie. $WHERE_TO_SWITCH",
     ),
 )

@@ -64,12 +64,15 @@ import kotlinx.datetime.toLocalDateTime
  *
  * Only the first one still filling takes the evening's points. The order is the
  * user's to change at any time; what a reward has earned stays with it.
+ *
+ * **A reward is made and deleted, never changed** (step 47): its name, price and
+ * binding are what was promised when it was set up.
  */
 @Composable
 fun RewardsScreen(viewModel: RewardsViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // The editor is three windows that take turns — the reward, its binding menu,
+    // Making one is three windows that take turns — the reward, its binding menu,
     // and a new standing task made from that menu. One draft carries through all
     // three, and only one of them is ever open: a dialog opened from inside a
     // dialog is a window on top of a window.
@@ -109,19 +112,13 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
             } else {
                 RewardList(
                     rows = state.open,
-                    onOpen = { id ->
-                        state.open.firstOrNull { it.reward.id == id }?.let { row ->
-                            draft = RewardDraft.of(row, state)
-                            stage = EditorStage.REWARD
-                        }
-                    },
                     onDelete = { deleting = it },
                     onRedeem = viewModel::redeem,
                     onReorder = viewModel::reorder,
                 )
                 EtaText(
-                    text = "Antippen zum Bearbeiten, am ≡ ziehen zum Umsortieren, gedrückt " +
-                        "halten zum Löschen. Erarbeitete Punkte bleiben bei ihrer Belohnung. " +
+                    text = "Am ≡ ziehen zum Umsortieren, gedrückt halten zum Löschen. Ändern " +
+                        "lässt sich eine Belohnung nicht mehr. Erarbeitete Punkte bleiben bei ihr. " +
                         "Die Reihenfolge zählt für ungebundene Belohnungen; gebundene " +
                         "sammeln an jeder Stelle.",
                     style = EtaTheme.typography.caption,
@@ -158,7 +155,7 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
                 onBind = { stage = EditorStage.BINDING },
                 onDismiss = { draft = null },
                 onSave = {
-                    viewModel.save(current.id, current.name.trim(), current.cost, current.itemIds)
+                    viewModel.create(current.name.trim(), current.cost, current.itemIds)
                     draft = null
                 },
             )
@@ -166,7 +163,7 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
             EditorStage.BINDING -> BindingDialog(
                 groups = state.groups,
                 // What other rewards already hold: a task is bound to one.
-                taken = claimsOf(state.open.filter { it.reward.id != current.id }.map { it.target })
+                taken = claimsOf(state.open.map { it.target })
                     .mapValues { it.value.name },
                 selected = current.itemIds,
                 onChange = { draft = current.copy(itemIds = it) },
@@ -213,7 +210,7 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
     }
 }
 
-/** Which of the editor's three windows is open. */
+/** Which of the three windows of making a reward is open. */
 internal enum class EditorStage { REWARD, BINDING, NEW_TASK }
 
 /**
@@ -222,7 +219,7 @@ internal enum class EditorStage { REWARD, BINDING, NEW_TASK }
  * The same shape as the Growth-Tasks tab's list, with one difference: the drag
  * starts on the **≡** at once rather than after a long press on the row, because
  * the long press on a reward already means "löschen" and one gesture cannot mean
- * both. Rearranged in local state while the finger is down and written once on
+ * both. A tap means nothing: there is nothing about a reward to open. Rearranged in local state while the finger is down and written once on
  * release.
  *
  * Everything the gestures read goes through a `State` object or
@@ -232,7 +229,6 @@ internal enum class EditorStage { REWARD, BINDING, NEW_TASK }
 @Composable
 private fun RewardList(
     rows: List<RewardRow>,
-    onOpen: (String) -> Unit,
     onDelete: (String) -> Unit,
     onRedeem: (String) -> Unit,
     onReorder: (List<String>) -> Unit,
@@ -250,7 +246,6 @@ private fun RewardList(
     val roles = rolesOf(order.mapNotNull { byId[it]?.target })
     val currentOrder = rememberUpdatedState(order)
     val commit = rememberUpdatedState(onReorder)
-    val open = rememberUpdatedState(onOpen)
     val delete = rememberUpdatedState(onDelete)
     val step = rememberUpdatedState(gap)
 
@@ -270,10 +265,7 @@ private fun RewardList(
                             IntOffset(0, if (dragging) dragOffset.floatValue.roundToInt() else 0)
                         }
                         .pointerInput(id) {
-                            detectTapGestures(
-                                onTap = { open.value(id) },
-                                onLongPress = { delete.value(id) },
-                            )
+                            detectTapGestures(onLongPress = { delete.value(id) })
                         },
                     handle = Modifier.reorderHandle(id) {
                         detectDragGestures(

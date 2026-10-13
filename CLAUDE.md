@@ -59,7 +59,7 @@ used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
 keeps its scroll position. Everything else is still verified by compilation, the unit suite (694 tests
-as of step 46), `assembleRelease` and `lint` — and the sounds not at all: channel
+as of step 47), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -401,6 +401,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-43-sleep-stats-notes.md` | *Step 43*: getting up and going to bed (`SleepLog`, `sleepPrompts`, "Guten Morgen!" / "Gute Nacht!" in the "Gerade" box, the two half points in the settlement), a late timer that lengthens its block (`timerExtension`), what is stamped for the statistics (`originalStart` / `originalDuration`, `quantityDone`), the Statistiken tab (`StatRange`, `StatSection`, `overview`, `taskStats`, `PensumChart`) and the Notiz-Merger (`Note`, Taskify) |
 | `step-44-clock-accent-navigation.md` | *Step 44*: a muted phone silences Eta (`isRingerMuted`), scroll positions that survive (`menuScroll`, `rememberSaveableStateHolder`), the morning alarm handed to the clock app (`ClockAppAlarms`, `clockAlarms`, `ClockApp`), an accent of one's own (`DesignChoice.accent`, `withAccent`), and names, icons or both in the tab bar (`TabStyle`, `EtaIcon`) |
 | `step-46-setup-rhythm-audio.md` | *Step 46*: the setup rebuilt (`SetupPage`, the checklist, `CustomTask`, "Folgetag", `SetupWeekReview`), every other week (`ItemExtras.rhythm`, `RhythmField`, the hatching), a task's own colour (`Item.color`, `colorOf(item)`, the Wochenschema's bars), "Termine anzeigen" and the timetable on any seven days (`WeekTabViewModel(from)`, `weekAdjust`), and the audio modes (`AudioMode`) |
+| `step-47-rewards-fixed-stats-look.md` | *Step 47*: a reward is made and deleted, never changed (no `RewardRepository.update`, a tap does nothing), and the Statistiken page's three grounds (`StatCard`, `StatTile`, `ShareBar`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -482,7 +483,8 @@ creation · 42. Timer-Tasks, and the "Ziele" tab · 43. Getting up and going to 
 Statistiken, and the Notiz-Merger · 44. Silence, the clock app, an accent of one's
 own, and icons · 45. "Aktuell" on the week timetable changes one
 occurrence · 46. The setup rebuilt, every other week, a task's own colour, and
-audio modes.
+audio modes · 47. Rewards that are not changed, and a Statistiken page easier
+to read.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

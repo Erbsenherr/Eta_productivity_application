@@ -1,22 +1,4 @@
-Bugfixes:
--nach dem zurücksetzen der App kann ich keine neue Morgenroutine subtask anlegen (ist leer, wenn ich auffülle und speichern klicke wird's nicht gespeichert). Wenn ich die Daten wiederherstelle sind die allerdings wieder da.
--die Farben der Mock-Wochenansicht in der Liste für wiederkehrende Aufgaben sollen den Aufgaben entsprechen, die sich in der Liste befinden.
-
-Change:
--Dashboard->Woche (Generell) -> option "Termine Anzeigen" ermöglichen
-
-Das aktuelle Setup-Menü soll grundlegend verändert werden:
--Bereits vor dem Setup soll sich der Nutzer mit Google anmelden können.
--Bei "Betterftig machen ab" und "Schlafen gehen" soll eine Box "Folgetag" angetickt werden können. Dann würden Uhrzeiten wie 01:00 Uhr auch der Uhrzeit entsprechen, die wahrscheinlich gemeint ist.
--Unter dem "Morgenroutine" Eintrag soll man auch die Morgenroutine eintragen können: Also gemäß des Routine-Extras sollen sub-Punkte dort eingebaut werden.
--Planungsphasen soll so bleiben
--Freizeitplanung soll so bleiben
--Neue Seite: Wiederkehrende Tasks. Hier ist eine Liste mit checkboxen, die die bereits bestehenden Tasks umfassen: Essen, Hausputz, Sport, Selbstachtsamkeit, Schule/Uni/Arbeit, und der möglichkeit, neue hinzuzufügen (die dann automatisch gecheckt sind) bzw. auch wieder zu entfernen.
--Dann kommt der Wizard, der den Nutzer all diese Tasks erstellen lässt. Bei Terminkonflikten bekommt der Nutzer den Hinweis, das er diese auch später lösen kann.
--Wenn er mit der Liste durch ist, soll er den selben Schirm bekommen, wie unter Dashboard->Woche (Generell) mit "Termine Anzeigen" aktiviert. Hier soll wie im Tutorial eine Box am unteren Bildschirmrand aufgehen, die diesen Screen erklärt. Erklärt werden soll insbesondere das "Gesperrt" Schloss und der Unterschied zwischen Aktuell und Generell erklärt werden, wobei "Aktuell" gerade nicht angewählt werden kann, weil bei "Aktuell" nur bestehende Einträge bearbeitet werden können, es diese aber noch nicht gibt.
---> so soll der Nutzer das Setup leichter/übersichtlicher und mit mehr drag n drop abschließen können
-
-weitere Features:
--Einstellung für wiederkehrende Tasks: alle zwei Wochen; gerade/ungerade KW. Für Anzeige im Wochen/Tagesplaner: gerade KW Aufgaben sollen links-schraffiert sein. ungerade KW Aufgaben rechts-schraffiert. Name für ungerade KW = Unten-Bündig, Name für gerade KW = Oben-Bündig.
--Im "Woche-Planen" Modus, gibt es aktuell den "Auffüllen" Reiter, also das Fenster, in dem man ToDos in die Woche schiebt. Man soll über einen Button "Anpassungen Vornehmen" aber auch den Wochenbildschirm öffnen können, den man auch über das Dashboard erreichen kann. Dort soll man dann a) alle Termine, die Google Calendar importiert und man als wichtig befunden hat sehen können und b) alle wiederkehrenden Aufgaben für die Woche verändern können (also tatsächlich nur für diese Woche).
--Einstellung "Ansagen" wechseln zu Audio. Dann, Vibration und Still modus hinzufügen.
+Changes:
+-Belohnomat Einträge sollen nicht veränderbar, nur löschbar sein.
+-Nimm ein anderes Beispiel für den Belohn-o-mat (Eis)
+-hübsche die Statistik page etwas auf. Sorge dafür, dass die boxen besser voneinander unterscheidbar sind.

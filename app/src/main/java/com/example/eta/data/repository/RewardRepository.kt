@@ -92,23 +92,6 @@ class RewardRepository(
     }
 
     /**
-     * Changes name, cost and binding. What has been earned stays, cut to the new
-     * cost where that is lower — a reward cannot hold more than it costs.
-     */
-    suspend fun update(id: String, name: String, cost: Double, itemIds: Collection<String>) {
-        val reward = rewardDao.findById(id) ?: return
-        rewardDao.upsert(
-            reward.copy(
-                name = name,
-                cost = cost,
-                progress = reward.progress.coerceAtMost(cost),
-                updatedAt = clock.now(),
-            ),
-        )
-        bind(id, itemIds)
-    }
-
-    /**
      * **A task is bound to one reward.** Binding it here therefore takes it away
      * from wherever it was bound before — by name, the identity a binding is
      * read by, so every weekday's row of the task goes together.

@@ -98,6 +98,9 @@ evening — also when the bedtime itself lies after midnight.
 
 #### The Statistiken tab
 
+**Drawn anew in step 47** — cards with a coloured edge, tiles, bars. See
+*Step 47*; the arithmetic below is unchanged.
+
 `domain/stats/Statistics.kt` holds the arithmetic, `ui/stats/` the screen.
 `StatisticsViewModel` reads **every block once per visit** and writes nothing;
 the screen cuts that history per range, since there are several pickers on it.

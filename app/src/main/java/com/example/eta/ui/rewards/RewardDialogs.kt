@@ -31,35 +31,17 @@ const val DEFAULT_REWARD_COST = 25
 const val MAX_REWARD_COST = 9999
 
 /**
- * A reward being made or changed.
+ * A reward being made. There is no draft of an existing one: a reward is not
+ * changed once it stands (step 47).
  *
  * [itemIds] are the rows of the standing tasks it is to be bound to — every row
  * of each ticked task, since a task is one row per weekday.
  */
 data class RewardDraft(
-    val id: String? = null,
     val name: String = "",
     val cost: Int = DEFAULT_REWARD_COST,
     val itemIds: Set<String> = emptySet(),
-) {
-    companion object {
-        /**
-         * The draft an existing reward opens with.
-         *
-         * The binding is read by name and written back as the rows the tasks
-         * have **now**, so saving also brings it up to date with weekdays added
-         * since it was made.
-         */
-        fun of(row: RewardRow, state: RewardsUiState) = RewardDraft(
-            id = row.reward.id,
-            name = row.reward.name,
-            cost = row.reward.cost.toInt().coerceIn(1, MAX_REWARD_COST),
-            itemIds = state.groups
-                .filter { it.isBoundBy(row.entry.boundNames) }
-                .flatMapTo(mutableSetOf()) { it.ids },
-        )
-    }
-}
+)
 
 /** Name, price, and the way into the binding menu. */
 @Composable
@@ -75,15 +57,18 @@ internal fun RewardEditDialog(
         .map { it.representative.name }
         .distinct()
 
-    EtaDialog(
-        title = if (draft.id == null) "Neue Belohnung" else "Belohnung",
-        onDismiss = onDismiss,
-    ) {
+    EtaDialog(title = "Neue Belohnung", onDismiss = onDismiss) {
+        EtaText(
+            text = "Name, Preis und Bindung stehen danach fest — eine Belohnung lässt " +
+                "sich später nur noch löschen.",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textMuted,
+        )
         EtaField(label = "Name") {
             EtaTextField(
                 value = draft.name,
                 onValueChange = { onChange(draft.copy(name = it)) },
-                placeholder = "Ein gutes Steak für 50 Euro",
+                placeholder = "Ein großer Eisbecher in der Eisdiele",
             )
         }
         EtaField(
@@ -116,7 +101,7 @@ internal fun RewardEditDialog(
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
             Spacer(Modifier.weight(1f))
             EtaButton(
-                text = if (draft.id == null) "Erstellen" else "Sichern",
+                text = "Erstellen",
                 enabled = draft.name.isNotBlank(),
                 onClick = onSave,
             )

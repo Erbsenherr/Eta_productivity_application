@@ -13,6 +13,10 @@ user first; the answers are the rules below.
 
 #### The Belohn-o-mat
 
+**Since step 47 a reward is made and deleted, never changed** — a tap does
+nothing, and there is no `update`. See *Step 47*; what is said below about
+editing is how it stood.
+
 A tab of its own (`ui/rewards/`, between Growth-Tasks and Einstellungen): long-term
 rewards with a name and a price in points, worked off from the top.
 
