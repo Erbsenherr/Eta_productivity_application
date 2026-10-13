@@ -34,6 +34,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.weekOccupancy
+import com.example.eta.domain.recurrence.weekTaskSpans
 import com.example.eta.domain.setup.isMorningRoutine
 import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.components.ConfirmDialog
@@ -199,7 +200,14 @@ fun SmartListsScreen(
                         opened = OpenedRow(entry.item, detail, editable = true)
                     }
                 }
-                WeekSchemeChart(booked = booked)
+                // Each task in the colour of the dot in front of its row below.
+                val taskSpans = remember(state.definitions) { weekTaskSpans(state.definitions) }
+                WeekSchemeChart(
+                    booked = booked,
+                    tasks = taskSpans.mapValues { (_, spans) ->
+                        spans.map { (range, item) -> range to colorOf(item) }
+                    },
+                )
                 state.recurring.forEach { group ->
                     ItemLine(
                         item = group.representative,
@@ -741,7 +749,7 @@ private fun ItemLine(
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .background(colorOf(item.category), CircleShape),
+                .background(colorOf(item), CircleShape),
         )
         Spacer(Modifier.size(EtaTheme.spacing.sm))
         Column(Modifier.weight(1f)) {
@@ -779,7 +787,7 @@ private fun BlockLine(entry: BlockWithItem, onOpen: () -> Unit = {}) {
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .background(colorOf(entry.item.category), CircleShape),
+                .background(colorOf(entry.item), CircleShape),
         )
         Spacer(Modifier.size(EtaTheme.spacing.sm))
         EtaText(

@@ -6,6 +6,15 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.EtaButtonStyle
+import com.example.eta.ui.components.EtaText
+import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.week.WeekView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -73,6 +82,7 @@ import com.example.eta.ui.settings.CalendarSettingsViewModel
 import com.example.eta.ui.settings.SettingsScreen
 import com.example.eta.ui.settings.SettingsViewModel
 import com.example.eta.ui.setup.SetupScreen
+import com.example.eta.ui.setup.SetupWeekReview
 import com.example.eta.ui.setup.SetupViewModel
 import com.example.eta.domain.tutorial.TutorialId
 import com.example.eta.ui.tutorial.TutorialHost
@@ -117,6 +127,11 @@ fun EtaApp(
         )
     }
 
+    // The same instance the questionnaire fills in — it lives in the activity's
+    // store — asked here whether its last screen is still owed.
+    val setupViewModel: SetupViewModel = viewModel(factory = setupViewModelFactory(container))
+    val weekReview by setupViewModel.weekReview.collectAsStateWithLifecycle()
+
     when (destination) {
         RootDestination.Loading -> EtaScreen {}
 
@@ -130,10 +145,22 @@ fun EtaApp(
         } else {
             SetupScreen(
                 viewModel = viewModel(factory = setupViewModelFactory(container)),
+                calendarViewModel = viewModel(factory = calendarSettingsViewModelFactory(container)),
             )
         }
 
-        RootDestination.Dashboard -> if (tutorial.active) {
+        // The questionnaire's last screen, before anything else the app owes:
+        // the week it has just laid down, to be looked over and pulled straight.
+        RootDestination.Dashboard -> if (weekReview) {
+            SetupWeekReview(onDone = setupViewModel::endWeekReview) { footer ->
+                WeekTabScreen(
+                    viewModel = viewModel(key = "setup-week", factory = weekTabViewModelFactory(container)),
+                    onlyView = WeekView.GENERAL,
+                    showAppointments = true,
+                    footer = footer,
+                )
+            }
+        } else if (tutorial.active) {
             // Owed after a first setup, or asked for from the settings. In place
             // of the scaffold rather than over it: no tab bar, no flow, nothing
             // to wander off into — and nothing of the user's on screen meanwhile.
@@ -283,6 +310,7 @@ private fun MainScaffold(
                         ),
                     ),
                     onClose = { flow = null },
+                    weekAdjust = { onBack -> WeekAdjustScreen(container, weekViewModel.weekStart, dateKey, onBack) },
                 )
             }
 
@@ -303,6 +331,7 @@ private fun MainScaffold(
                         ),
                     ),
                     onClose = { flow = null },
+                    weekAdjust = { onBack -> WeekAdjustScreen(container, weekViewModel.weekStart, dateKey, onBack) },
                 )
             }
 
@@ -607,7 +636,7 @@ private fun rootViewModelFactory(container: AppContainer): ViewModelProvider.Fac
 
 private fun setupViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { SetupViewModel(container.setupRepository) }
+        initializer { SetupViewModel(container.setupRepository, container.recurringTaskService) }
     }
 
 internal fun dashboardViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
@@ -671,7 +700,54 @@ internal fun weekPlannerViewModelFactory(
         }
     }
 
-private fun weekTabViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+/**
+ * The week a planning phase is laying out, as the timetable — "Anpassungen
+ * vornehmen".
+ *
+ * The dashboard's own "Woche" on other days: the seven from the first day of the
+ * phase's week, and "Aktuell" only, since what the phase is about is **this**
+ * week — its appointments to be seen, its standing tasks to be moved for once.
+ * The standing week is changed from the dashboard, not from inside a phase that
+ * plans one week of it.
+ */
+@Composable
+private fun WeekAdjustScreen(
+    container: AppContainer,
+    weekStart: LocalDate,
+    dateKey: String,
+    onBack: () -> Unit,
+) {
+    WeekTabScreen(
+        viewModel = viewModel(
+            key = "week-adjust-$weekStart",
+            factory = weekTabViewModelFactory(container, from = weekStart),
+        ),
+        plannerViewModel = viewModel(
+            key = "planner-today-$dateKey",
+            factory = plannerViewModelFactory(container, PlannerDay.TODAY),
+        ),
+        onlyView = WeekView.CURRENT,
+        header = {
+            Row(
+                modifier = Modifier.padding(
+                    start = EtaTheme.spacing.lg,
+                    end = EtaTheme.spacing.lg,
+                    top = EtaTheme.spacing.lg,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
+            ) {
+                EtaButton(text = "‹ Woche planen", style = EtaButtonStyle.Secondary, onClick = onBack)
+                EtaText(text = "Anpassungen", style = EtaTheme.typography.title)
+            }
+        },
+    )
+}
+
+private fun weekTabViewModelFactory(
+    container: AppContainer,
+    from: LocalDate? = null,
+): ViewModelProvider.Factory =
     viewModelFactory {
         initializer {
             WeekTabViewModel(
@@ -684,6 +760,7 @@ private fun weekTabViewModelFactory(container: AppContainer): ViewModelProvider.
                 subtaskRepository = container.subtaskRepository,
                 itemRepository = container.itemRepository,
                 clock = container.clock,
+                from = from,
             )
         }
     }

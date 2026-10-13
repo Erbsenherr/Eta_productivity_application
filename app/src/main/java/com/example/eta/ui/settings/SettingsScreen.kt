@@ -19,9 +19,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import com.example.eta.alarm.AudioMode
 import com.example.eta.alarm.ClockApp
 import com.example.eta.alarm.ClockAppAlarms
 import com.example.eta.domain.setup.clockAlarms
+import com.example.eta.ui.components.EtaSwatch
 import com.example.eta.ui.components.EtaIcon
 import com.example.eta.ui.components.EtaIconImage
 import com.example.eta.ui.format.formatWeekdays
@@ -276,7 +278,10 @@ fun SettingsScreen(
                                 ClockAlarmsBox(setup = setup, dirty = dirty)
                             }
                             SettingsPage.STILL_ACTIVE -> StillActiveBox(setup, viewModel::update)
-                            SettingsPage.ANNOUNCEMENT -> TaskAnnouncementBox(setup, viewModel::update)
+                            SettingsPage.ANNOUNCEMENT -> {
+                                AudioModeBox()
+                                TaskAnnouncementBox(setup, viewModel::update)
+                            }
                             SettingsPage.PLANNING -> PlanningStep(setup, viewModel::update)
                             SettingsPage.FEATURES -> {
                                 AdvancedFeaturesBox(setup, viewModel::setFeature)
@@ -337,7 +342,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     WAKE("Weckruf", SettingsSection.SETUP),
     PLANNING("Planungsphasen", SettingsSection.SETUP),
     STILL_ACTIVE("Bin ich noch bei der Sache?", SettingsSection.SETUP),
-    ANNOUNCEMENT("Ansagen", SettingsSection.SETUP),
+    ANNOUNCEMENT("Audio", SettingsSection.SETUP),
     FEATURES("Advanced Features", SettingsSection.SETUP),
     FLEXIBILITY("Flexibilität", SettingsSection.SETUP),
     BREAKS("Pausenchecker", SettingsSection.SETUP),
@@ -494,9 +499,9 @@ private fun AccentField(choice: DesignChoice, onAccentChange: (Int?) -> Unit) {
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
             ) {
-                Swatch(color = own, selected = choice.accent == null, onClick = { onAccentChange(null) })
+                EtaSwatch(color = own, selected = choice.accent == null, onClick = { onAccentChange(null) })
                 ACCENT_PRESETS.forEach { preset ->
-                    Swatch(
+                    EtaSwatch(
                         color = Color(preset),
                         selected = choice.accent == preset,
                         onClick = { onAccentChange(preset) },
@@ -533,23 +538,6 @@ private fun AccentField(choice: DesignChoice, onAccentChange: (Int?) -> Unit) {
             }
         }
     }
-}
-
-@Composable
-private fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) EtaTheme.colors.textPrimary else EtaTheme.colors.border,
-                shape = CircleShape,
-            )
-            .padding(5.dp)
-            .background(color, CircleShape)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
-    )
 }
 
 /**
@@ -759,6 +747,53 @@ private fun StillActiveBox(setup: UserSetup, onChange: OnSetupChange) {
  * choice depends on — whether the phone has a speech engine with a German voice —
  * cannot be told from a setting, only heard.
  */
+/**
+ * Sound, vibration or nothing — for everything Eta announces, the wake alarm
+ * excepted.
+ *
+ * Above the choice between sounds and reading aloud, which only matters while
+ * this says "Ton". Applied at once and kept beside the Do-Not-Disturb switch;
+ * see `AudioMode`.
+ */
+@Composable
+private fun AudioModeBox() {
+    val context = LocalContext.current
+    var mode by remember { mutableStateOf(EtaSound.mode(context)) }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Audio", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Wie Eta sich meldet: bei Aufgaben, Pomodoro und Timer, bei den " +
+                    "Planungsphasen und bei Erinnerungen. Gilt sofort. Der Weckruf am " +
+                    "Morgen klingelt immer.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            EtaChoice(
+                options = AudioMode.entries.map { it to it.label },
+                selected = mode,
+                onSelect = {
+                    mode = it
+                    EtaSound.setMode(context, it)
+                },
+            )
+            EtaText(
+                text = when (mode) {
+                    AudioMode.SOUND -> "Töne oder Ansage, wie unten gewählt."
+                    AudioMode.VIBRATE ->
+                        "Statt eines Tons vibriert das Handy kurz. Vorgelesen wird nichts. " +
+                            "Steht das Handy auf »Lautlos«, bleibt auch die Vibration aus."
+
+                    AudioMode.SILENT -> "Kein Ton und keine Vibration — nur die Benachrichtigung."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+    }
+}
+
 @Composable
 private fun TaskAnnouncementBox(setup: UserSetup, onChange: OnSetupChange) {
     val context = LocalContext.current

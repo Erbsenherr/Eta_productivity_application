@@ -187,6 +187,63 @@ fun DayOfWeek.shifted(days: Int): DayOfWeek = WEEK[Math.floorMod(WEEK.indexOf(th
 /** The night of an ordinary day — the three times the questionnaire always asks for. */
 val UserSetup.weekdayNight: NightTimes get() = NightTimes(bedPrepTime, sleepTime, wakeTime)
 
+/** The every-night answers, written back from a [NightTimes]. */
+fun UserSetup.withWeekdayNight(night: NightTimes): UserSetup =
+    copy(bedPrepTime = night.bedPrep, sleepTime = night.sleep, wakeTime = night.wake)
+
+/**
+ * Whether winding down begins after midnight — on the day of getting up.
+ *
+ * The counterpart of [NightTimes.sleepsAfterMidnight], and what the "Folgetag"
+ * box beside that hour shows.
+ */
+val NightTimes.bedPrepIsNextDay: Boolean get() = bedPrepOffset() >= 0
+
+/**
+ * "Folgetag" ticked or unticked beside the **bedtime**.
+ *
+ * Which side of midnight an hour lies on was never stored and still is not: an
+ * hour before getting up *is* after midnight, there being no other night it
+ * could belong to. So the box cannot contradict the hour — it moves it. Ticked,
+ * an evening bedtime becomes the same minute past twelve; unticked, one in the
+ * small hours becomes the same minute past eleven. Winding down keeps its
+ * length and follows, as it does wherever a bedtime is moved.
+ */
+fun NightTimes.withSleepNextDay(nextDay: Boolean): NightTimes {
+    if (nextDay == sleepsAfterMidnight) return this
+    val moved = if (nextDay) {
+        // Past twelve, and still before getting up.
+        LocalTime(0, sleep.minute).takeIf { it.minuteOfDay() < wake.minuteOfDay() } ?: LocalTime(0, 0)
+    } else {
+        LocalTime(23, sleep.minute)
+    }
+    return movedTo(moved, wake)
+}
+
+/**
+ * The same for **winding down**.
+ *
+ * Ticked, it begins the same minute past twelve — and the bedtime, which cannot
+ * come before it, follows across midnight at the old distance where it was
+ * still in the evening. Unticked, it begins the same minute past eleven and the
+ * bedtime stays where it is.
+ */
+fun NightTimes.withBedPrepNextDay(nextDay: Boolean): NightTimes {
+    if (nextDay == bedPrepIsNextDay) return this
+    if (!nextDay) return copy(bedPrep = LocalTime(23, bedPrep.minute))
+
+    val start = LocalTime(0, bedPrep.minute)
+    val keepsBedtime = sleepsAfterMidnight && sleep.minuteOfDay() > start.minuteOfDay()
+    if (keepsBedtime) return copy(bedPrep = start)
+
+    val lead = bedPrepDuration().inWholeMinutes.toInt().coerceIn(SNAP_LEAD_MINUTES, 2 * 60)
+    val bedtime = (start.minuteOfDay() + lead).coerceAtMost(wake.minuteOfDay() - 1).coerceAtLeast(start.minuteOfDay())
+    return copy(bedPrep = start, sleep = LocalTime(bedtime / 60, bedtime % 60))
+}
+
+/** The least winding down a bedtime moved across midnight is given. */
+private const val SNAP_LEAD_MINUTES = 15
+
 /**
  * The night that ends on [weekday]: its own where every weekday has one, else
  * the weekend's where one was given.

@@ -28,6 +28,19 @@ import com.example.eta.domain.setup.withNightEndingOn
 import com.example.eta.domain.setup.withNightMode
 import com.example.eta.domain.setup.TimeSpan
 import com.example.eta.domain.setup.WorkBlock
+import androidx.compose.runtime.key
+import com.example.eta.domain.recurrence.RecurringOverlap
+import com.example.eta.domain.setup.SetupPart
+import com.example.eta.domain.setup.bedPrepIsNextDay
+import com.example.eta.domain.setup.withBedPrepNextDay
+import com.example.eta.domain.setup.withSleepNextDay
+import com.example.eta.domain.setup.withWeekdayNight
+import com.example.eta.domain.subtask.SubtaskDraft
+import com.example.eta.ui.attributes.CheckRow
+import com.example.eta.ui.attributes.RecurringAttributeFields
+import com.example.eta.ui.attributes.RecurringAttributes
+import com.example.eta.ui.components.EtaTextField
+import com.example.eta.ui.subtasks.MorningRoutineSteps
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.WEEK
 import com.example.eta.domain.setup.WeeklySlot
@@ -157,7 +170,17 @@ fun WelcomeStep() {
 }
 
 @Composable
-fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
+fun SleepStep(
+    draft: UserSetup,
+    onChange: OnSetupChange,
+    /**
+     * The morning routine's steps, where they can be given here — the
+     * questionnaire, which holds them until there is a task to put them on.
+     * Null in the settings, which edit the stored ones in a box of their own.
+     */
+    morningSteps: List<SubtaskDraft>? = null,
+    onMorningSteps: (List<SubtaskDraft>) -> Unit = {},
+) {
     StepCard(
         title = "Schlaf und Morgen",
         description = "Schlafzeiten werden im Tagesplaner farblich hinterlegt und aus den " +
@@ -179,6 +202,12 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                         onValueChange = { time -> onChange { it.copy(bedPrepTime = time) } },
                     )
                 }
+                NextDayBox(
+                    checked = draft.weekdayNight.bedPrepIsNextDay,
+                    onCheckedChange = { on ->
+                        onChange { it.withWeekdayNight(it.weekdayNight.withBedPrepNextDay(on)) }
+                    },
+                )
                 EtaField(
                     label = "Schlafen gehen",
                     hint = AFTER_MIDNIGHT_HINT.takeIf { draft.weekdayNight.sleepsAfterMidnight },
@@ -188,6 +217,12 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                         onValueChange = { time -> onChange { it.copy(sleepTime = time) } },
                     )
                 }
+                NextDayBox(
+                    checked = draft.weekdayNight.sleepsAfterMidnight,
+                    onCheckedChange = { on ->
+                        onChange { it.withWeekdayNight(it.weekdayNight.withSleepNextDay(on)) }
+                    },
+                )
                 EtaField(label = "Aufstehen") {
                     EtaTimePicker(
                         value = draft.wakeTime,
@@ -197,14 +232,32 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
             }
             EtaField(
                 label = "Morgenroutine",
-                hint = "Wie lange sie dauert, ab dem Aufstehen — Anziehen, Frühstück, " +
-                    "Ankommen. Ihre Schritte legst du in den Einstellungen oder im " +
-                    "Reiter Listen an.",
+                hint = if (morningSteps != null) {
+                    "Wie lange sie dauert, ab dem Aufstehen — Anziehen, Frühstück, Ankommen."
+                } else {
+                    "Wie lange sie dauert, ab dem Aufstehen — Anziehen, Frühstück, " +
+                        "Ankommen. Ihre Schritte legst du in den Einstellungen oder im " +
+                        "Reiter Listen an."
+                },
             ) {
                 EtaDurationPicker(
                     value = draft.morningDuration,
                     onValueChange = { duration -> onChange { it.copy(morningDuration = duration) } },
                 )
+            }
+            if (morningSteps != null) {
+                // The routine itself, right under its length: the steps are
+                // worked through one at a time in the "Gerade" box.
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaText(text = "Schritte der Morgenroutine", style = EtaTheme.typography.bodyStrong)
+                    EtaText(
+                        text = "Woraus sie besteht, in der Reihenfolge, in der du sie abarbeitest. " +
+                            "Morgens zeigt dir das Dashboard immer nur den nächsten Schritt.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                    MorningRoutineSteps(steps = morningSteps, onSave = onMorningSteps)
+                }
             }
             if (mode != NightMode.PER_DAY) {
                 DerivedHint(
@@ -268,6 +321,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                         onValueChange = { time -> change { it.copy(bedPrep = time) } },
                     )
                 }
+                NextDayBox(
+                    checked = weekend.bedPrepIsNextDay,
+                    onCheckedChange = { on -> change { it.withBedPrepNextDay(on) } },
+                )
                 EtaField(
                     label = "Schlafen gehen (${formatWeekdays(weekend.sleepDays(days))})",
                     hint = AFTER_MIDNIGHT_HINT.takeIf { weekend.sleepsAfterMidnight },
@@ -277,6 +334,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                         onValueChange = { time -> change { it.copy(sleep = time) } },
                     )
                 }
+                NextDayBox(
+                    checked = weekend.sleepsAfterMidnight,
+                    onCheckedChange = { on -> change { it.withSleepNextDay(on) } },
+                )
                 EtaField(label = "Aufstehen (${formatWeekdays(days)})") {
                     EtaTimePicker(
                         value = weekend.wake,
@@ -311,6 +372,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                                 onValueChange = { time -> change { it.copy(bedPrep = time) } },
                             )
                         }
+                        NextDayBox(
+                            checked = night.bedPrepIsNextDay,
+                            onCheckedChange = { on -> change { it.withBedPrepNextDay(on) } },
+                        )
                         EtaField(
                             label = "Schlafen gehen (${formatWeekdays(night.sleepDays(one))})",
                             hint = AFTER_MIDNIGHT_HINT.takeIf { night.sleepsAfterMidnight },
@@ -320,6 +385,10 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                                 onValueChange = { time -> change { it.copy(sleep = time) } },
                             )
                         }
+                        NextDayBox(
+                            checked = night.sleepsAfterMidnight,
+                            onCheckedChange = { on -> change { it.withSleepNextDay(on) } },
+                        )
                         EtaField(label = "Aufstehen (${wakeDay.formatVeryShort()})") {
                             EtaTimePicker(
                                 value = night.wake,
@@ -348,6 +417,149 @@ fun SleepStep(draft: UserSetup, onChange: OnSetupChange) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * "Folgetag", under an hour of the night.
+ *
+ * Ticked, the hour lies after midnight — on the day of getting up. It ticks
+ * itself when such an hour is picked on the dial, which is the point of it:
+ * "01:00" then visibly means one at night, the thing that was probably meant.
+ * Ticking it by hand moves the hour across midnight; see `withSleepNextDay`.
+ */
+@Composable
+private fun NextDayBox(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    CheckRow(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        label = "Folgetag",
+        hint = if (checked) {
+            "Die Uhrzeit liegt nach Mitternacht, also schon am Tag des Aufstehens."
+        } else {
+            "Ankreuzen, wenn die Uhrzeit nach Mitternacht liegt — etwa 01:00 Uhr nachts."
+        },
+    )
+}
+
+/**
+ * The checklist that decides which of the wizard's pages there are.
+ *
+ * The five the questionnaire always knew, each on or off, and beneath them
+ * whatever the user adds — a name is enough here, the rest is asked on the
+ * task's own page. A box unticked is a page not shown and a task not laid down;
+ * everything can be added later on the Listen tab, and the page says so.
+ */
+@Composable
+fun RecurringTasksStep(
+    skipped: Set<SetupPart>,
+    custom: List<Pair<String, String>>,
+    onToggle: (SetupPart, Boolean) -> Unit,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+
+    StepCard(
+        title = "Wiederkehrende Tasks",
+        description = "Was jede Woche zu deinem Alltag gehört. Für alles, was angehakt ist, " +
+            "fragt dich die Einrichtung gleich nach Tagen und Uhrzeiten.",
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            listOf(
+                Triple(SetupPart.MEALS, "Essen", "Kochen und Mahlzeiten."),
+                Triple(SetupPart.HOUSEKEEPING, "Hausputz", "Putzen und Aufräumen."),
+                Triple(SetupPart.SPORT, "Sport", "Training an festen Tagen."),
+                Triple(SetupPart.MINDFULNESS, "Selbstachtsamkeit", "Meditation, Tagebuch, Zeit für dich."),
+                Triple(SetupPart.WORK, "Schule / Uni / Arbeit", "Feste Arbeits- oder Unterrichtszeiten."),
+            ).forEach { (part, label, hint) ->
+                CheckRow(
+                    checked = part !in skipped,
+                    onCheckedChange = { on -> onToggle(part, on) },
+                    label = label,
+                    hint = hint,
+                )
+            }
+
+            custom.forEach { (id, label) ->
+                key(id) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            CheckRow(
+                                checked = true,
+                                // Unticking one of the user's own takes it off the list.
+                                onCheckedChange = { on -> if (!on) onRemove(id) },
+                                label = label,
+                                hint = "Eigene Task — Tage und Uhrzeit fragt die Einrichtung gleich.",
+                            )
+                        }
+                        EtaButton(
+                            text = "Entfernen",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { onRemove(id) },
+                        )
+                    }
+                }
+            }
+
+            EtaField(label = "Weitere hinzufügen", hint = "Zum Beispiel »Gitarre üben« oder »Einkaufen«.") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        EtaTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            placeholder = "Name der Task",
+                        )
+                    }
+                    EtaButton(
+                        text = "Hinzufügen",
+                        enabled = name.isNotBlank(),
+                        onClick = {
+                            onAdd(name.trim())
+                            name = ""
+                        },
+                    )
+                }
+            }
+            EtaText(
+                text = "Nichts davon ist endgültig: Im Reiter Listen legst du jederzeit " +
+                    "weitere wiederkehrende Tasks an oder beendest welche.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+    }
+}
+
+/**
+ * The wizard's page for a task of the user's own: its name, and the ordinary
+ * form a standing task is filled in with anywhere else.
+ */
+@Composable
+fun CustomTaskStep(
+    name: String,
+    attributes: RecurringAttributes,
+    overlaps: List<RecurringOverlap>,
+    onName: (String) -> Unit,
+    onAttributes: (RecurringAttributes) -> Unit,
+) {
+    StepCard(
+        title = name.ifBlank { "Eigene Task" },
+        description = "An welchen Tagen, wann und wie lange.",
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg)) {
+            EtaField(label = "Name") {
+                EtaTextField(value = name, onValueChange = onName)
+            }
+            RecurringAttributeFields(
+                value = attributes,
+                onChange = onAttributes,
+                overlaps = overlaps,
+            )
         }
     }
 }

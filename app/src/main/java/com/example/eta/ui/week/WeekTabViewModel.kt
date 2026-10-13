@@ -76,7 +76,15 @@ data class WeekTabUiState(
     /** Nights changed for one date — shown in "Aktuell", which is this week as it is. */
     val nightOverrides: Map<LocalDate, NightOverride> = emptyMap(),
 ) {
-    fun dateOf(day: DayOfWeek): LocalDate = weekStart.plus(DatePeriod(days = WEEK.indexOf(day)))
+    /**
+     * The date [day] falls on in the seven days from [weekStart].
+     *
+     * Looked up rather than counted from Monday: the dashboard's week begins on
+     * one, but the week a planning phase lays out begins on the day it is
+     * planned, and the timetable serves both.
+     */
+    fun dateOf(day: DayOfWeek): LocalDate =
+        (0 until WEEK.size).map { weekStart.plus(DatePeriod(days = it)) }.first { it.dayOfWeek == day }
 
     /**
      * The night as it falls on [day], for the shading: the standing one in
@@ -95,9 +103,25 @@ data class WeekTabUiState(
      * own round corners, which there say what it is rather than what can be done
      * with it.
      */
-    fun blocksOn(day: DayOfWeek, view: WeekView, unlocked: Boolean): List<BlockWithItem> = when (view) {
+    fun blocksOn(
+        day: DayOfWeek,
+        view: WeekView,
+        unlocked: Boolean,
+        /**
+         * "Termine anzeigen", in "Generell": this week's imported appointments
+         * drawn over the standing week, to be planned around. They are this
+         * week's and not the task's, so they are shown and nothing more — the
+         * timetable answers a long press on one with the sentence it has for
+         * everything that only happens once.
+         */
+        appointments: Boolean = false,
+    ): List<BlockWithItem> = when (view) {
         WeekView.GENERAL -> standingBlocksOn(day, dateOf(day), definitions, unlocked = false).map { entry ->
             entry.copy(block = entry.block.copy(flexible = unlocked && canReschedule(entry)))
+        } + if (appointments) {
+            blocks[dateOf(day)].orEmpty().filter { it.block.origin == BlockOrigin.CALENDAR_IMPORT }
+        } else {
+            emptyList()
         }
 
         WeekView.CURRENT -> blocks[dateOf(day)].orEmpty().map { entry ->
@@ -190,10 +214,16 @@ class WeekTabViewModel(
     itemRepository: ItemRepository,
     private val clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    /**
+     * The first of the seven days shown. Null is this calendar week, from its
+     * Monday — the dashboard's. The weekly planning hands in the first day of
+     * the week it is laying out.
+     */
+    from: LocalDate? = null,
 ) : ViewModel() {
 
     val today: LocalDate = clock.todayIn(timeZone)
-    private val weekStart: LocalDate = mondayOf(today)
+    private val weekStart: LocalDate = from ?: mondayOf(today)
 
     private val _pending = MutableStateFlow<PendingReschedule?>(null)
     val pending: StateFlow<PendingReschedule?> = _pending.asStateFlow()

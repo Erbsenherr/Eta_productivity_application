@@ -66,6 +66,9 @@ sound from a resource or a content URI, so they are **copied** into
 `app/src/main/res/raw/` — `sounds/` stays the source folder, `res/raw/` is what
 ships. Re-copy after changing one; nothing watches the folder.
 
+**Since step 46 there is a mode above all of it** — Ton, Vibration, Still
+(`AudioMode`, the "Audio" page) — see *Step 46*.
+
 **Since step 44 a phone on silent or vibrate silences Eta as well** — see
 *Step 44*; the paragraph below is the rule as it stood, and still describes DND.
 

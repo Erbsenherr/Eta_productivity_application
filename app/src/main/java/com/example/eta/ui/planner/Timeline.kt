@@ -37,6 +37,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.eta.data.local.BlockWithItem
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.clipRect
+import com.example.eta.domain.model.RecurrenceRule
+import com.example.eta.domain.model.WeekParity
 import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.PlannedBlock
@@ -346,7 +351,7 @@ private fun MarginContainer(entry: BlockWithItem, minutePx: Float, offsetPx: Flo
     val accent = if (block.origin == BlockOrigin.CALENDAR_IMPORT) {
         EtaTheme.colors.calendar
     } else {
-        colorOf(entry.item.category)
+        colorOf(entry.item)
     }
     val from = block.containerStartMinute()
     val to = block.containerEndMinute()
@@ -440,7 +445,7 @@ private fun NameBubble(
     val accent = if (block.origin == BlockOrigin.CALENDAR_IMPORT) {
         EtaTheme.colors.calendar
     } else {
-        colorOf(entry.item.category)
+        colorOf(entry.item)
     }
 
     Box(
@@ -708,12 +713,17 @@ private fun TimelineBlock(
     val accent = when {
         cancelled -> EtaTheme.colors.textMuted
         imported -> EtaTheme.colors.calendar
-        else -> colorOf(entry.item.category)
+        else -> colorOf(entry.item)
     }
     val shape = if (block.isMovable) EtaTheme.shapes.draggedBlock else EtaTheme.shapes.fixedBlock
     val height = with(LocalDensity.current) {
         ((shownEnd - shownStart) * minutePx).toDp()
     }
+    // Every other week: hatched, leaning left in the even calendar weeks and
+    // right in the odd ones, with the name at the top or at the bottom — so two
+    // tasks that share an hour on alternating weeks can both be read where the
+    // standing week draws them on top of each other.
+    val parity = (entry.item.recurrenceRule as? RecurrenceRule.Biweekly)?.parity
 
     Box(
         modifier = Modifier
@@ -731,6 +741,25 @@ private fun TimelineBlock(
                 color = if (imported && !selected) accent.copy(alpha = 0.6f) else accent,
                 shape = shape,
             )
+            .drawBehind {
+                if (parity == null) return@drawBehind
+                val step = 9.dp.toPx()
+                val lean = if (parity == WeekParity.EVEN) -1f else 1f
+                clipRect {
+                    // Lines across the whole box at forty-five degrees, started
+                    // far enough out on either side that the corners are covered.
+                    var x = -size.height
+                    while (x < size.width + size.height) {
+                        drawLine(
+                            color = accent.copy(alpha = 0.45f),
+                            start = Offset(x, if (lean > 0) size.height else 0f),
+                            end = Offset(x + size.height, if (lean > 0) 0f else size.height),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                        x += step
+                    }
+                }
+            }
             .alpha(if (block.isCompleted || cancelled) 0.55f else 1f)
             .pointerInput(entry.block.id, editable) {
                 detectTapGestures(
@@ -795,7 +824,11 @@ private fun TimelineBlock(
             }
             .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.xs),
     ) {
-        Column {
+        Column(
+            modifier = Modifier.align(
+                if (parity == WeekParity.ODD) Alignment.BottomStart else Alignment.TopStart,
+            ),
+        ) {
             EtaText(
                 text = entry.item.name,
                 style = EtaTheme.typography.bodyStrong,

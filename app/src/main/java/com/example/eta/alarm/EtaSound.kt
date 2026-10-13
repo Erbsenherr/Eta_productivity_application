@@ -11,6 +11,9 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.annotation.RawRes
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -47,6 +50,21 @@ import androidx.core.content.getSystemService
  * The wake alarm is the one exception and keeps its own [WakeAlarmRinger]: an
  * alarm clock that stayed quiet under DND would not be an alarm clock.
  */
+/**
+ * How Eta makes itself heard — every sound it has except the wake alarm.
+ *
+ * [SOUND] is what there was. [VIBRATE] buzzes where a sound would have played;
+ * [SILENT] does neither and leaves the banner to say it. Chosen on the "Audio"
+ * page of the settings and kept in `SharedPreferences`, for the reason the
+ * Do-Not-Disturb switch is: the sounds are played from receivers that have a
+ * context and nothing else.
+ */
+enum class AudioMode(val label: String) {
+    SOUND("Ton"),
+    VIBRATE("Vibration"),
+    SILENT("Still"),
+}
+
 object EtaSound {
 
     private val attributes: AudioAttributes = AudioAttributes.Builder()
@@ -117,10 +135,53 @@ object EtaSound {
         context.applicationContext.getSharedPreferences("sound", Context.MODE_PRIVATE)
 
     private const val KEY_IGNORE_DND = "ignoreDoNotDisturb"
+    private const val KEY_MODE = "audioMode"
+
+    fun mode(context: Context): AudioMode {
+        val stored = prefs(context).getString(KEY_MODE, null)
+        return AudioMode.entries.firstOrNull { it.name == stored } ?: AudioMode.SOUND
+    }
+
+    fun setMode(context: Context, mode: AudioMode) {
+        prefs(context).edit().putString(KEY_MODE, mode.name).apply()
+    }
+
+    /**
+     * One short buzz in place of a sound.
+     *
+     * Not under Do-Not-Disturb unless the user said to play through it, and not
+     * on a phone switched fully silent — vibrate mode is the phone asking for
+     * exactly this, silent mode is it asking for nothing at all.
+     */
+    private fun vibrate(context: Context) {
+        val audio: AudioManager? = context.getSystemService()
+        if (isDoNotDisturbOn(context) && !ignoresDoNotDisturb(context)) return
+        if (audio?.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        runCatching {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService<VibratorManager>()?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService<Vibrator>()
+            } ?: return
+            val pattern = longArrayOf(0, 250, 150, 250)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(pattern, -1)
+            }
+        }
+    }
 
     /** Plays [sound] once, unless the phone was asked for quiet — see [isSilenced]. Never throws. */
     fun play(context: Context, @RawRes sound: Int) {
         val app = context.applicationContext
+        when (mode(app)) {
+            AudioMode.SILENT -> return
+            AudioMode.VIBRATE -> return vibrate(app)
+            AudioMode.SOUND -> Unit
+        }
         if (isSilenced(app)) return
         val audio: AudioManager? = app.getSystemService()
 

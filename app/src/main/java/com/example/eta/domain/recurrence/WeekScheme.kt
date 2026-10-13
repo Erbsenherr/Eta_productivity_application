@@ -43,6 +43,26 @@ fun weekOccupancy(
     return byDay.mapValues { (_, spans) -> mergeSpans(spans) }
 }
 
+/**
+ * Every standing task's stretch of each weekday, **with the task** — what the
+ * Wochenschema over the list draws, so each bar can wear its task's colour.
+ *
+ * The same filter and the same spans as [weekOccupancy], only not merged: two
+ * tasks side by side are two bars. A fortnightly task stands on its weekday as
+ * it does there.
+ */
+fun weekTaskSpans(definitions: List<Item>): Map<DayOfWeek, List<Pair<IntRange, Item>>> {
+    val byDay = WEEK.associateWith { mutableListOf<Pair<IntRange, Item>>() }
+    definitions
+        .filter { it.completedAt == null && it.isConcretized }
+        .filter { it.stage != Stage.COLLECTION && it.stage != Stage.LOCKED }
+        .forEach { item ->
+            val slot = RecurringSlot.of(item) ?: return@forEach
+            slot.spansByWeekday().forEach { (day, span) -> byDay.getValue(day) += span to item }
+        }
+    return byDay.mapValues { (_, spans) -> spans.sortedBy { it.first.first } }
+}
+
 /** The spans a set of slots — a form being filled in — would book, per weekday. */
 fun slotOccupancy(slots: List<RecurringSlot>): Map<DayOfWeek, List<IntRange>> {
     val byDay = WEEK.associateWith { mutableListOf<IntRange>() }

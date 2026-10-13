@@ -209,7 +209,7 @@ class ItemRepository(
         /** Hours of their own for single weekdays; see `rulesWithTimes`. */
         startTimes: Map<DayOfWeek, LocalTime> = emptyMap(),
     ) {
-        val timed = rulesWithTimes(Rhythm.Weekly, weekdays, startTime, startTimes)
+        val timed = rulesWithTimes(extras.rhythm ?: Rhythm.Weekly, weekdays, startTime, startTimes)
         if (timed.isEmpty()) return
 
         val now = clock.now()

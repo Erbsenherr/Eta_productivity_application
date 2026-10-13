@@ -316,4 +316,4 @@ fun DragGhost(entry: RevolverEntry, modifier: Modifier = Modifier) {
 /** Colour a revolver entry the way its category colours everything else. */
 @Composable
 fun Item.toColouredRevolverEntry(): RevolverEntry =
-    toRevolverEntry().copy(accent = colorOf(category))
+    toRevolverEntry().copy(accent = colorOf(this))

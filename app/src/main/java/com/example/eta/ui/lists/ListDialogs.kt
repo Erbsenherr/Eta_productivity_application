@@ -24,6 +24,7 @@ import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.RecurringOverlap
 import com.example.eta.domain.reward.yieldOf
+import com.example.eta.domain.model.WeekParity
 import com.example.eta.domain.recurrence.Rhythm
 import com.example.eta.domain.recurrence.nextFreeStart
 import com.example.eta.domain.recurrence.recurringOverlaps
@@ -588,7 +589,9 @@ fun recurringSummary(group: RecurringGroup): String = buildString {
     append(formatWeekdays(group.weekdays))
     when (val rhythm = group.rhythm) {
         Rhythm.Weekly -> Unit
-        is Rhythm.Biweekly -> append(" (alle 2 Wochen)")
+        is Rhythm.Biweekly -> append(
+            if (rhythm.parity == WeekParity.EVEN) " (gerade KW)" else " (ungerade KW)",
+        )
         is Rhythm.Monthly -> append(" (${rhythm.weekOfMonth}. im Monat)")
     }
     group.representative.startTime?.let { append(" · ${it.formatClock()}") }
@@ -717,7 +720,7 @@ fun RecurringGroupEditDialog(
         mutableStateOf(RecurringAttributes.of(item, subtasks).copy(weekdays = group.weekdays))
     }
     val overlaps = remember(attributes, definitions) {
-        recurringOverlaps(attributes.slots(group.rhythm), definitions, ignoreIds = group.ids)
+        recurringOverlaps(attributes.slots(), definitions, ignoreIds = group.ids)
     }
     val growthIssues = remember(attributes, definitions) {
         growthIssuesFor(
@@ -763,7 +766,7 @@ fun RecurringGroupEditDialog(
             onChange = { attributes = it },
             allowNoCategory = true,
             overlaps = overlaps,
-            findNextFree = { nextFreeStart(it.slots(group.rhythm), booked) },
+            findNextFree = { nextFreeStart(it.slots(), booked) },
             // A standing task is exactly what can grow, and this is where one is
             // edited — including switching growth off again.
             allowGrowth = true,
@@ -809,7 +812,9 @@ internal fun SchemePreview(
     rhythm: Rhythm = Rhythm.Weekly,
     modifier: Modifier = Modifier,
 ) {
-    val draft = remember(attributes, rhythm) { slotOccupancy(attributes.slots(rhythm)) }
+    // The form's own rhythm, which it may just have changed; [rhythm] is the
+    // one the task had when the window opened.
+    val draft = remember(attributes) { slotOccupancy(attributes.slots()) }
     val clashDays = remember(overlaps) { overlaps.flatMapTo(mutableSetOf()) { it.weekdays } }
     WeekSchemeChart(
         booked = booked,

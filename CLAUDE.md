@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (684 tests
-as of step 45), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (694 tests
+as of step 46), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -400,6 +400,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-42-timer-tasks.md` | *Step 42*: Timer-Tasks (`Item.timerTask`, `timerBuffer` inside `estimatedDuration`, `timerDuration`, `withBufferAdded`, `ItemExtras.timer`), the timer on the block (`TaskTimer.kt`: `timerGoal` / `timerWorked` / `timerRunningSince`, `timerPhase`, `timerSignals`, `workedInFull`), its buttons on the dashboard (`TimerControls`, the late start, ticking one off by hand), a Growth-Task as a Timer-Task with a "Zielzeit", and the "Ziele" tab |
 | `step-43-sleep-stats-notes.md` | *Step 43*: getting up and going to bed (`SleepLog`, `sleepPrompts`, "Guten Morgen!" / "Gute Nacht!" in the "Gerade" box, the two half points in the settlement), a late timer that lengthens its block (`timerExtension`), what is stamped for the statistics (`originalStart` / `originalDuration`, `quantityDone`), the Statistiken tab (`StatRange`, `StatSection`, `overview`, `taskStats`, `PensumChart`) and the Notiz-Merger (`Note`, Taskify) |
 | `step-44-clock-accent-navigation.md` | *Step 44*: a muted phone silences Eta (`isRingerMuted`), scroll positions that survive (`menuScroll`, `rememberSaveableStateHolder`), the morning alarm handed to the clock app (`ClockAppAlarms`, `clockAlarms`, `ClockApp`), an accent of one's own (`DesignChoice.accent`, `withAccent`), and names, icons or both in the tab bar (`TabStyle`, `EtaIcon`) |
+| `step-46-setup-rhythm-audio.md` | *Step 46*: the setup rebuilt (`SetupPage`, the checklist, `CustomTask`, "Folgetag", `SetupWeekReview`), every other week (`ItemExtras.rhythm`, `RhythmField`, the hatching), a task's own colour (`Item.color`, `colorOf(item)`, the Wochenschema's bars), "Termine anzeigen" and the timetable on any seven days (`WeekTabViewModel(from)`, `weekAdjust`), and the audio modes (`AudioMode`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -480,7 +481,8 @@ Pausenchecker · 41. An overlap that is asked about, one revolver, and a note at
 creation · 42. Timer-Tasks, and the "Ziele" tab · 43. Getting up and going to bed,
 Statistiken, and the Notiz-Merger · 44. Silence, the clock app, an accent of one's
 own, and icons · 45. "Aktuell" on the week timetable changes one
-occurrence.
+occurrence · 46. The setup rebuilt, every other week, a task's own colour, and
+audio modes.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and
@@ -497,6 +499,9 @@ lands.
   migration test needs `MigrationTestHelper` with a JVM SQLite driver; `room3-testing` is
   already on the test classpath for it.
 - **Nothing lets the user set an `ItemRole`** — see *`ItemRole`*.
+- **After a debug reset, steps added to the morning routine are reported not to
+  be saved** (they are back after restoring a backup). Parked by the user in
+  step 46; the save path reads correct and the cause is not known.
 - **A deadline on a card already planned into a day** has nowhere to be asked for
   yet. (A note at creation time is asked in the planner's forms since step 41;
   Quick-Add stays name-only.)

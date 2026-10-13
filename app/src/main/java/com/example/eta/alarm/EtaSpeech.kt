@@ -63,6 +63,9 @@ object EtaSpeech {
      */
     suspend fun speak(context: Context, text: String): Boolean {
         val app = context.applicationContext
+        // Vibration or silence was chosen: nothing is read out, and the caller
+        // falls back to `EtaSound.play`, which buzzes or stays quiet as asked.
+        if (EtaSound.mode(app) != AudioMode.SOUND) return false
         if (text.isBlank() || EtaSound.isSilenced(app)) return true
 
         val available = withTimeoutOrNull(BIND_TIMEOUT) { bind(app).await() } ?: false

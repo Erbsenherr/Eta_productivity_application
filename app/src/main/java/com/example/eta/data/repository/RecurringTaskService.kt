@@ -114,7 +114,8 @@ class RecurringTaskService(
     suspend fun saveGroup(ids: Collection<String>, edit: RecurringEdit) {
         val existing = ids.mapNotNull { itemDao.findById(it) }.filter { it.completedAt == null }
         val representative = existing.firstOrNull() ?: return
-        val rhythm = Rhythm.of(representative.recurrenceRule ?: return)
+        // The form's answer where it gave one; otherwise the rhythm is kept.
+        val rhythm = edit.extras.rhythm ?: Rhythm.of(representative.recurrenceRule ?: return)
         val timed = rulesWithTimes(rhythm, edit.weekdays, edit.startTime, edit.startTimes)
         val rules = timed.map { it.first }
         if (rules.isEmpty()) return
@@ -181,7 +182,7 @@ class RecurringTaskService(
         rhythm: Rhythm = Rhythm.Weekly,
         growthOrder: Int? = null,
     ): List<String> {
-        val timed = rulesWithTimes(rhythm, edit.weekdays, edit.startTime, edit.startTimes)
+        val timed = rulesWithTimes(edit.extras.rhythm ?: rhythm, edit.weekdays, edit.startTime, edit.startTimes)
         if (timed.isEmpty()) return emptyList()
 
         val now = clock.now()

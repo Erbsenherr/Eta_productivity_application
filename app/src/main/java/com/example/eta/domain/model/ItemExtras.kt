@@ -6,6 +6,7 @@ import com.example.eta.domain.growth.timerSetting
 import com.example.eta.domain.growth.withTimer
 import com.example.eta.domain.growth.quantitySetting
 import com.example.eta.domain.growth.withQuantity
+import com.example.eta.domain.recurrence.Rhythm
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -56,6 +57,17 @@ data class ItemExtras(
      * business, and they finish with `withBufferAdded`.
      */
     val timer: TimerSetting? = null,
+    /** The tenth: a colour of the task's own — see [Item.color]. */
+    val color: Int? = null,
+    /**
+     * The eleventh, and the odd one out: **not a column**. Weekly, or every
+     * other week in the even or the odd calendar weeks — which is part of a
+     * standing task's `recurrenceRule`, written by the paths that write the
+     * rules. It rides here only to reach them without a parameter on each;
+     * `withExtras` does not touch it. Null is "as it is" on an edit and weekly
+     * on a new task; a ToDo carries none.
+     */
+    val rhythm: Rhythm? = null,
 ) {
     val hasPomodoro: Boolean get() = pomodoroWork != null && pomodoroPause != null
 
@@ -76,6 +88,8 @@ data class ItemExtras(
             repeatUntil = item.repeatUntil,
             routineMode = item.routineMode,
             timer = item.timerSetting,
+            color = item.color,
+            rhythm = item.recurrenceRule?.let(Rhythm::of),
         )
     }
 }
@@ -92,6 +106,7 @@ fun Item.withExtras(extras: ItemExtras): Item = copy(
     deadlineAt = extras.deadlineAt,
     repeatUntil = extras.repeatUntil,
     routineMode = extras.routineMode,
+    color = extras.color,
 ).withQuantity(extras.quantity).withTimer(extras.timer)
 
 /**

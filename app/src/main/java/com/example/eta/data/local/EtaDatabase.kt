@@ -52,7 +52,7 @@ import com.example.eta.domain.setup.UserSetup
         SleepLog::class,
         Note::class,
     ],
-    version = 31,
+    version = 32,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -984,5 +984,15 @@ val MIGRATION_30_31 = object : Migration(30, 31) {
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `statistics` INTEGER NOT NULL DEFAULT 1")
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `statsHidden` TEXT NOT NULL DEFAULT ''")
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `notes` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/**
+ * Step 46: `items.color`, a colour of the task's own. Null for every task there
+ * is, which is "the category's" — nothing looks different until one is chosen.
+ */
+val MIGRATION_31_32 = object : Migration(31, 32) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `color` INTEGER")
     }
 }

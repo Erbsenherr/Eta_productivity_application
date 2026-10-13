@@ -320,7 +320,7 @@ private fun NowLine(
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(colorOf(entry.item.category), CircleShape),
+                    .background(colorOf(entry.item), CircleShape),
             )
             Spacer(Modifier.width(EtaTheme.spacing.sm))
             // Never cut off: the box grows with what it has to say. It is the
@@ -902,7 +902,7 @@ private fun TaskRow(
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(colorOf(entry.item.category), CircleShape),
+                    .background(colorOf(entry.item), CircleShape),
             )
             Spacer(Modifier.width(EtaTheme.spacing.sm))
 
@@ -1087,7 +1087,7 @@ fun DeadlinesBox(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(colorOf(item.category), CircleShape),
+                            .background(colorOf(item), CircleShape),
                     )
                     Spacer(Modifier.width(EtaTheme.spacing.sm))
                     Column(Modifier.weight(1f)) {

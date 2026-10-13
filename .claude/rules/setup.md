@@ -8,6 +8,11 @@ paths:
 
 ### The setup questionnaire
 
+**Rebuilt in step 46** — the pages are a list made from the answers, with a
+checklist of standing tasks, Google on the first page, a "Folgetag" box, the
+morning routine's steps, and the week as a timetable for a last screen. See
+*Step 46*. What follows is the domain underneath, which did not change.
+
 `domain/setup/` holds the whole of it as pure Kotlin, with the UI in `ui/setup/`:
 
 - **`UserSetup`** is a single-row Room entity (`SETUP_ID = 0`) and doubles as the

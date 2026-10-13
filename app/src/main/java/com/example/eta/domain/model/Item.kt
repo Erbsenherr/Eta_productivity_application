@@ -163,6 +163,12 @@ data class Item(
     val timerTask: Boolean = false,
     val timerBuffer: Duration? = null,
     /**
+     * A colour of the task's own, as ARGB, in place of its category's — null is
+     * the category's. Read through `colorOf(item)`, the one place a card's
+     * colour is decided, so the planner, the lists and the Wochenschema agree.
+     */
+    val color: Int? = null,
+    /**
      * A Mengen-Inkrement: the count this task is done with, growing by
      * [quantityIncrement] every [quantityEvery] confirmed completions, up to an
      * optional [quantityTarget]. [quantity] is where it stands now, and is what

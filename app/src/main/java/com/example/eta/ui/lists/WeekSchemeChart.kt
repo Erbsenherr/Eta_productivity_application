@@ -22,6 +22,10 @@ import kotlinx.datetime.DayOfWeek
 /**
  * The Wochenschema: seven columns, Monday on the left, midnight at the top.
  *
+ * In the list of standing tasks it is drawn with [tasks]: every task a bar in
+ * its own colour — the category's, or the one it was given — which is the colour
+ * of the dot in front of its row.
+ *
  * **No labels at all**, as asked — it answers one question, "where is the week
  * still free", and a grid of hours would turn a glance into a reading. Free time
  * is the green, everything booked (the night included) the quiet grey behind it.
@@ -41,11 +45,19 @@ fun WeekSchemeChart(
     draft: Map<DayOfWeek, List<IntRange>> = emptyMap(),
     height: Dp = 140.dp,
     clashDays: Set<DayOfWeek> = emptySet(),
+    /**
+     * The tasks themselves, each stretch with its colour — the chart over the
+     * list of standing tasks, where a bar should be findable in the list below
+     * it. With these the free time is no longer painted green: green is a
+     * category's colour, and a free afternoon would read as a task.
+     */
+    tasks: Map<DayOfWeek, List<Pair<IntRange, Color>>>? = null,
 ) {
     val bookedColor = EtaTheme.colors.border
     val freeColor = EtaTheme.colors.success
     val draftColor = EtaTheme.colors.accent
     val clashColor = EtaTheme.colors.danger
+    val plainColor = EtaTheme.colors.surface
     val freeByDay = WEEK.associateWith { freeSpans(booked[it].orEmpty()) }
 
     Canvas(
@@ -80,7 +92,14 @@ fun WeekSchemeChart(
                 size = Size(columnWidth, size.height),
                 cornerRadius = corner,
             )
-            freeByDay.getValue(day).forEach { span(x, it, freeColor) }
+            if (tasks == null) {
+                freeByDay.getValue(day).forEach { span(x, it, freeColor) }
+            } else {
+                // The column is the day, lighter where nothing stands; the night
+                // and whatever else is booked stay the quiet grey underneath.
+                freeByDay.getValue(day).forEach { span(x, it, plainColor) }
+                tasks[day].orEmpty().forEach { (range, color) -> span(x, range, color) }
+            }
             val markColor = if (day in clashDays) clashColor else draftColor
             draft[day].orEmpty().forEach { span(x, it, markColor, inset = columnWidth * 0.2f) }
         }

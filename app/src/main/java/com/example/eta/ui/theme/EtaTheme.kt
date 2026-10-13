@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.eta.domain.model.Category
+import com.example.eta.domain.model.Item
 import androidx.compose.ui.graphics.Color
 
 private val LocalEtaColors = staticCompositionLocalOf<EtaColors> {
@@ -54,6 +55,15 @@ object EtaTheme {
 }
 
 /** The accent a task carries, so category colouring never gets hand-mapped per screen. */
+@Composable
+@ReadOnlyComposable
+fun colorOf(item: Item): Color = item.color?.let { Color(it) } ?: colorOf(item.category)
+
+/**
+ * The colour of a category. For a **card**, ask [colorOf] with the item instead:
+ * a task may carry a colour of its own, and a screen that asks by category
+ * would not see it.
+ */
 @Composable
 @ReadOnlyComposable
 fun colorOf(category: Category?): Color = when (category) {

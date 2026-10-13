@@ -48,6 +48,8 @@ import com.example.eta.domain.setup.isOwnedBySettings
 import com.example.eta.ui.attributes.RecurringAttributes
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
+import androidx.compose.ui.draw.alpha
+import com.example.eta.ui.components.EtaCheckbox
 import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
@@ -94,13 +96,28 @@ fun WeekTabScreen(
      * long press with a sentence instead.
      */
     plannerViewModel: DayPlannerViewModel? = null,
+    /**
+     * The one view this mounting offers. The switch is still drawn, with the
+     * other half greyed, so it can be explained rather than be missing: the
+     * weekly planning changes this week only ("Aktuell"), and the end of the
+     * setup has no occurrences to change yet ("Generell").
+     */
+    onlyView: WeekView? = null,
+    /** Whether "Termine anzeigen" starts ticked. */
+    showAppointments: Boolean = false,
+    /** Above the timetable — a way back, where this is not a tab. */
+    header: (@Composable () -> Unit)? = null,
+    /** Below it — the box that explains the screen at the end of the setup. */
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
 
-    var viewName by rememberSaveable { mutableStateOf(WeekView.CURRENT.name) }
-    val view = WeekView.valueOf(viewName)
+    var viewName by rememberSaveable { mutableStateOf((onlyView ?: WeekView.CURRENT).name) }
+    val view = onlyView ?: WeekView.valueOf(viewName)
+    // "Termine anzeigen": this week's imported appointments over the standing week.
+    var appointments by rememberSaveable { mutableStateOf(showAppointments) }
     // Locked again on every visit: the open lock is a state one is in for a
     // moment, and a timetable found unlocked a week later is one that gets
     // rearranged by a thumb on the way past.
@@ -108,6 +125,7 @@ fun WeekTabScreen(
     var showInfo by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(initialPage = WEEK.indexOf(state.today.dayOfWeek)) { WEEK.size }
+    fun shown(on: DayOfWeek) = state.blocksOn(on, view, unlocked, appointments)
     val scope = rememberCoroutineScope()
     val day = WEEK[pagerState.currentPage]
 
@@ -127,6 +145,7 @@ fun WeekTabScreen(
     var editingNight by remember { mutableStateOf<DayOfWeek?>(null) }
 
     Column(modifier = modifier.fillMaxSize()) {
+        header?.invoke()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -134,7 +153,7 @@ fun WeekTabScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
         ) {
-            WeekViewSwitch(selected = view, onSelect = { viewName = it.name })
+            WeekViewSwitch(selected = view, only = onlyView, onSelect = { viewName = it.name })
             InfoButton(onClick = { showInfo = true })
             Spacer(Modifier.weight(1f))
             LockButton(unlocked = unlocked, onClick = { unlocked = !unlocked })
@@ -145,6 +164,21 @@ fun WeekTabScreen(
             today = state.today.dayOfWeek.takeIf { view == WeekView.CURRENT },
             onSelect = { chosen -> scope.launch { pagerState.animateScrollToPage(WEEK.indexOf(chosen)) } },
         )
+
+        if (view == WeekView.GENERAL) {
+            Row(
+                modifier = Modifier.padding(horizontal = EtaTheme.spacing.lg),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EtaCheckbox(checked = appointments, onCheckedChange = { appointments = it })
+                Spacer(Modifier.size(EtaTheme.spacing.sm))
+                EtaText(
+                    text = "Termine anzeigen",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                )
+            }
+        }
 
         Column(Modifier.padding(horizontal = EtaTheme.spacing.lg, vertical = EtaTheme.spacing.xs)) {
             EtaText(
@@ -183,7 +217,7 @@ fun WeekTabScreen(
                     .verticalScroll(scrollState),
             ) {
                 DayTimeline(
-                    blocks = state.blocksOn(pageDay, view, unlocked),
+                    blocks = shown(pageDay),
                     sleep = state.sleepOn(pageDay, view),
                     // Read off the standing nights in both views: what the
                     // window changes is the weekday's night, whatever a single
@@ -225,7 +259,7 @@ fun WeekTabScreen(
                         if (view == WeekView.CURRENT) {
                             viewModel.moveOccurrence(blockId, startMinute = minute)
                         } else {
-                            state.blocksOn(pageDay, view, unlocked)
+                            shown(pageDay)
                                 .firstOrNull { it.block.id == blockId }
                                 ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute = minute) }
                         }
@@ -235,7 +269,7 @@ fun WeekTabScreen(
                             if (view == WeekView.CURRENT) {
                                 viewModel.moveOccurrence(blockId, startMinute, durationMinutes)
                             } else {
-                                state.blocksOn(pageDay, view, unlocked)
+                                shown(pageDay)
                                     .firstOrNull { it.block.id == blockId }
                                     ?.let { viewModel.reschedule(it.item.id, pageDay, startMinute, durationMinutes) }
                             }
@@ -263,6 +297,7 @@ fun WeekTabScreen(
             )
         }
         notice?.let { NoticeBar(text = it, onDismiss = viewModel::dismissNotice) }
+        footer?.invoke()
     }
 
     if (showInfo) WeekInfoDialog(onDismiss = { showInfo = false })
@@ -392,7 +427,7 @@ fun WeekTabScreen(
 
 /** "Aktuell" or "Generell": two halves of one pill, the chosen one filled. */
 @Composable
-private fun WeekViewSwitch(selected: WeekView, onSelect: (WeekView) -> Unit) {
+private fun WeekViewSwitch(selected: WeekView, only: WeekView?, onSelect: (WeekView) -> Unit) {
     Row(
         modifier = Modifier
             .background(EtaTheme.colors.surface, EtaTheme.shapes.pill)
@@ -401,12 +436,15 @@ private fun WeekViewSwitch(selected: WeekView, onSelect: (WeekView) -> Unit) {
     ) {
         WeekView.entries.forEach { option ->
             val chosen = option == selected
+            // The half this mounting does not offer: there, and not to be had.
+            val offered = only == null || option == only
             val interactionSource = remember { MutableInteractionSource() }
             EtaText(
                 text = option.label,
                 style = EtaTheme.typography.label,
                 color = if (chosen) EtaTheme.colors.onAccent else EtaTheme.colors.textSecondary,
                 modifier = Modifier
+                    .alpha(if (offered) 1f else 0.35f)
                     .background(
                         color = if (chosen) EtaTheme.colors.accent else EtaTheme.colors.surface,
                         shape = EtaTheme.shapes.pill,
@@ -414,6 +452,7 @@ private fun WeekViewSwitch(selected: WeekView, onSelect: (WeekView) -> Unit) {
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
+                        enabled = offered,
                         onClick = { onSelect(option) },
                     )
                     .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.sm),
@@ -617,7 +656,10 @@ private fun WeekInfoDialog(onDismiss: () -> Unit) {
         EtaText(
             text = "»Generell« zeigt nur deinen festen Wochenplan: die wiederkehrenden Tasks " +
                 "und Routinen jedes Wochentags mit Schlafens- und Aufstehzeit — ohne " +
-                "einmalig eingeplante Aufgaben oder Termine.",
+                "einmalig eingeplante Aufgaben. Mit »Termine anzeigen« werden die " +
+                "übernommenen Google-Termine dieser Woche eingeblendet, damit du um sie " +
+                "herum planen kannst; ändern lassen sie sich dort nicht. Aufgaben, die " +
+                "nur alle zwei Wochen anstehen, sind schraffiert.",
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )

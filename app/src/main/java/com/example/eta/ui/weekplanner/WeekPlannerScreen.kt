@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -94,6 +95,12 @@ fun WeekPlannerScreen(
     calendarViewModel: CalendarEventsViewModel?,
     modifier: Modifier = Modifier,
     onClose: () -> Unit = {},
+    /**
+     * The week being planned as a timetable — the dashboard's "Woche", on these
+     * seven days — behind "Anpassungen vornehmen". Handed its own way back.
+     * Null leaves the button out, as the tutorial's practice week does.
+     */
+    weekAdjust: (@Composable (onBack: () -> Unit) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val inflation by viewModel.inflation.collectAsStateWithLifecycle()
@@ -107,10 +114,18 @@ fun WeekPlannerScreen(
     )
     val scope = rememberCoroutineScope()
     var adding by remember { mutableStateOf(false) }
+    // The timetable lies **over** the phase rather than replacing it: the pager
+    // above keeps its page, so coming back lands on "Auffüllen" again.
+    var adjusting by rememberSaveable { mutableStateOf(false) }
 
     // The system back is a door out of the phase like any other, and the
     // devaluation is booked on the way through it.
-    BackHandler { viewModel.leave(onClose) }
+    BackHandler { if (adjusting) adjusting = false else viewModel.leave(onClose) }
+
+    if (adjusting && weekAdjust != null) {
+        EtaScreen(modifier = modifier) { weekAdjust { adjusting = false } }
+        return
+    }
 
     EtaScreen(modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
@@ -161,7 +176,27 @@ fun WeekPlannerScreen(
                         Step.INFLATION -> InflationStep(inflation, banned)
                         Step.EVALUATION -> EvaluationStep(evaluation, viewModel::setEvaluation)
                         Step.CALENDAR -> calendarViewModel?.let { CalendarEventsSection(it) }
-                        Step.PLAN -> PlanStep(state, viewModel, onAdd = { adding = true })
+                        Step.PLAN -> {
+                            if (weekAdjust != null) {
+                                EtaSurface(modifier = Modifier.fillMaxWidth()) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                                        EtaText(
+                                            text = "Die Woche als Stundenplan: übernommene " +
+                                                "Google-Termine ansehen und wiederkehrende " +
+                                                "Aufgaben verschieben — nur für diese Woche.",
+                                            style = EtaTheme.typography.caption,
+                                            color = EtaTheme.colors.textSecondary,
+                                        )
+                                        EtaButton(
+                                            text = "Anpassungen vornehmen",
+                                            style = EtaButtonStyle.Secondary,
+                                            onClick = { adjusting = true },
+                                        )
+                                    }
+                                }
+                            }
+                            PlanStep(state, viewModel, onAdd = { adding = true })
+                        }
                     }
                     Spacer(Modifier.size(EtaTheme.spacing.xl))
                 }
@@ -477,7 +512,7 @@ private fun ItemCard(item: Item, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(colorOf(item.category), CircleShape),
+                    .background(colorOf(item), CircleShape),
             )
             Spacer(Modifier.size(EtaTheme.spacing.sm))
             EtaText(

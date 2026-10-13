@@ -41,6 +41,12 @@ import com.example.eta.domain.planning.DEFAULT_POMODORO_WORK
 import com.example.eta.domain.planning.MIN_POMODORO_PHASE
 import com.example.eta.domain.recurrence.RecurringOverlap
 import com.example.eta.domain.recurrence.RecurringSlot
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.Color
+import com.example.eta.domain.model.WeekParity
+import com.example.eta.ui.components.EtaSwatch
+import com.example.eta.ui.theme.ACCENT_PRESETS
 import com.example.eta.domain.recurrence.Rhythm
 import com.example.eta.domain.recurrence.weekdaysOf
 import com.example.eta.domain.reminder.DEFAULT_REMINDER_LEAD_HOURS
@@ -285,7 +291,7 @@ data class RecurringAttributes(
     val hasOwnTimes: Boolean get() = weekdays.map(::timeOn).distinct().size > 1
 
     /** The slots these answers would lay down, for the overlap check. */
-    fun slots(rhythm: Rhythm = Rhythm.Weekly): List<RecurringSlot> =
+    fun slots(rhythm: Rhythm = extras.rhythm ?: Rhythm.Weekly): List<RecurringSlot> =
         rulesWithTimes(rhythm, weekdays, startTime, ownStartTimes).map { (rule, start) ->
             // What the block will hold: the time, and a Timer-Task's buffer.
             val length = duration + (extras.timer?.buffer ?: Duration.ZERO)
@@ -551,6 +557,10 @@ fun RecurringAttributeFields(
             days = WEEK,
         )
     }
+    RhythmField(
+        rhythm = value.extras.rhythm ?: Rhythm.Weekly,
+        onRhythm = { onChange(value.copy(extras = value.extras.copy(rhythm = it))) },
+    )
     // Only where there is more than one day to differ: with a single weekday
     // the box would switch on a second picker for the same hour.
     if (value.weekdays.size > 1) {
@@ -982,6 +992,7 @@ fun ExtrasBox(
         extras.hasReminder,
         extras.timer != null,
         extras.hasQuantity,
+        extras.color != null,
         extras.hasDeadline,
         subtasks?.subtasks?.isNotEmpty() == true,
     ).count { it }
@@ -1062,6 +1073,7 @@ fun ExtrasBox(
         if (offerQuantity) {
             QuantityRow(extras = extras, onExtras = onExtras)
         }
+        ColorRow(extras = extras, onExtras = onExtras)
         if (subtasks != null && onSubtasks != null) {
             Column(
                 modifier = Modifier.tutorialSpot(TutorialSpot.EXTRA_SUBTASKS),
@@ -1536,6 +1548,71 @@ private fun UpdateConditionField(every: Int, onEvery: (Int) -> Unit) {
             format = { if (it == 1) "jedes Mal" else "alle $it" },
             title = "Inkrement alle wie viele Abschlüsse?",
         )
+    }
+}
+
+/**
+ * How often a standing task comes round: every week, or every other one.
+ *
+ * "Alle zwei Wochen" needs to know **which** weeks, and the calendar week is the
+ * one count everybody already has on the wall: the even ones or the odd ones. A
+ * rhythm the form does not offer — the monthly one a task may still carry from
+ * an older setup — is listed as itself rather than silently made weekly.
+ */
+@Composable
+private fun RhythmField(rhythm: Rhythm, onRhythm: (Rhythm) -> Unit) {
+    val options = buildList {
+        add(Rhythm.Weekly to "Jede Woche")
+        add(Rhythm.Biweekly(WeekParity.EVEN) to "Alle zwei Wochen — gerade KW")
+        add(Rhythm.Biweekly(WeekParity.ODD) to "Alle zwei Wochen — ungerade KW")
+        if (rhythm is Rhythm.Monthly) add(rhythm to "Monatlich — ${rhythm.weekOfMonth}. Woche")
+    }
+    EtaField(
+        label = "Rhythmus",
+        hint = if (rhythm is Rhythm.Biweekly) {
+            "KW ist die Kalenderwoche. Im Plan ist die Aufgabe schraffiert — gerade " +
+                "Wochen nach links, ungerade nach rechts."
+        } else {
+            null
+        },
+    ) {
+        EtaChoice(options = options, selected = rhythm, onSelect = onRhythm)
+    }
+}
+
+/**
+ * A colour of the task's own, in place of its category's.
+ *
+ * The category's is the default and the first swatch — drawn in the muted tone
+ * rather than in a category colour, since this row does not know the category,
+ * and labelled so it is not mistaken for "grey".
+ */
+@Composable
+private fun ColorRow(extras: ItemExtras, onExtras: (ItemExtras) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+        CheckRow(
+            checked = extras.color != null,
+            onCheckedChange = { on ->
+                onExtras(extras.copy(color = if (on) ACCENT_PRESETS.first() else null))
+            },
+            label = "Eigene Farbe",
+            hint = "Statt der Farbe der Kategorie — im Tagesplan, in den Listen und im " +
+                "Wochenschema.",
+        )
+        if (extras.color != null) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm),
+            ) {
+                ACCENT_PRESETS.forEach { preset ->
+                    EtaSwatch(
+                        color = Color(preset),
+                        selected = extras.color == preset,
+                        onClick = { onExtras(extras.copy(color = preset)) },
+                    )
+                }
+            }
+        }
     }
 }
 

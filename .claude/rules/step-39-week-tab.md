@@ -176,6 +176,10 @@ that: every gesture here — the pinch on the initial pass, a long press reachin
 the timeline past its blocks, a pager inside a tab around a vertical scroll —
 is reasoning about Compose's pointer dispatch that only a finger can confirm.
 
+**Since step 46** "Generell" can show this week's imported appointments
+("Termine anzeigen"), the timetable serves any seven days and is opened from the
+weekly planning as well — see *Step 46*.
+
 #### Step 45: "Aktuell" changes one occurrence
 
 At the user's request: editing Thursday in "Aktuell" is to touch this week's
