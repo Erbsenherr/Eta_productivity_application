@@ -147,6 +147,22 @@ data class Item(
     val growthEvery: Int = 1,
     val growthProgress: Int = 0,
     /**
+     * A Timer-Task: a standing task that is not ticked off but **worked** — the
+     * dashboard offers "Start" instead of a checkbox and counts the time down.
+     * See `TimerTask.kt`.
+     *
+     * [timerBuffer] is slack at the end of the block, so a late start does not
+     * run into what follows. **[estimatedDuration] includes it**: the block is
+     * that much longer than the time on the timer, and everything that asks
+     * about time — expansion, overlap, the week — needs to know nothing more.
+     * `Item.timerDuration` is the time on the timer itself.
+     *
+     * A growth task (the three `growth…` columns) is a Timer-Task with a
+     * "Zielzeit" since step 42; it was a kind of its own before.
+     */
+    val timerTask: Boolean = false,
+    val timerBuffer: Duration? = null,
+    /**
      * A Mengen-Inkrement: the count this task is done with, growing by
      * [quantityIncrement] every [quantityEvery] confirmed completions, up to an
      * optional [quantityTarget]. [quantity] is where it stands now, and is what

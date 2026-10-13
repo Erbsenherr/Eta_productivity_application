@@ -124,6 +124,18 @@ data class PlannedBlock(
      * Means nothing on a block that is not [BlockOrigin.RECURRING].
      */
     val flexible: Boolean = false,
+    /**
+     * The timer of a Timer-Task, as it stands — see `TaskTimer.kt`.
+     *
+     * [timerGoal] is what this sitting counts down from, null until "Start" was
+     * pressed. [timerWorked] is what had been counted when it was last paused,
+     * and [timerRunningSince] the moment it was last set running — null while it
+     * is paused. Kept as a start instant rather than a ticking number, so the
+     * count is right however long the app was closed.
+     */
+    val timerGoal: Duration? = null,
+    val timerWorked: Duration? = null,
+    val timerRunningSince: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

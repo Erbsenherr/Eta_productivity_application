@@ -239,7 +239,7 @@ private fun RecurrenceRule.namedWeekday(): DayOfWeek = when (this) {
 private fun Item.finalSlot(): RecurringSlot? {
     val base = RecurringSlot.of(this) ?: return null
     val target = growthTarget ?: return base
-    return base.copy(duration = maxOf(base.duration, target))
+    return base.copy(duration = maxOf(base.duration, target + timerBufferOrZero))
 }
 
 private fun RecurringSlot.span() = MinuteSpan(containerStartMinute(), containerEndMinute())

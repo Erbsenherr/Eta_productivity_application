@@ -9,7 +9,11 @@ import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.data.repository.ReevaluationService
 import com.example.eta.data.repository.RewardOutlook
+import com.example.eta.domain.growth.timerBufferOrZero
 import com.example.eta.domain.model.Contract
+import com.example.eta.domain.planning.timerBilled
+import com.example.eta.domain.planning.timerPaused
+import com.example.eta.domain.planning.timerWasUsed
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.reevaluation.ContractVerdict
@@ -207,6 +211,17 @@ class ReevaluationViewModel(
         viewModelScope.launch {
             if (entry.block.isCompleted) {
                 planRepository.reopen(entry.block)
+            } else if (entry.item.timerTask && entry.block.timerWasUsed) {
+                // A Timer-Task whose timer was started and never ended: what it
+                // counted is what the sitting was. One never started is taken at
+                // its word, and the stepper under the row corrects it.
+                val now = clock.now()
+                val block = entry.block
+                planRepository.complete(
+                    block.timerPaused(now),
+                    actualDuration = block.timerBilled(now, entry.item.timerBufferOrZero)
+                        .takeIf { it < block.plannedDuration },
+                )
             } else {
                 planRepository.complete(entry.block)
             }

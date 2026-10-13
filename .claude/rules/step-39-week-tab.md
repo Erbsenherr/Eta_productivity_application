@@ -41,6 +41,8 @@ applied at once through `setFeature` like the Advanced Features:
   `DayPlannerViewModel` passes `skipped` as 0 while it is off, so a count from
   before the switch was flipped cannot linger. "Von vorn" shows only after a skip.
 - **`allowTodoBesideWeek`** — see below.
+- **`allowPartialTimerGrowth`** (step 42): a Timer-Task's "Zielzeit" counts a
+  sitting that was ended early. See *Step 42*.
 
 **Off for whoever upgrades as well.** Unlike the Advanced Features, where the
 migration switched everything on so no tab vanished: here the round *is* that the

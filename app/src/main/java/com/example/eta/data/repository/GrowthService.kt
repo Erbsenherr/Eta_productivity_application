@@ -9,6 +9,7 @@ import com.example.eta.domain.growth.growthOrdering
 import com.example.eta.domain.growth.hasQuantity
 import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.growth.quantityFamily
+import com.example.eta.domain.growth.workedInFull
 import com.example.eta.domain.model.Item
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,12 @@ class GrowthService(
     private val itemDao: ItemDao,
     private val planRepository: PlanRepository,
     private val scheduleMaintenance: ScheduleMaintenance,
+    /**
+     * The Flexibilität switch: whether a sitting ended early still counts
+     * towards the next increment. A lambda, because it is a setting and is read
+     * at the evening it applies to.
+     */
+    private val allowPartialGrowth: suspend () -> Boolean = { false },
     private val clock: Clock = Clock.System,
 ) {
 
@@ -95,11 +102,18 @@ class GrowthService(
         // two definitions; advancing only the one that was completed would give the
         // two different lengths and counts, which the standing schedule then shows
         // as two separate tasks. See [GrowthFamily] and [QuantityFamily].
+        //
+        // The time grows only for a sitting **worked in full** — the timer run
+        // to its goal, or ticked off by hand without a shorter time being given
+        // — unless the settings say otherwise. See `workedInFull`.
+        val lenient = allowPartialGrowth()
         val advanced = planRepository.completedOn(date)
-            .map { it.item }
-            .filter { it.isGrowthTask || it.hasQuantity }
-            .distinctBy { it.familyKey }
-            .associate { item -> item.familyKey to item.advancedByCompletion() }
+            .filter { it.item.isGrowthTask || it.item.hasQuantity }
+            .distinctBy { it.item.familyKey }
+            .associate { entry ->
+                entry.item.familyKey to
+                    entry.item.advancedByCompletion(timeCounts = lenient || entry.block.workedInFull)
+            }
         if (advanced.isEmpty()) return emptyList()
 
         val rows = itemDao.findRecurringDefinitions()

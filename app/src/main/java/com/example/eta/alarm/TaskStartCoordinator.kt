@@ -96,10 +96,12 @@ class TaskStartCoordinator(
                 TaskEventKind.END -> TaskEndNotifications.show(context, event.entry)
                 TaskEventKind.STILL_ACTIVE -> TaskNudgeNotifications.showStillActive(context, event.entry)
                 TaskEventKind.POMODORO_PAUSE ->
-                    TaskNudgeNotifications.showPomodoro(context, event.entry, PomodoroPhaseKind.PAUSE, minute)
+                    TaskNudgeNotifications.showPomodoro(context, event.entry, PomodoroPhaseKind.PAUSE, minute, at)
 
                 TaskEventKind.POMODORO_WORK ->
-                    TaskNudgeNotifications.showPomodoro(context, event.entry, PomodoroPhaseKind.WORK, minute)
+                    TaskNudgeNotifications.showPomodoro(context, event.entry, PomodoroPhaseKind.WORK, minute, at)
+
+                TaskEventKind.TIMER_DONE -> TaskNudgeNotifications.showTimerDone(context, event.entry)
             }
         }
         // Booked before anything is said: reading a name out takes seconds, and
@@ -121,6 +123,8 @@ class TaskStartCoordinator(
         TaskEventKind.STILL_ACTIVE -> R.raw.still_active
         TaskEventKind.POMODORO_PAUSE -> R.raw.pom_pause_start
         TaskEventKind.POMODORO_WORK -> R.raw.pom_work_start
+        // The user's choice: the timer running out sounds like a pause beginning.
+        TaskEventKind.TIMER_DONE -> R.raw.pom_pause_start
     }
 
     /** Zero while the question is switched off, which asks nothing. */

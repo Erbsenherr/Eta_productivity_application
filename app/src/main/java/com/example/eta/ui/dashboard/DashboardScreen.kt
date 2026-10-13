@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
+import com.example.eta.domain.planning.timerWasUsed
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
@@ -239,6 +240,44 @@ private fun TodayPage(
         var confirming by remember { mutableStateOf<BlockWithItem?>(null) }
         val followUp by viewModel.followUp.collectAsStateWithLifecycle()
 
+        // Timer-Tasks: the buttons under them, and the three things they can
+        // lead to. The tick is held as an id, like every dialog about a row.
+        val timerActions = TimerActions(
+            now = now,
+            onStart = viewModel::startTimer,
+            onPause = viewModel::pauseTimer,
+            onResume = viewModel::resumeTimer,
+            onEnd = viewModel::endTimer,
+        )
+        var tickingTimerId by remember { mutableStateOf<String?>(null) }
+        val timerOverflow by viewModel.timerOverflow.collectAsStateWithLifecycle()
+        val timerResult by viewModel.timerResult.collectAsStateWithLifecycle()
+
+        tickingTimerId?.let { id ->
+            val entry = state.todayBlocks.firstOrNull { it.block.id == id && it.block.isOpen }
+            if (entry == null) {
+                tickingTimerId = null
+            } else {
+                TimerTickDialog(
+                    entry = entry,
+                    onDismiss = { tickingTimerId = null },
+                    onConfirm = { worked ->
+                        viewModel.completeTimerByHand(id, worked)
+                        tickingTimerId = null
+                    },
+                )
+            }
+        }
+        timerOverflow?.let { prompt ->
+            TimerOverflowDialog(
+                prompt = prompt,
+                onShorten = { viewModel.answerTimerOverflow(shorten = true) },
+                onPushNext = { viewModel.answerTimerOverflow(shorten = false) },
+                onDismiss = viewModel::dismissTimerOverflow,
+            )
+        }
+        timerResult?.let { TimerResultDialog(result = it, onDismiss = viewModel::dismissTimerResult) }
+
         NowBox(
             modifier = Modifier.tutorialSpot(TutorialSpot.NOW),
             current = nowAndNext.current,
@@ -250,6 +289,7 @@ private fun TodayPage(
             checkTimes = state.checkTimes,
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
+            timer = timerActions,
         )
 
         // Asked by the screen rather than inside the box: what is being agreed to is
@@ -382,7 +422,16 @@ private fun TodayPage(
             title = "Heute anstehend",
             blocks = state.todayBlocks,
             foldKey = "today.tasks",
-            onToggle = viewModel::toggleCompleted,
+            onToggle = { entry ->
+                // A Timer-Task is not simply ticked off: with its timer started
+                // the tick is "Ende", and without it the screen asks first.
+                when {
+                    !entry.item.timerTask || !entry.block.isOpen -> viewModel.toggleCompleted(entry)
+                    entry.block.timerWasUsed -> viewModel.endTimer(entry.block.id)
+                    else -> tickingTimerId = entry.block.id
+                }
+            },
+            timer = timerActions,
             onDurationChange = { entry, duration ->
                 viewModel.setActualDuration(entry.block, duration)
             },

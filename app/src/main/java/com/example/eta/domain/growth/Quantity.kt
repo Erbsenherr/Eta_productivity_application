@@ -118,10 +118,14 @@ fun countCompletion(progress: Int, every: Int): Pair<Int, Boolean> {
  *
  * A growth task that has reached its target, or a count that has reached its
  * own, stops counting as well — there is nothing left for the count to lead to.
+ *
+ * [timeCounts] is false for a sitting of a Timer-Task that was not worked in
+ * full: the count of a Mengen-Inkrement still advances — the task was done —
+ * but the time does not move towards its next step.
  */
-fun Item.advancedByCompletion(): Item {
+fun Item.advancedByCompletion(timeCounts: Boolean = true): Item {
     var result = this
-    if (isGrowthTask && !isFullyGrown) {
+    if (timeCounts && isGrowthTask && !isFullyGrown) {
         val (progress, fires) = countCompletion(growthProgress, growthEvery)
         result = result.copy(
             growthProgress = progress,

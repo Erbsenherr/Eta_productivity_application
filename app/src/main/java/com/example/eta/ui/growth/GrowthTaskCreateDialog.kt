@@ -59,10 +59,12 @@ fun GrowthTaskCreateDialog(
         growthIssuesFor(attributes = attributes, definitions = definitions, order = null)
     }
 
-    EtaDialog(title = "Neue Growth-Task", onDismiss = onDismiss) {
+    EtaDialog(title = "Neue Timer-Task", onDismiss = onDismiss) {
         EtaText(
-            text = "Beginnt bei der Startzeit und wird mit jedem bestätigten Abschluss " +
-                "um das Inkrement länger, bis die Zielzeit erreicht ist.",
+            text = "Eine Timer-Task zählt investierte Zeit: Im Dashboard drückst du " +
+                "»Start«, und ein Timer läuft herunter. Mit der Zielzeit beginnt sie bei " +
+                "der Startzeit und wird mit jedem voll absolvierten Termin um das " +
+                "Inkrement länger. Puffer und Zielzeit stehen unten unter »Extras«.",
             style = EtaTheme.typography.caption,
             color = EtaTheme.colors.accent,
         )
@@ -71,7 +73,7 @@ fun GrowthTaskCreateDialog(
             EtaTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = "Woran wächst du?",
+                placeholder = "Worin investierst du Zeit?",
             )
         }
         EtaField(label = "Notiz") {

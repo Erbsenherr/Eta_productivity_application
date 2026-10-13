@@ -568,9 +568,9 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
             CheckRow(
                 checked = setup.growthTasks,
                 onCheckedChange = { on -> onChange { it.copy(growthTasks = on) } },
-                label = "Growth-Tasks",
-                hint = "Der Reiter, und die Option, eine wiederkehrende Aufgabe wachsen " +
-                    "zu lassen.",
+                label = "Timer-Tasks und Ziele",
+                hint = "Der Reiter »Ziele«, und die Option, eine wiederkehrende Aufgabe " +
+                    "zur Timer-Task zu machen — mit Start-Knopf, Puffer und Zielzeit.",
             )
             CheckRow(
                 checked = setup.contracts,
@@ -630,6 +630,14 @@ private fun FlexibilityBox(setup: UserSetup, onChange: OnSetupChange) {
                 label = "Neue ToDos trotz offener Wochenliste",
                 hint = "Im Tagesplaner lässt sich ein neues ToDo anlegen, obwohl in der " +
                     "Wochenliste noch Aufgaben warten, die in den Tag passen würden.",
+            )
+            CheckRow(
+                checked = setup.allowPartialTimerGrowth,
+                onCheckedChange = { on -> onChange { it.copy(allowPartialTimerGrowth = on) } },
+                label = "Zielzeit wächst auch bei vorzeitigem Ende",
+                hint = "Eine Timer-Task mit Zielzeit zählt einen Termin auch dann für das " +
+                    "nächste Inkrement, wenn der Timer nicht voll abgearbeitet wurde. " +
+                    "Ausgeschaltet wächst die Zeit nur nach vollständigen Terminen.",
             )
         }
     }

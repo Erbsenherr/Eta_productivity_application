@@ -24,6 +24,10 @@ import com.example.eta.domain.growth.QuantitySetting
 import com.example.eta.domain.growth.GrowthFitIssue
 import com.example.eta.domain.growth.GrowthFitProblem
 import com.example.eta.domain.growth.GrowthSetting
+import com.example.eta.domain.growth.DEFAULT_TIMER_BUFFER
+import com.example.eta.domain.growth.MIN_TIMER_BUFFER
+import com.example.eta.domain.growth.TimerSetting
+import com.example.eta.domain.growth.timerDuration
 import com.example.eta.domain.growth.MIN_GROWTH_DURATION
 import com.example.eta.domain.growth.MIN_GROWTH_INCREMENT
 import com.example.eta.domain.growth.growthSetting
@@ -205,9 +209,14 @@ data class TodoAttributes(
  * Freizeit, Morgenzeit — is a standing task that deliberately pays nothing, and
  * editing its time must not be a way of accidentally making it pay.
  *
- * [growth] is the Growth-Task sub-feature. When it is set, [duration] stops
- * being an answer of its own: it is where the length has got to, and growing
- * owns it — see `GrowthTask.kt`.
+ * [duration] is the task's own time. For a Timer-Task (`extras.timer`) that is
+ * the time on the timer, **without** the buffer; the block is longer by it, and
+ * the save paths add it — see `withBufferAdded`.
+ *
+ * [growth] is the "Zielzeit" of a Timer-Task. When it is set, [duration] stops
+ * being an answer of its own: it is where the time has got to, and growing owns
+ * it — see `GrowthTask.kt`. It means nothing without `extras.timer`, and the
+ * form clears the one with the other.
  */
 data class RecurringAttributes(
     val category: Category? = Category.FOKUS,
@@ -240,7 +249,7 @@ data class RecurringAttributes(
             category = if (item.isConcretized) item.category else item.category ?: Category.FOKUS,
             weekdays = item.recurrenceRule?.weekdaysOf() ?: setOf(WEEK.first()),
             startTime = item.startTime ?: LocalTime(18, 0),
-            duration = item.estimatedDuration ?: DEFAULT_DURATION,
+            duration = item.timerDuration ?: DEFAULT_DURATION,
             travelBefore = item.travelBefore,
             returnAfter = item.returnAfter,
             breakAfter = item.breakAfter,
@@ -251,11 +260,13 @@ data class RecurringAttributes(
         )
 
         /**
-         * What the Growth-Tasks tab opens with: the ordinary defaults, and the
-         * box already ticked, since that is the button that was pressed.
+         * What the Ziele tab opens with: a Timer-Task working towards a
+         * "Zielzeit", both boxes already ticked, since that is the button that
+         * was pressed.
          */
         fun newGrowth() = RecurringAttributes(
             duration = DEFAULT_GROWTH_START,
+            extras = ItemExtras(timer = TimerSetting()),
             growth = GrowthSetting.Default,
         )
     }
@@ -276,7 +287,9 @@ data class RecurringAttributes(
     /** The slots these answers would lay down, for the overlap check. */
     fun slots(rhythm: Rhythm = Rhythm.Weekly): List<RecurringSlot> =
         rulesWithTimes(rhythm, weekdays, startTime, ownStartTimes).map { (rule, start) ->
-            RecurringSlot(rule, start, duration, travelBefore, returnAfter, breakAfter)
+            // What the block will hold: the time, and a Timer-Task's buffer.
+            val length = duration + (extras.timer?.buffer ?: Duration.ZERO)
+            RecurringSlot(rule, start, length, travelBefore, returnAfter, breakAfter)
         }
 }
 
@@ -490,9 +503,10 @@ fun RecurringAttributeFields(
     /** Tasks that can be folded into this one as steps. */
     foldCandidates: List<FoldCandidate> = emptyList(),
 ) {
-    // Out of sight with the Growth-Tasks feature — except on a task that already
-    // grows, which has to stay reachable so the growing can be switched off.
-    val offerGrowth = allowGrowth && (LocalFeatures.current.growthTasks || value.growth != null)
+    // Out of sight with the Timer-Tasks feature — except on a task that already
+    // is one, which has to stay reachable so it can be switched off.
+    val offerGrowth = allowGrowth &&
+        (LocalFeatures.current.growthTasks || value.growth != null || value.extras.timer != null)
 
     EtaField(
         label = "Kategorie",
@@ -594,7 +608,12 @@ fun RecurringAttributeFields(
         }
     }
     if (value.growth == null) {
-        EtaField(label = "Dauer") {
+        EtaField(
+            label = if (value.extras.timer != null) "Timer-Zeit" else "Dauer",
+            hint = value.extras.timer?.buffer?.let {
+                "Dazu kommen ${it.formatShort()} Puffer — der Block ist entsprechend länger."
+            },
+        ) {
             EtaDurationPicker(
                 value = value.duration,
                 onValueChange = { onChange(value.copy(duration = it)) },
@@ -605,7 +624,7 @@ fun RecurringAttributeFields(
         // Growing owns the length, so there is nothing to set here — only
         // something to say. Two answers for one number would be one too many.
         EtaField(
-            label = "Dauer",
+            label = "Timer-Zeit",
             hint = if (value.growth.every > 1) {
                 "Wächst alle ${value.growth.every} Abschlüsse."
             } else {
@@ -643,7 +662,13 @@ fun RecurringAttributeFields(
         breakAfter = value.breakAfter,
         onBreakAfter = { onChange(value.copy(breakAfter = it)) },
         extras = value.extras,
-        onExtras = { onChange(value.copy(extras = it)) },
+        // One write for both: a "Zielzeit" belongs to a Timer-Task, so switching
+        // the timer off takes it along. Two callbacks would each copy the same
+        // stale `value`, and the second would undo the first.
+        onExtras = { extras ->
+            onChange(value.copy(extras = extras, growth = value.growth.takeIf { extras.timer != null }))
+        },
+        timerTime = value.duration,
         growth = if (offerGrowth) value.growth else null,
         onGrowth = if (offerGrowth) {
             { setting ->
@@ -914,10 +939,16 @@ fun ExtrasBox(
     onBreakAfter: (Duration?) -> Unit,
     extras: ItemExtras,
     onExtras: (ItemExtras) -> Unit,
-    /** Null where growth is not on offer — a ToDo or an appointment cannot grow. */
+    /**
+     * Null where the Timer-Task is not on offer — a ToDo or an appointment is
+     * done once, and has no sittings to time. [onGrowth] is its "Zielzeit";
+     * the timer itself and its buffer travel in [extras].
+     */
     growth: GrowthSetting? = null,
     onGrowth: ((GrowthSetting?) -> Unit)? = null,
     growthIssues: List<GrowthFitIssue> = emptyList(),
+    /** The form's own "Timer-Zeit", which a freshly ticked "Zielzeit" starts from. */
+    timerTime: Duration? = null,
     /**
      * Whether the Mengen-Inkrement is on offer. Only on a standing task: the
      * count grows with every confirmed completion, and a ToDo is completed once.
@@ -949,7 +980,7 @@ fun ExtrasBox(
         breakAfter != null,
         extras.hasPomodoro,
         extras.hasReminder,
-        growth != null,
+        extras.timer != null,
         extras.hasQuantity,
         extras.hasDeadline,
         subtasks?.subtasks?.isNotEmpty() == true,
@@ -962,7 +993,7 @@ fun ExtrasBox(
             (if (today != null) ", Deadline" else "") +
             (if (onSubtasks != null) ", Subtasks" else "") +
             (if (offerQuantity) ", Mengen-Inkrement" else "") +
-            if (onGrowth != null) " und Growth-Task." else ".",
+            if (onGrowth != null) " und Timer-Task." else ".",
         summary = when (active) {
             0 -> "Keine — antippen zum Öffnen."
             1 -> "1 aktiv"
@@ -1019,7 +1050,14 @@ fun ExtrasBox(
             }
         }
         if (onGrowth != null) {
-            GrowthRow(growth = growth, onGrowth = onGrowth, issues = growthIssues)
+            TimerRow(
+                extras = extras,
+                onExtras = onExtras,
+                timerTime = timerTime,
+                growth = growth,
+                onGrowth = onGrowth,
+                issues = growthIssues,
+            )
         }
         if (offerQuantity) {
             QuantityRow(extras = extras, onExtras = onExtras)
@@ -1355,31 +1393,81 @@ private fun HoursDialog(
 }
 
 /**
- * The Growth-Task switch and the three lengths behind it.
+ * The Timer-Task switch, its buffer, and the "Zielzeit" behind it.
  *
- * Three lengths and not three clock times: what grows is how long the task runs,
- * and the start time stays the start time — which with dynamic placement becomes
- * the *earliest* start time. See `GrowthTask.kt`.
+ * Three boxes, each inside the one before: a Timer-Task may have a buffer, and
+ * may work towards a target. The target is what a Growth-Task used to be — three
+ * lengths and not three clock times: what grows is how long the timer runs, and
+ * the start time stays the start time, which with dynamic placement becomes the
+ * *earliest* one. See `TimerTask.kt` and `GrowthTask.kt`.
  */
 @Composable
-private fun GrowthRow(
+private fun TimerRow(
+    extras: ItemExtras,
+    onExtras: (ItemExtras) -> Unit,
+    timerTime: Duration?,
     growth: GrowthSetting?,
     onGrowth: (GrowthSetting?) -> Unit,
     issues: List<GrowthFitIssue>,
 ) {
+    val timer = extras.timer
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
         CheckRow(
+            checked = timer != null,
+            // Unticking takes the "Zielzeit" along — the caller's `onExtras` does it.
+            onCheckedChange = { on -> onExtras(extras.copy(timer = if (on) TimerSetting() else null)) },
+            label = "Timer-Task",
+            hint = "Für Aufgaben, bei denen es um investierte Zeit geht statt um ein " +
+                "Ergebnis — »2 h lernen«. Im Dashboard steht dann »Start« statt " +
+                "»Erledigt«, und ein Timer zählt die Zeit herunter.",
+        )
+        if (timer == null) return@Column
+
+        CheckRow(
+            checked = timer.buffer != null,
+            onCheckedChange = { on ->
+                onExtras(extras.copy(timer = timer.copy(buffer = if (on) DEFAULT_TIMER_BUFFER else null)))
+            },
+            label = "Pufferzeit",
+            hint = "Der Block wird um diese Zeit länger als der Timer. Startest du etwas " +
+                "später, läuft die Zeit so nicht in die nächste Aufgabe.",
+        )
+        if (timer.buffer != null) {
+            EtaDurationPicker(
+                value = timer.buffer,
+                onValueChange = { onExtras(extras.copy(timer = timer.copy(buffer = it))) },
+                step = 5.minutes,
+                minimum = MIN_TIMER_BUFFER,
+            )
+        }
+
+        CheckRow(
             checked = growth != null,
-            onCheckedChange = { on -> onGrowth(if (on) GrowthSetting.Default else null) },
-            label = "Growth-Task",
-            hint = "Wird mit bestätigten Abschlüssen länger, bis die Zielzeit " +
-                "erreicht ist.",
+            onCheckedChange = { on ->
+                onGrowth(
+                    if (on) {
+                        // From the time the form already has, so ticking the box
+                        // does not quietly make the task shorter.
+                        val start = (timerTime ?: DEFAULT_GROWTH_START).coerceAtLeast(MIN_GROWTH_DURATION)
+                        GrowthSetting.Default.copy(
+                            start = start,
+                            target = maxOf(DEFAULT_GROWTH_TARGET, start),
+                        )
+                    } else {
+                        null
+                    },
+                )
+            },
+            label = "Zielzeit",
+            hint = "Die Timer-Zeit wächst Schritt für Schritt, bis die Zielzeit erreicht " +
+                "ist. Gezählt wird nur ein Termin, dessen Zeit voll abgearbeitet wurde.",
         )
         if (growth == null) return@Column
 
         EtaField(
             label = "Startzeit",
-            hint = "So lang beginnt die Aufgabe. Antippen, um sie sekundengenau einzugeben.",
+            hint = "Mit dieser Timer-Zeit beginnt die Aufgabe. Antippen, um sie " +
+                "sekundengenau einzugeben.",
         ) {
             EtaDurationPicker(
                 value = growth.start,
@@ -1421,7 +1509,7 @@ private fun GrowthRow(
             label = "Dynamische Zeitsetzung",
             hint = "Der Beginn gilt als früheste Uhrzeit. Ist sie belegt, rückt die " +
                 "Aufgabe direkt dahinter — bei Streit entscheidet die Reihenfolge im " +
-                "Reiter Growth-Tasks.",
+                "Reiter Ziele.",
         )
 
         GrowthFitWarning(issues)

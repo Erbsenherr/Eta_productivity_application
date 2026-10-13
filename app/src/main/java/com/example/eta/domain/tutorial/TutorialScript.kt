@@ -657,7 +657,7 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         text = {
             "Verplante Karten kannst du verschieben oder zurück auf den Revolver " +
                 "ziehen. Gedrückt halten zeigt weitere Optionen. Das war der " +
-                "Quickstart! Zu den Extras, den Growth-Tasks, den Verträgen und dem " +
+                "Quickstart! Zu den Extras, den Timer-Tasks, den Verträgen und dem " +
                 "Belohn-o-mat gibt es eigene Tutorials: Einstellungen → Tutorial."
         },
         allow = setOf(TutorialGate.PLANNER_CONFIRM),

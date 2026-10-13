@@ -225,7 +225,7 @@ class WeekTabViewModel(
         // stands is worked out for it day by day. Both would take the gesture
         // back at the next evening, so it is refused here and said why.
         if (item.isGrowthTask && length != wanted) {
-            _notice.value = "»${item.name}« ist eine Growth-Task — ihre Dauer wächst von " +
+            _notice.value = "»${item.name}« arbeitet auf eine Zielzeit hin — ihre Dauer wächst von " +
                 "selbst und lässt sich hier nicht ziehen."
             return
         }

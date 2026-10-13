@@ -171,6 +171,8 @@ fun NowBox(
      * consists of. The screen asks again before it counts.
      */
     onConfirm: (BlockWithItem) -> Unit = {},
+    /** The timer of a Timer-Task, which stands where "Erledigt" would. */
+    timer: TimerActions? = null,
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
 
@@ -254,6 +256,7 @@ fun NowBox(
                                 onCheckSubtask(entry.entry.block.id, subtaskId, on)
                             },
                             onConfirm = { onConfirm(entry.entry) },
+                            timer = timer,
                         )
                     }
                 }
@@ -287,9 +290,12 @@ private fun NowLine(
     checkTimes: Map<String, Instant> = emptyMap(),
     onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit = { _, _ -> },
     onConfirm: () -> Unit = {},
+    timer: TimerActions? = null,
 ) {
     val entry = now.entry
     val block = entry.block
+    // A Timer-Task is worked, not ticked: its timer stands where the button would.
+    val timed = timer != null && entry.item.timerTask
     val routine = entry.item.routineMode && steps.isNotEmpty()
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
@@ -331,7 +337,8 @@ private fun NowLine(
             style = EtaTheme.typography.bodyStrong,
             color = EtaTheme.colors.textSecondary,
         )
-        PomodoroLine(block, minuteOfDay, running)
+        // A Timer-Task's rhythm follows its timer, which says the phase itself.
+        PomodoroLine(block, minuteOfDay, running && !timed)
 
         // The steps, tickable while the group is being worked through. On the "Als
         // Nächstes" page they are read-only: nothing has begun yet, and a checkbox
@@ -387,7 +394,11 @@ private fun NowLine(
 
         // Only for what is running, and only for the task itself: confirming a
         // journey or a break would be confirming the frame rather than the thing.
-        if (running && now.phase == BlockPhase.TASK && block.isOpen) {
+        if (timed && timer != null) {
+            // On both pages and in every phase: a sitting may begin early, and
+            // one begun late is still running when the plan says "Pause".
+            if (block.isOpen) TimerControls(entry = entry, actions = timer)
+        } else if (running && now.phase == BlockPhase.TASK && block.isOpen) {
             EtaButton(
                 text = if (steps.isEmpty()) "Erledigt" else "Gruppe erledigt",
                 style = EtaButtonStyle.Secondary,
@@ -752,6 +763,8 @@ fun TasksBox(
      * read from, and an id cannot go stale.
      */
     onEdit: ((blockId: String) -> Unit)? = null,
+    /** The timer under every open Timer-Task of the list; null shows none. */
+    timer: TimerActions? = null,
     emptyHint: String = "Nichts geplant.",
     /**
      * Set to make the box foldable, under this name — see [rememberFold]. Open
@@ -810,6 +823,7 @@ fun TasksBox(
                         onStartChange = onStartChange,
                         onUncancel = onUncancel,
                         onEdit = onEdit,
+                        timer = timer,
                     )
                 }
             }
@@ -825,6 +839,7 @@ private fun TaskRow(
     onStartChange: ((BlockWithItem, LocalTime) -> Unit)? = null,
     onUncancel: ((BlockWithItem) -> Unit)? = null,
     onEdit: ((blockId: String) -> Unit)? = null,
+    timer: TimerActions? = null,
 ) {
     var pickingStart by remember(entry.block.id) { mutableStateOf(false) }
     var offeringUncancel by remember(entry.block.id) { mutableStateOf(false) }
@@ -913,6 +928,16 @@ private fun TaskRow(
                 text = "Lange drücken, um sie doch einzuplanen.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
+            )
+        }
+
+        // Here as well as in the "Gerade" box: a sitting begun before or after
+        // its hour is not in that box at all.
+        if (timer != null && entry.item.timerTask && entry.block.isOpen) {
+            TimerControls(
+                entry = entry,
+                actions = timer,
+                modifier = Modifier.padding(start = 46.dp),
             )
         }
 

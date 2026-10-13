@@ -37,6 +37,10 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
+import androidx.compose.runtime.key
+import com.example.eta.domain.growth.growthCurrent
+import com.example.eta.domain.growth.isGrowthTask
+import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.lists.RecurringGroupEditDialog
@@ -45,8 +49,9 @@ import com.example.eta.ui.theme.EtaTheme
 import kotlin.math.roundToInt
 
 /**
- * The Growth-Tasks tab: the tasks that get longer, in the order that decides
- * which of them wins a slot.
+ * The "Ziele" tab: what is working towards something — Timer-Tasks whose time
+ * grows towards a "Zielzeit", in the order that decides which of them wins a
+ * slot, and under them the tasks whose count grows.
  *
  * Its own tab rather than a section of the Listen tab, because the **order** is
  * what this screen is for. Growth tasks appear in the standing schedule as well
@@ -68,20 +73,23 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
             verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
         ) {
             Column {
-                EtaText(text = "Growth-Tasks", style = EtaTheme.typography.title)
+                EtaText(text = "Ziele", style = EtaTheme.typography.title)
                 EtaText(
-                    text = "Aufgaben, die mit jedem Abschluss länger werden.",
+                    text = "Timer-Tasks, die auf eine Zielzeit hinarbeiten, und Aufgaben " +
+                        "mit Mengen-Inkrement.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textSecondary,
                 )
             }
 
+            EtaText(text = "Zielzeit", style = EtaTheme.typography.heading)
             if (state.groups.isEmpty()) {
                 EtaSurface(modifier = Modifier.fillMaxWidth()) {
                     EtaText(
-                        text = "Noch keine. Eine Growth-Task beginnt kurz und wächst bis zu " +
-                            "ihrer Zielzeit — für alles, was sich in voller Länge nicht " +
-                            "anfangen lässt.",
+                        text = "Noch keine. Eine Timer-Task zählt die Zeit, die du " +
+                            "investierst. Mit einer Zielzeit beginnt sie kurz und wächst " +
+                            "mit jedem voll absolvierten Termin — für alles, was sich in " +
+                            "voller Länge nicht anfangen lässt.",
                         style = EtaTheme.typography.body,
                         color = EtaTheme.colors.textMuted,
                     )
@@ -101,7 +109,26 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                 )
             }
 
-            EtaButton(text = "Growth-Task erstellen", onClick = { creating = true })
+            EtaButton(text = "Timer-Task mit Zielzeit erstellen", onClick = { creating = true })
+
+            EtaText(text = "Mengen-Inkrement", style = EtaTheme.typography.heading)
+            if (state.counted.isEmpty()) {
+                EtaText(
+                    text = "Noch keine. Ein Mengen-Inkrement schaltest du in den Extras " +
+                        "einer wiederkehrenden Aufgabe ein — etwa »Klimmzüge, beginnend " +
+                        "mit 1«.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    state.counted.forEach { group ->
+                        key(group.representative.id) {
+                            CountedRow(group = group, onClick = { editing = group })
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.size(EtaTheme.spacing.xl))
         }
     }
@@ -124,7 +151,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
         RecurringGroupEditDialog(
             group = group,
             definitions = state.definitions,
-            title = "Growth-Task",
+            title = if (group.representative.isGrowthTask) "Timer-Task" else "Aufgabe",
             subtasks = state.subtasks[group.representative.id].orEmpty(),
             foldCandidates = state.foldable.foldCandidatesExcept(*group.ids.toTypedArray()),
             onDismiss = { editing = null },
@@ -225,7 +252,42 @@ private fun ReorderableList(
     }
 }
 
-/** One growth task: where it stands, where it is going, and when it happens. */
+/** A task with a Mengen-Inkrement: when it happens, and where its count stands. */
+@Composable
+private fun CountedRow(group: RecurringGroup, onClick: () -> Unit) {
+    val item = group.representative
+    val interactionSource = remember { MutableInteractionSource() }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
+        ) {
+            EtaText(
+                text = item.name,
+                style = EtaTheme.typography.bodyStrong,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            EtaText(
+                text = buildString {
+                    append(formatWeekdays(group.weekdays))
+                    item.startTime?.let { append(" · ${it.formatClock()}") }
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+            QuantityText(item)
+        }
+    }
+}
+
+/** One Timer-Task with a target: where it stands, where it is going, and when it happens. */
 @Composable
 private fun GrowthRow(
     group: RecurringGroup,
@@ -281,7 +343,7 @@ private fun GrowthRow(
                 )
                 growth?.let {
                     EtaText(
-                        text = "${item.estimatedDuration?.formatShort() ?: "—"} → " +
+                        text = "${item.growthCurrent?.formatShort() ?: "—"} → " +
                             "${it.target.formatShort()} (+${it.increment.formatShort()}" +
                             (if (it.every > 1) " alle ${it.every} Abschlüsse)" else ")"),
                         style = EtaTheme.typography.caption,

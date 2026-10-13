@@ -36,6 +36,7 @@ import com.example.eta.ui.attributes.MIN_TASK_DURATION
 import com.example.eta.ui.attributes.RecurringAttributeFields
 import com.example.eta.domain.growth.growthSetting
 import com.example.eta.domain.growth.quantityLabel
+import com.example.eta.domain.growth.timerDuration
 import com.example.eta.ui.attributes.RecurringAttributes
 import com.example.eta.ui.attributes.growthIssuesFor
 import com.example.eta.ui.attributes.TodoAttributeFields
@@ -591,7 +592,9 @@ fun recurringSummary(group: RecurringGroup): String = buildString {
         is Rhythm.Monthly -> append(" (${rhythm.weekOfMonth}. im Monat)")
     }
     group.representative.startTime?.let { append(" · ${it.formatClock()}") }
-    group.representative.estimatedDuration?.let { append(" · ${it.formatShort()}") }
+    // A Timer-Task says the time on its timer; the buffer behind it is slack.
+    group.representative.timerDuration?.let { append(" · ${it.formatShort()}") }
+    if (group.representative.timerTask) append(" Timer")
     group.representative.repeatUntil?.let { append(" · bis ${it.formatLong()}") }
     // A growth task is an ordinary standing task and belongs in this list; what
     // it has extra is where its length is going, and the row is the place to say

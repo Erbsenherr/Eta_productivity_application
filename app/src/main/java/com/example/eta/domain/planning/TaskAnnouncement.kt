@@ -40,5 +40,6 @@ fun spokenAnnouncement(events: List<TaskEvent>, withNotes: Boolean): String =
             TaskEventKind.STILL_ACTIVE -> "Bist du noch bei $name?"
             TaskEventKind.POMODORO_PAUSE -> "Pause bei $name."
             TaskEventKind.POMODORO_WORK -> "Weiter mit $name."
+            TaskEventKind.TIMER_DONE -> "$name: die Timer-Zeit ist erreicht."
         }
     }

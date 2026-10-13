@@ -469,7 +469,7 @@ private enum class EtaTab(val label: String) {
      * **order** growth tasks hold, which is what settles a slot two of them both
      * want.
      */
-    Growth("Growth-Tasks"),
+    Growth("Ziele"),
 
     /** Long-term rewards, filled by the evening. Before the settings, which stay last. */
     Rewards("Belohn-o-mat"),

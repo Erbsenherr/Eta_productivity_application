@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -47,6 +49,7 @@ private const val PRESSED_SCALE = 0.97f
  * Material artifacts this project deliberately does without, and a subtle squeeze
  * suits the card-and-drag feel of the planner better anyway.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EtaButton(
     text: String,
@@ -54,6 +57,8 @@ fun EtaButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     style: EtaButtonStyle = EtaButtonStyle.Primary,
+    /** A second meaning behind a long press; null leaves the button a plain one. */
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -84,10 +89,11 @@ fun EtaButton(
                     Modifier
                 },
             )
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
+                onLongClick = onLongClick,
                 onClick = onClick,
             )
             .padding(PaddingValues(horizontal = 20.dp, vertical = 12.dp)),

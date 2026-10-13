@@ -35,8 +35,8 @@ enum class TutorialId(
         advanced = false,
     ),
     GROWTH(
-        title = "Growth-Tasks",
-        summary = "Aufgaben, die klein anfangen und mit jedem Abschluss wachsen.",
+        title = "Timer-Tasks",
+        summary = "Aufgaben, bei denen Zeit zählt — und die mit einer Zielzeit wachsen.",
         advanced = true,
     ),
     CONTRACTS(
@@ -271,7 +271,7 @@ val EXTRAS_STEPS: List<TutorialStep> = listOf(
         TutorialStage.EXTRAS,
         "Das waren die Extras",
         "Wiederkehrende Aufgaben kennen zwei weitere: das Mengen-Inkrement und die " +
-            "Growth-Task — zu ihr gibt es ein eigenes Tutorial. Für einen einzelnen " +
+            "Timer-Task — zu ihr gibt es ein eigenes Tutorial. Für einen einzelnen " +
             "Termin änderst du die Extras im Tagesplaner: den Block gedrückt halten.",
     ),
 )
@@ -279,42 +279,46 @@ val EXTRAS_STEPS: List<TutorialStep> = listOf(
 val GROWTH_STEPS: List<TutorialStep> = listOf(
     text(
         TutorialStage.GROWTH,
-        "Growth-Tasks",
-        "Manches lässt sich in voller Länge nicht anfangen: eine Stunde lesen, " +
-            "dreißig Minuten meditieren. Eine Growth-Task beginnt deshalb kurz und " +
-            "wird mit jedem bestätigten Abschluss etwas länger — bis zu ihrer Zielzeit.",
+        "Timer-Tasks",
+        "Manche Aufgaben zeichnen sich nicht durch ein Ergebnis aus, sondern durch " +
+            "die Zeit, die du investierst: zwei Stunden lernen, dreißig Minuten " +
+            "meditieren. Eine Timer-Task hakst du deshalb nicht ab — im Dashboard " +
+            "drückst du »Start«, und ein Timer zählt die Zeit herunter.",
     ),
     text(
         TutorialStage.GROWTH,
-        "Drei Angaben",
-        "Eine Growth-Task ist eine wiederkehrende Aufgabe mit drei Zusätzen: der " +
-            "Dauer, mit der sie startet, der Zielzeit und dem Inkrement — dem, was " +
-            "ein Schritt hinzufügt. Im Formular stehen sie unter »Extras«; das " +
-            "Häkchen »Growth-Task« ist dort schon gesetzt.",
+        "Puffer und Zielzeit",
+        "Zwei Zusätze stehen im Formular unter »Extras«. Die Pufferzeit macht den " +
+            "Block etwas länger als den Timer, damit ein später Start nicht in die " +
+            "nächste Aufgabe läuft. Mit einer Zielzeit beginnt die Aufgabe kurz und " +
+            "wächst um ihr Inkrement, bis sie erreicht ist. Hier im Reiter »Ziele« " +
+            "sind beide Häkchen schon gesetzt.",
     ),
     TutorialStep(
         stage = TutorialStage.GROWTH,
         title = "Eine anlegen",
         text = {
-            "Tippe auf »Growth-Task erstellen«. Gib einen Namen ein — etwa »Lesen« —, " +
+            "Tippe auf »Timer-Task mit Zielzeit erstellen«. Gib einen Namen ein — etwa »Lesen« —, " +
                 "wähle Wochentage und tippe auf »Erstellen«. Das Fenster verdeckt " +
                 "diese Leiste; danach geht es hier weiter."
         },
         kind = StepKind.TASK,
-        checks = { listOf(TutorialCheck("Eine Growth-Task erstellen", it.growthTasks > 0)) },
+        checks = { listOf(TutorialCheck("Eine Timer-Task erstellen", it.growthTasks > 0)) },
     ),
     text(
         TutorialStage.GROWTH,
         "So wächst sie",
-        "Die Aufgabe steht jetzt in deinem Wochenplan wie jede wiederkehrende. Hakst " +
-            "du sie ab und schließt den Tag ab, wächst sie um ihr Inkrement. Mit " +
-            "»dynamischer Zeitsetzung« sucht sie sich ab ihrer frühesten Uhrzeit " +
-            "selbst den nächsten freien Platz.",
+        "Die Aufgabe steht jetzt in deinem Wochenplan wie jede wiederkehrende. " +
+            "Läuft ihr Timer bis zum Ende und schließt du den Tag ab, wächst sie um " +
+            "ihr Inkrement — »Pause« von Hand zählt dabei nicht mit, ein vorzeitiges " +
+            "»Ende« (Knopf gedrückt halten) bringt kein Inkrement. Mit »dynamischer " +
+            "Zeitsetzung« sucht sie sich ab ihrer frühesten Uhrzeit selbst den " +
+            "nächsten freien Platz.",
     ),
     text(
         TutorialStage.GROWTH,
         "Die Reihenfolge",
-        "Antippen öffnet eine Growth-Task zum Bearbeiten. Lange drücken und ziehen " +
+        "Antippen öffnet eine Aufgabe zum Bearbeiten. Lange drücken und ziehen " +
             "ändert die Reihenfolge: Wollen zwei dynamische Aufgaben denselben Platz, " +
             "bekommt ihn die weiter oben. $WHERE_TO_SWITCH",
     ),

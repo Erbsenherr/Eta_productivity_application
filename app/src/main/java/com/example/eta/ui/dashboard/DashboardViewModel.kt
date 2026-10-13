@@ -37,6 +37,18 @@ import com.example.eta.domain.planning.nextPlanning
 import com.example.eta.domain.planning.claimsItsSlot
 import com.example.eta.domain.planning.snapToGrid
 import com.example.eta.domain.planning.withPomodoro
+import com.example.eta.domain.planning.endMinute
+import com.example.eta.domain.planning.fullTimerGoal
+import com.example.eta.domain.planning.timerBilled
+import com.example.eta.domain.planning.timerCleared
+import com.example.eta.domain.planning.timerElapsed
+import com.example.eta.domain.planning.timerOverflow
+import com.example.eta.domain.planning.timerPaused
+import com.example.eta.domain.planning.timerResumed
+import com.example.eta.domain.planning.timerStarted
+import com.example.eta.domain.planning.timerWasUsed
+import com.example.eta.domain.growth.isGrowthTask
+import com.example.eta.domain.growth.timerBufferOrZero
 import com.example.eta.domain.planning.withoutPomodoro
 import com.example.eta.domain.reevaluation.LEGACY_DAILY_CAP
 import com.example.eta.domain.reward.plannedYield
@@ -113,6 +125,35 @@ data class DashboardUiState(
 }
 
 /**
+ * A Timer-Task started so late that its time would run into the next task.
+ *
+ * What the dialog shows; the answer is worked out again when it is given.
+ */
+data class TimerOverflowPrompt(
+    val blockId: String,
+    val name: String,
+    val goal: Duration,
+    val projectedEnd: LocalTime,
+    val nextName: String,
+    val nextStart: LocalTime,
+    /** What the timer would count instead, or null when no time is left at all. */
+    val shortenedGoal: Duration?,
+    /** When the next task would begin instead, or null when it cannot be moved. */
+    val pushedStart: LocalTime?,
+)
+
+/** A timer ended short of its time, for the screen to say what that means. */
+data class TimerResult(
+    val name: String,
+    val worked: Duration,
+    val goal: Duration,
+    /** A "Zielzeit" is being worked towards, and this sitting does not count. */
+    val missesIncrement: Boolean,
+    /** The block's frame had run out — the case a larger buffer answers. */
+    val frameOver: Boolean,
+)
+
+/**
  * What the list did with a correction it could not carry out as asked.
  *
  * The dashboard's list edits the same blocks the planner does, so it obeys the
@@ -185,6 +226,12 @@ class DashboardViewModel(
 
     private val _followUp = MutableStateFlow<FollowUpQuestion?>(null)
     val followUp: StateFlow<FollowUpQuestion?> = _followUp.asStateFlow()
+
+    private val _timerOverflow = MutableStateFlow<TimerOverflowPrompt?>(null)
+    val timerOverflow: StateFlow<TimerOverflowPrompt?> = _timerOverflow.asStateFlow()
+
+    private val _timerResult = MutableStateFlow<TimerResult?>(null)
+    val timerResult: StateFlow<TimerResult?> = _timerResult.asStateFlow()
 
     val uiState: StateFlow<DashboardUiState> = combine(
         pointsRepository.observeBalance(),
@@ -290,7 +337,8 @@ class DashboardViewModel(
                 // The billed length belongs to the tick being taken back: one set
                 // by finishing early would otherwise survive and bill a task that
                 // then runs its full course at the shortened figure.
-                planRepository.reopen(entry.block.copy(actualDuration = null))
+                // A Timer-Task's timer goes with it: the sitting starts over.
+                planRepository.reopen(entry.block.copy(actualDuration = null).timerCleared())
             } else {
                 // Only a tick on the day itself can be early; one on another day
                 // is being caught up, and the clock says nothing about it.
@@ -537,6 +585,165 @@ class DashboardViewModel(
             val block = planRepository.findBlock(blockId) ?: return@launch
             planRepository.addBlock(block.withoutPomodoro().copy(updatedAt = clock.now()))
             taskStartCoordinator.reschedule()
+        }
+    }
+
+    // --- Timer-Tasks ---------------------------------------------------------
+
+    /** Today's entry by id, with the block read fresh — the list's copy may be older. */
+    private suspend fun timerEntry(blockId: String): BlockWithItem? {
+        val listed = uiState.value.todayBlocks.firstOrNull { it.block.id == blockId } ?: return null
+        val block = planRepository.findBlock(blockId) ?: return null
+        return listed.copy(block = block)
+    }
+
+    /**
+     * "Start": the timer of a Timer-Task begins to count.
+     *
+     * Begun so late that its time would run into the next task, it asks first —
+     * see [TimerOverflowPrompt]. The buffer is what usually makes that question
+     * unnecessary.
+     */
+    fun startTimer(blockId: String) {
+        viewModelScope.launch {
+            val entry = timerEntry(blockId) ?: return@launch
+            if (!entry.block.isOpen || entry.block.timerWasUsed) return@launch
+            val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
+            val minute = nowMinute()
+            val overflow = timerOverflow(uiState.value.todayBlocks, entry, minute, goal)
+                ?.takeIf { it.shortenedGoal != null || it.pushedNext != null }
+            if (overflow == null) {
+                beginTimer(entry.block, goal)
+                return@launch
+            }
+            _timerOverflow.value = TimerOverflowPrompt(
+                blockId = blockId,
+                name = entry.item.name,
+                goal = goal,
+                projectedEnd = minuteToLocalTime(minute + ((goal.inWholeSeconds + 59) / 60).toInt()),
+                nextName = overflow.next.item.name,
+                nextStart = overflow.next.block.start,
+                shortenedGoal = overflow.shortenedGoal,
+                pushedStart = overflow.pushedNext?.start,
+            )
+        }
+    }
+
+    /**
+     * The answer to a late start: the timer stops early ([shorten]), or the
+     * next task begins later. Worked out again from the day as it now stands —
+     * a minute has passed since the question was put.
+     */
+    fun answerTimerOverflow(shorten: Boolean) {
+        val prompt = _timerOverflow.value ?: return
+        _timerOverflow.value = null
+        viewModelScope.launch {
+            val entry = timerEntry(prompt.blockId) ?: return@launch
+            if (!entry.block.isOpen || entry.block.timerWasUsed) return@launch
+            val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
+            val overflow = timerOverflow(uiState.value.todayBlocks, entry, nowMinute(), goal)
+            when {
+                overflow == null -> beginTimer(entry.block, goal)
+                shorten -> beginTimer(entry.block, overflow.shortenedGoal ?: goal)
+                else -> {
+                    overflow.pushedNext?.let { planRepository.addBlock(it.copy(updatedAt = clock.now())) }
+                    beginTimer(entry.block, goal)
+                }
+            }
+        }
+    }
+
+    fun dismissTimerOverflow() {
+        _timerOverflow.value = null
+    }
+
+    private suspend fun beginTimer(block: PlannedBlock, goal: Duration) {
+        val now = clock.now()
+        planRepository.addBlock(block.timerStarted(goal, now).copy(updatedAt = now))
+        // The pomodoro turns and the goal ring off the timer, so the alarm has
+        // to be aimed again whenever it starts, stops or goes on.
+        taskStartCoordinator.reschedule()
+    }
+
+    /** "Pause": a break by hand, which is not counted. */
+    fun pauseTimer(blockId: String) = changeTimer(blockId) { block, now -> block.timerPaused(now) }
+
+    /** "Weiter". */
+    fun resumeTimer(blockId: String) = changeTimer(blockId) { block, now -> block.timerResumed(now) }
+
+    private fun changeTimer(blockId: String, change: (PlannedBlock, Instant) -> PlannedBlock) {
+        viewModelScope.launch {
+            val block = planRepository.findBlock(blockId) ?: return@launch
+            if (!block.isOpen || !block.timerWasUsed) return@launch
+            val now = clock.now()
+            planRepository.addBlock(change(block, now).copy(updatedAt = now))
+            taskStartCoordinator.reschedule()
+        }
+    }
+
+    /**
+     * "Ende": the sitting is over, and what the timer counted is what it was.
+     *
+     * Worked in full, it is a completion like any other and the day asks what
+     * to do with the time. Ended short, it is billed at what was counted and
+     * does not count towards the next increment — and the screen says so, with
+     * the advice about the buffer if the frame had run out.
+     */
+    fun endTimer(blockId: String) {
+        viewModelScope.launch {
+            val entry = timerEntry(blockId) ?: return@launch
+            val block = entry.block
+            if (!block.isOpen || !block.timerWasUsed) return@launch
+
+            val now = clock.now()
+            val buffer = entry.item.timerBufferOrZero
+            val goal = block.fullTimerGoal(buffer)
+            val counted = block.timerElapsed(now)
+            val full = counted >= goal
+            planRepository.complete(
+                block.timerPaused(now).copy(actualDuration = null),
+                actualDuration = if (full) null else block.timerBilled(now, buffer),
+            )
+            taskStartCoordinator.reschedule()
+
+            if (full) {
+                askFollowUp(entry, billing = null)
+            } else {
+                _timerResult.value = TimerResult(
+                    name = entry.item.name,
+                    worked = counted,
+                    goal = goal,
+                    missesIncrement = entry.item.isGrowthTask &&
+                        setupRepository.find()?.allowPartialTimerGrowth != true,
+                    frameOver = nowMinute() >= block.endMinute(),
+                )
+            }
+        }
+    }
+
+    fun dismissTimerResult() {
+        _timerResult.value = null
+    }
+
+    /**
+     * A Timer-Task ticked off without its timer, after the screen has asked.
+     *
+     * [worked] is the time the user says was put in, or null for all of it. It
+     * is stored the way the timer stores its own count — plus the buffer — so
+     * the evening bills it and decides about the increment by the one rule.
+     */
+    fun completeTimerByHand(blockId: String, worked: Duration?) {
+        viewModelScope.launch {
+            val entry = timerEntry(blockId) ?: return@launch
+            val block = entry.block
+            if (!block.isOpen) return@launch
+            val buffer = entry.item.timerBufferOrZero
+            val billed = worked
+                ?.takeIf { it < block.fullTimerGoal(buffer) }
+                ?.let { (it + buffer).coerceAtMost(block.plannedDuration) }
+            planRepository.complete(block.copy(actualDuration = null), actualDuration = billed)
+            taskStartCoordinator.reschedule()
+            askFollowUp(entry, billing = null)
         }
     }
 

@@ -73,7 +73,7 @@ val Item.growthSetting: GrowthSetting?
         val target = growthTarget ?: return null
         val increment = growthIncrement ?: return null
         return GrowthSetting(
-            start = growthStart ?: estimatedDuration ?: target,
+            start = growthStart ?: timerDuration ?: target,
             target = target,
             increment = increment,
             dynamic = growthDynamic,
@@ -81,25 +81,31 @@ val Item.growthSetting: GrowthSetting?
         )
     }
 
-/** Where the length stands now — the block's own length, as everything else sees it. */
+/**
+ * Where the time on the timer stands now.
+ *
+ * Not the block's length: since step 42 that may carry a buffer behind it, and
+ * growing is about the time worked — see `Item.timerDuration`.
+ */
 val Item.growthCurrent: Duration?
-    get() = if (isGrowthTask) estimatedDuration else null
+    get() = if (isGrowthTask) timerDuration else null
 
 /** Nothing left to grow: the target has been reached. */
 val Item.isFullyGrown: Boolean
-    get() = isGrowthTask && (estimatedDuration ?: Duration.ZERO) >= (growthTarget ?: Duration.ZERO)
+    get() = isGrowthTask && (timerDuration ?: Duration.ZERO) >= (growthTarget ?: Duration.ZERO)
 
 /**
  * The length after one more confirmed evening, capped at the target.
  *
  * Null when this does not grow, and the current length when it is already there —
- * so the caller can compare and write nothing when nothing moved.
+ * so the caller can compare and write nothing when nothing moved. The step is
+ * taken on the time on the timer; the buffer stays behind it, as long as it was.
  */
 fun Item.grownDuration(): Duration? {
     val target = growthTarget ?: return null
     val increment = growthIncrement ?: return null
-    val current = estimatedDuration ?: return null
-    return minOf(current + increment, target)
+    val current = timerDuration ?: return null
+    return minOf(current + increment, target) + timerBufferOrZero
 }
 
 /**

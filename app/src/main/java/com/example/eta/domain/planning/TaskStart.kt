@@ -42,7 +42,7 @@ fun PlannedBlock.endsAt(timeZone: TimeZone): Instant =
  * they are about the same block at a minute on the plan, and one pending intent
  * for the whole day is the property worth keeping.
  */
-enum class TaskEventKind { START, END, STILL_ACTIVE, POMODORO_PAUSE, POMODORO_WORK }
+enum class TaskEventKind { START, END, STILL_ACTIVE, POMODORO_PAUSE, POMODORO_WORK, TIMER_DONE }
 
 /** One announcement waiting to be made. */
 data class TaskEvent(
@@ -69,6 +69,25 @@ private fun eventsOf(
             add(TaskEvent(entry, TaskEventKind.START, entry.block.startsAt(timeZone)))
             if (entry.item.endSound) {
                 add(TaskEvent(entry, TaskEventKind.END, entry.block.endsAt(timeZone)))
+            }
+            if (entry.item.timerTask) {
+                // A Timer-Task's rhythm follows its timer, not the hour it was
+                // planned for: nothing rings until "Start", and nothing while it
+                // is paused. Its goal announces itself as well.
+                entry.block.timerSignals().forEach { signal ->
+                    add(
+                        TaskEvent(
+                            entry = entry,
+                            kind = when (signal.kind) {
+                                TimerSignalKind.PAUSE -> TaskEventKind.POMODORO_PAUSE
+                                TimerSignalKind.WORK -> TaskEventKind.POMODORO_WORK
+                                TimerSignalKind.DONE -> TaskEventKind.TIMER_DONE
+                            },
+                            at = signal.at,
+                        ),
+                    )
+                }
+                return@buildList
             }
             entry.block.pomodoroBoundaries().forEach { boundary ->
                 add(

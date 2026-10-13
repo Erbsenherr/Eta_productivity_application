@@ -3,6 +3,7 @@ package com.example.eta.data.repository
 import com.example.eta.data.local.ItemDao
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.growth.GrowthSetting
+import com.example.eta.domain.growth.withBufferAdded
 import com.example.eta.domain.growth.withGrowth
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.ItemExtras
@@ -228,6 +229,7 @@ class ItemRepository(
             // Last, because for a growth task the length belongs to growing
             // rather than to the form above it.
             .withGrowth(growth)
+            .withBufferAdded()
         val (firstRule, firstStart) = timed.first()
         val written = listOf(base.copy(recurrenceRule = firstRule, startTime = firstStart)) +
             timed.drop(1).map { (rule, start) ->

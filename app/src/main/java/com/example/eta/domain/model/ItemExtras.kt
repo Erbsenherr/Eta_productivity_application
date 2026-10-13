@@ -1,6 +1,9 @@
 package com.example.eta.domain.model
 
 import com.example.eta.domain.growth.QuantitySetting
+import com.example.eta.domain.growth.TimerSetting
+import com.example.eta.domain.growth.timerSetting
+import com.example.eta.domain.growth.withTimer
 import com.example.eta.domain.growth.quantitySetting
 import com.example.eta.domain.growth.withQuantity
 import kotlin.time.Duration
@@ -46,6 +49,13 @@ data class ItemExtras(
     val quantity: QuantitySetting? = null,
     val repeatUntil: LocalDate? = null,
     val routineMode: Boolean = false,
+    /**
+     * The ninth: a Timer-Task, with its buffer. Here for the reason this class
+     * exists — it reaches every save path without a parameter of its own. Only
+     * the flag and the buffer are written; the length is the paths' own
+     * business, and they finish with `withBufferAdded`.
+     */
+    val timer: TimerSetting? = null,
 ) {
     val hasPomodoro: Boolean get() = pomodoroWork != null && pomodoroPause != null
 
@@ -65,6 +75,7 @@ data class ItemExtras(
             quantity = item.quantitySetting,
             repeatUntil = item.repeatUntil,
             routineMode = item.routineMode,
+            timer = item.timerSetting,
         )
     }
 }
@@ -81,7 +92,7 @@ fun Item.withExtras(extras: ItemExtras): Item = copy(
     deadlineAt = extras.deadlineAt,
     repeatUntil = extras.repeatUntil,
     routineMode = extras.routineMode,
-).withQuantity(extras.quantity)
+).withQuantity(extras.quantity).withTimer(extras.timer)
 
 /**
  * The pomodoro rhythm a definition hands to a block it produces.

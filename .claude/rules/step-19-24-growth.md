@@ -7,6 +7,11 @@ paths:
   - "app/src/**/TaskReminderService.kt"
 ---
 
+**Since step 42 a Growth-Task is a Timer-Task with a "Zielzeit"**, the tab is
+called "Ziele", and the length growing moves is the time on the timer — the
+block may carry a buffer behind it. What follows still describes how growing
+works; see *Step 42* for what changed around it.
+
 ### Step 19: Growth-Tasks, task reminders and the conflict box
 
 Six questions went to the user first, and the answers are the design: a Growth-Task

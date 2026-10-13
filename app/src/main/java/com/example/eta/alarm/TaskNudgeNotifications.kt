@@ -9,6 +9,12 @@ import com.example.eta.domain.planning.PomodoroPhaseKind
 import com.example.eta.domain.planning.endMinute
 import com.example.eta.domain.planning.minuteToLocalTime
 import com.example.eta.domain.planning.pomodoroPhaseAt
+import com.example.eta.domain.planning.timerPhase
+import com.example.eta.domain.planning.timerRemaining
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatShort
 
@@ -72,11 +78,20 @@ object TaskNudgeNotifications {
         entry: BlockWithItem,
         kind: PomodoroPhaseKind,
         minuteOfDay: Int,
+        /** The moment the phase begins — what a Timer-Task's rhythm is counted from. */
+        at: Instant,
     ) {
         ensureChannels(context)
         val block = entry.block
-        val until = block.pomodoroPhaseAt(minuteOfDay)?.untilMinute ?: block.endMinute()
-        val untilText = minuteToLocalTime(until).formatClock()
+        // A Timer-Task's phase ends when its timer says so, which is a length
+        // from now rather than a minute of the plan.
+        val untilText = if (entry.item.timerTask) {
+            val left = block.timerPhase(at + 1.seconds)?.remaining ?: block.timerRemaining(at)
+            (at + left).toLocalDateTime(TimeZone.currentSystemDefault()).time.formatClock()
+        } else {
+            val until = block.pomodoroPhaseAt(minuteOfDay)?.untilMinute ?: block.endMinute()
+            minuteToLocalTime(until).formatClock()
+        }
 
         val (title, text) = when (kind) {
             PomodoroPhaseKind.PAUSE ->
@@ -99,6 +114,25 @@ object TaskNudgeNotifications {
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)
                 .setContentIntent(openIntent(context, "pomodoro:${block.id}"))
+                .build(),
+        )
+    }
+
+    /** The timer of a Timer-Task has counted its time down. */
+    fun showTimerDone(context: Context, entry: BlockWithItem) {
+        ensureChannels(context)
+        postNotification(
+            context = context,
+            tag = "pomodoro:${entry.block.id}",
+            id = POMODORO_NOTIFICATION_ID,
+            notification = NotificationCompat.Builder(context, POMODORO_CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Timer abgelaufen")
+                .setContentText("${entry.item.name} · im Dashboard mit »Ende« abschließen")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(openIntent(context, "pomodoro:${entry.block.id}"))
                 .build(),
         )
     }

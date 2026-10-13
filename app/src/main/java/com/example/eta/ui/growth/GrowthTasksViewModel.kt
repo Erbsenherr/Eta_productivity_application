@@ -6,6 +6,8 @@ import com.example.eta.data.repository.GrowthService
 import com.example.eta.data.repository.ItemRepository
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.SubtaskRepository
+import com.example.eta.domain.growth.hasQuantity
+import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.recurrence.RecurringGroup
@@ -23,6 +25,13 @@ data class GrowthTasksUiState(
     val groups: List<RecurringGroup> = emptyList(),
     /** Every live standing definition, which is what a fit check is asked against. */
     val definitions: List<Item> = emptyList(),
+    /**
+     * Standing tasks with a Mengen-Inkrement — the other kind of goal. Listed,
+     * not ordered: a count changes nothing about the day, so there is no slot
+     * for two of them to want. One that is also a Timer-Task with a "Zielzeit"
+     * is in [groups] and not here.
+     */
+    val counted: List<RecurringGroup> = emptyList(),
     /** The steps inside each task that has any, by item id. */
     val subtasks: Map<String, List<Subtask>> = emptyMap(),
     /** ToDos a group can swallow as steps. */
@@ -30,7 +39,10 @@ data class GrowthTasksUiState(
 )
 
 /**
- * The Growth-Tasks tab.
+ * The "Ziele" tab — the Growth-Tasks tab until step 42.
+ *
+ * It holds what is working towards something: Timer-Tasks with a "Zielzeit",
+ * which is what a Growth-Task was, and standing tasks with a Mengen-Inkrement.
  *
  * Two things live here that live nowhere else: **creating** a standing task from
  * a button — every other one in the app arrives from the questionnaire or from a
@@ -64,6 +76,7 @@ class GrowthTasksViewModel(
                 it.representative.growthOrder ?: Int.MAX_VALUE
             },
             definitions = definitions,
+            counted = groupRecurring(definitions.filter { it.hasQuantity && !it.isGrowthTask }),
         )
     }.stateIn(
         scope = viewModelScope,

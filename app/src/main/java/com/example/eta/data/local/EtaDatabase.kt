@@ -48,7 +48,7 @@ import com.example.eta.domain.setup.UserSetup
         NightOverride::class,
         PlannerDismissal::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -918,6 +918,34 @@ val MIGRATION_28_29 = object : Migration(28, 29) {
                 PRIMARY KEY(`date`, `kind`)
             )
             """.trimIndent(),
+        )
+    }
+}
+
+/**
+ * Step 42: Timer-Tasks.
+ *
+ * - `items.timerTask` (0) and `items.timerBuffer`. **Every growth task becomes a
+ *   Timer-Task**: growing is something a Timer-Task with a "Zielzeit" does now,
+ *   and a growth task left without the flag would keep growing with no way to
+ *   start its timer. None of them has a buffer, so no length changes.
+ * - `planned_blocks.timerGoal` / `timerWorked` / `timerRunningSince`: the timer
+ *   of one sitting. Null on every block there is.
+ * - `user_setup.allowPartialTimerGrowth`, off — the strict rule is the default.
+ */
+val MIGRATION_29_30 = object : Migration(29, 30) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `timerTask` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `timerBuffer` INTEGER")
+        connection.execSQL(
+            "UPDATE `items` SET `timerTask` = 1 " +
+                "WHERE `growthTarget` IS NOT NULL AND `growthIncrement` IS NOT NULL",
+        )
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `timerGoal` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `timerWorked` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `timerRunningSince` INTEGER")
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `allowPartialTimerGrowth` INTEGER NOT NULL DEFAULT 0",
         )
     }
 }

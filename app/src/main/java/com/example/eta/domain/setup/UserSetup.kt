@@ -448,6 +448,12 @@ data class UserSetup(
     val allowPrioritySkip: Boolean = false,
     val allowTodoBesideWeek: Boolean = false,
     /**
+     * Flexibilität, the third: a Timer-Task working towards a "Zielzeit" grows
+     * although its timer was ended early. Off, a sitting counts towards the next
+     * increment only when the whole time was worked.
+     */
+    val allowPartialTimerGrowth: Boolean = false,
+    /**
      * The Pausenchecker: whether the day planner says when a day holds too
      * little rest, and what "too little" is — [breakPerTwoHours] of rest for
      * every full two hours of tasks, and no more than [breakMaxStretch] of

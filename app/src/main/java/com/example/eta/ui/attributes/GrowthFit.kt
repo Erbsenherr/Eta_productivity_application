@@ -5,6 +5,7 @@ import com.example.eta.domain.growth.growthTargetFit
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.recurrence.Rhythm
+import kotlin.time.Duration
 
 /**
  * The fit check, asked in the terms the form already holds.
@@ -26,7 +27,8 @@ fun growthIssuesFor(
     return growthTargetFit(
         rules = rhythm.rulesFor(attributes.weekdays),
         earliestStart = attributes.startTime.minuteOfDay(),
-        target = growth.target,
+        // What the block will be then: the target, and the buffer behind it.
+        target = growth.target + (attributes.extras.timer?.buffer ?: Duration.ZERO),
         travelBefore = attributes.travelBefore,
         returnAfter = attributes.returnAfter,
         breakAfter = attributes.breakAfter,

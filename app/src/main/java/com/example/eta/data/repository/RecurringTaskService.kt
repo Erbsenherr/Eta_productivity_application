@@ -2,6 +2,7 @@ package com.example.eta.data.repository
 
 import com.example.eta.data.local.ItemDao
 import com.example.eta.domain.growth.GrowthSetting
+import com.example.eta.domain.growth.withBufferAdded
 import com.example.eta.domain.growth.withGrowth
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
@@ -154,6 +155,8 @@ class RecurringTaskService(
                 // Last, and it may overrule the duration above: for a growth task
                 // the current length belongs to growing rather than to the form.
                 .withGrowth(edit.growth)
+                // And the buffer behind it — the form's length is the timer's.
+                .withBufferAdded()
         }
         val retired = leftover.map { it.copy(completedAt = now, updatedAt = now) }
 
@@ -200,6 +203,7 @@ class RecurringTaskService(
         )
             .withExtras(edit.extras)
             .withGrowth(edit.growth)
+            .withBufferAdded()
 
         val rows = timed.map { (rule, start) ->
             base.copy(id = UUID.randomUUID().toString(), recurrenceRule = rule, startTime = start)
