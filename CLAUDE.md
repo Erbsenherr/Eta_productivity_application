@@ -50,8 +50,13 @@ warnings and hints — since step 18, when every `notify` started going through
 explicitly. A new error is therefore yours; findings live in
 `app/build/reports/lint-results-debug.xml`.
 
-**Nothing in this app has ever run on a device.** There is no emulator or phone on
-this machine, so everything is verified by compilation, the unit suite (684 tests
+**Almost nothing in this app has been seen running.** Since step 44 there can be
+an emulator (`adb devices` shows `emulator-5554` while the user has one open in
+Android Studio) — look before assuming there is none: `adb logcat -b crash -d`
+is what found the settings crash, and `uiautomator dump` plus `input tap` is
+enough to open a screen and read what it says. So far that has confirmed only
+that the settings tab opens, its Design and Navigation pages draw, and the menu
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (684 tests
 as of step 44), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
@@ -142,6 +147,13 @@ changed; documentation-only sessions push too.
   debug and the release KSP task both export `schemas/…/N.json`, and run in one
   Gradle invocation one can read the file while the other is still writing it.
   Nothing is wrong with the code — run the tests first and the release build after.
+- **A property a coroutine in `init` writes to must be declared above `init`.**
+  `viewModelScope.launch` runs on the main thread *at once*, up to its first real
+  suspension — and a Room query can answer without suspending. The write then
+  happens while the class is still being constructed, when everything declared
+  further down is still null. `SettingsViewModel` crashed the settings tab on
+  opening that way (`_openDays`, declared a hundred lines under the `init` that
+  set it); it compiles clean and no unit test sees it.
 - **Core library desugaring is required**, not optional: `kotlinx-datetime` resolves
   to `java.time`, which `minSdk 24` does not have. Without it the app compiles fine
   and crashes on Android 7/8 at runtime.

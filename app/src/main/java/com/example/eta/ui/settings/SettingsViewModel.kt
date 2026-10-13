@@ -127,6 +127,18 @@ class SettingsViewModel(
      */
     val alarms: StateFlow<AlarmSchedule> = _alarms.asStateFlow()
 
+    // Declared above `init`, and it has to stay there: the block below starts
+    // coroutines on the main thread at once, and one of them writes here. Where
+    // its query answers without suspending, that write happens while the class
+    // is still being built — and a property declared further down is still
+    // null then. It crashed the tab on opening exactly that way.
+    /** Past days the app planned but never settled — bounded by the catch-up window. */
+    private val _openDays = MutableStateFlow<List<LocalDate>>(emptyList())
+    val openDays: StateFlow<List<LocalDate>> = _openDays.asStateFlow()
+
+    private val _phrase = MutableStateFlow("")
+    val phrase: StateFlow<String> = _phrase.asStateFlow()
+
     init {
         viewModelScope.launch {
             stored.value = setupRepository.find()
@@ -228,13 +240,6 @@ class SettingsViewModel(
             }
         }
     }
-
-    /** Past days the app planned but never settled — bounded by the catch-up window. */
-    private val _openDays = MutableStateFlow<List<LocalDate>>(emptyList())
-    val openDays: StateFlow<List<LocalDate>> = _openDays.asStateFlow()
-
-    private val _phrase = MutableStateFlow("")
-    val phrase: StateFlow<String> = _phrase.asStateFlow()
 
     /** Only the exact words unlock it; anything else leaves the days untouchable. */
     val phraseAccepted: StateFlow<Boolean> = _phrase
