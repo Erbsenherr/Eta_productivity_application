@@ -2,6 +2,9 @@ package com.example.eta.domain.planning
 
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.PlannedBlock
+import com.example.eta.domain.model.Subtask
+import com.example.eta.domain.model.SubtaskTimer
+import com.example.eta.domain.subtask.asBlock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -63,8 +66,24 @@ private fun eventsOf(
     blocks: List<BlockWithItem>,
     timeZone: TimeZone,
     stillActivePerDay: Int,
+    stepTimers: List<BlockWithItem> = emptyList(),
 ): List<TaskEvent> {
-    val own = blocks.filter { it.block.isOpen }.flatMap { entry ->
+    // Step 49: a routine step's timer rings like a Timer-Task's — its pomodoro
+    // turns and its goal, off the timer, nothing else. See [stepTimerEntries].
+    val steps = stepTimers.flatMap { entry ->
+        entry.block.timerSignals().map { signal ->
+            TaskEvent(
+                entry = entry,
+                kind = when (signal.kind) {
+                    TimerSignalKind.PAUSE -> TaskEventKind.POMODORO_PAUSE
+                    TimerSignalKind.WORK -> TaskEventKind.POMODORO_WORK
+                    TimerSignalKind.DONE -> TaskEventKind.TIMER_DONE
+                },
+                at = signal.at,
+            )
+        }
+    }
+    val own = steps + blocks.filter { it.block.isOpen }.flatMap { entry ->
         buildList {
             add(TaskEvent(entry, TaskEventKind.START, entry.block.startsAt(timeZone)))
             if (entry.item.endSound) {
@@ -149,7 +168,8 @@ fun nextTaskEvent(
     now: Instant,
     timeZone: TimeZone,
     stillActivePerDay: Int = 0,
-): Instant? = eventsOf(blocks, timeZone, stillActivePerDay)
+    stepTimers: List<BlockWithItem> = emptyList(),
+): Instant? = eventsOf(blocks, timeZone, stillActivePerDay, stepTimers)
     .map { it.at }
     .filter { it > now }
     .minOrNull()
@@ -182,5 +202,27 @@ fun eventsAt(
     at: Instant,
     timeZone: TimeZone,
     stillActivePerDay: Int = 0,
-): List<TaskEvent> = eventsOf(blocks, timeZone, stillActivePerDay)
+    stepTimers: List<BlockWithItem> = emptyList(),
+): List<TaskEvent> = eventsOf(blocks, timeZone, stillActivePerDay, stepTimers)
     .filter { (it.at - at).absoluteValue <= SAME_MINUTE }
+
+/**
+ * The running timers of routine steps as entries the alarm can announce
+ * (step 49): the step's timer as a block (`asBlock`), under its routine's item
+ * renamed to the step — so "Duschen" is what the notification names. Only for
+ * an open routine and a step not yet ticked.
+ */
+fun stepTimerEntries(
+    blocks: List<BlockWithItem>,
+    timers: List<SubtaskTimer>,
+    steps: Map<String, List<Subtask>>,
+    checked: Set<Pair<String, String>> = emptySet(),
+): List<BlockWithItem> {
+    val byId = blocks.filter { it.block.isOpen }.associateBy { it.block.id }
+    return timers.mapNotNull { timer ->
+        if (timer.blockId to timer.subtaskId in checked) return@mapNotNull null
+        val parent = byId[timer.blockId] ?: return@mapNotNull null
+        val step = steps[parent.item.id]?.firstOrNull { it.id == timer.subtaskId } ?: return@mapNotNull null
+        BlockWithItem(block = timer.asBlock(parent.block, step), item = parent.item.copy(name = step.name))
+    }
+}

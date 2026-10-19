@@ -18,7 +18,8 @@ questions went to the user first, and the answers are the design.
 #### Subtasks are not Items
 
 `subtasks` and `subtask_checks` are tables of their own, and a subtask is **name,
-note and nothing else**: no duration, no category, no priority, no deadline, no role,
+note and nothing else** — except, since step 49, a routine's step, which may be
+a Timer-Task and count (*Step 49*): no duration, no category, no priority, no deadline, no role,
 no block. It earns nothing, is never planned, never reaches the Sperrliste and
 appears in none of the six lists. Making it an `Item` with a parent id would have
 meant teaching every list query, the expansion, the Erfolgsliste and the settlement

@@ -322,6 +322,13 @@ private fun TodayPage(
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
             timer = timerActions,
+            stepTimers = state.stepTimers,
+            stepTimer = StepTimerActions(
+                onStart = viewModel::startStepTimer,
+                onPause = viewModel::pauseStepTimer,
+                onResume = viewModel::resumeStepTimer,
+                onEnd = viewModel::endStepTimer,
+            ),
             greeting = when {
                 sleep?.morning == true -> "Guten Morgen!"
                 sleep?.eveningOf != null -> "Gute Nacht!"

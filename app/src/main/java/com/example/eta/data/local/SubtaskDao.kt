@@ -6,6 +6,7 @@ import androidx.room3.Query
 import androidx.room3.Upsert
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
+import com.example.eta.domain.model.SubtaskTimer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.LocalDate
 
@@ -37,6 +38,32 @@ interface SubtaskDao {
 
     @Query("SELECT * FROM subtasks ORDER BY itemId, position")
     suspend fun all(): List<Subtask>
+
+    @Upsert
+    suspend fun upsertTimer(timer: SubtaskTimer)
+
+    @Query("SELECT * FROM subtask_timers WHERE blockId = :blockId AND subtaskId = :subtaskId")
+    suspend fun findTimer(blockId: String, subtaskId: String): SubtaskTimer?
+
+    @Query("DELETE FROM subtask_timers WHERE blockId = :blockId AND subtaskId = :subtaskId")
+    suspend fun deleteTimer(blockId: String, subtaskId: String)
+
+    /** The step timers of one day (step 49). */
+    @Query(
+        """
+        SELECT * FROM subtask_timers
+        WHERE blockId IN (SELECT id FROM planned_blocks WHERE date = :date)
+        """,
+    )
+    fun observeTimersForDate(date: LocalDate): Flow<List<SubtaskTimer>>
+
+    @Query(
+        """
+        SELECT * FROM subtask_timers
+        WHERE blockId IN (SELECT id FROM planned_blocks WHERE date BETWEEN :from AND :to)
+        """,
+    )
+    suspend fun timersBetween(from: LocalDate, to: LocalDate): List<SubtaskTimer>
 
     @Upsert
     suspend fun check(check: SubtaskCheck)

@@ -1,5 +1,8 @@
 package com.example.eta.ui.dashboard
 
+import com.example.eta.domain.model.Subtask
+import com.example.eta.domain.model.SubtaskTimer
+import com.example.eta.domain.subtask.isGrowingStep
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.alarm.TaskStartCoordinator
@@ -21,7 +24,6 @@ import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.PlannedBlock
-import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.PointsReason
 import com.example.eta.domain.planning.BlockConflict
 import com.example.eta.domain.planning.DailyPhaseStatus
@@ -123,6 +125,8 @@ data class DashboardUiState(
     val checked: Map<String, Set<String>> = emptyMap(),
     /** When each of them was ticked, by block id and step — a routine shows it. */
     val checkTimes: Map<String, Map<String, Instant>> = emptyMap(),
+    /** Step 49: the timers of routine steps today, by block and then by step. */
+    val stepTimers: Map<String, Map<String, SubtaskTimer>> = emptyMap(),
 ) {
     /**
      * The crown: legacy contracts are worth more per day than the cap credits.
@@ -298,6 +302,8 @@ class DashboardViewModel(
         state.copy(subtasks = subtasks)
     }.combine(subtaskRepository.observeCheckTimes(today)) { state, times ->
         state.copy(checked = times.mapValues { it.value.keys }, checkTimes = times)
+    }.combine(subtaskRepository.observeTimers(today)) { state, timers ->
+        state.copy(stepTimers = timers)
     }.combine(conflictRepository.observeDismissed(today)) { state, dismissed ->
         // Read off the blocks each time rather than stored: a collision is a fact
         // about where things stand, and moving one of the two blocks has to make
@@ -384,7 +390,65 @@ class DashboardViewModel(
 
     /** One step of a group, ticked off on this day only. */
     fun setSubtaskChecked(blockId: String, subtaskId: String, checked: Boolean) {
-        viewModelScope.launch { subtaskRepository.setChecked(blockId, subtaskId, checked) }
+        viewModelScope.launch {
+            subtaskRepository.setChecked(blockId, subtaskId, checked)
+            // A step's timer may have gone with the tick, and with it its alarm.
+            taskStartCoordinator.reschedule()
+        }
+    }
+
+    // --- the timer of a routine's step (step 49) -----------------------------
+
+    private fun stepOf(subtaskId: String): Subtask? =
+        uiState.value.subtasks.values.asSequence().flatten().firstOrNull { it.id == subtaskId }
+
+    /** "Start" on a Timer-Task step: its whole time, from now. */
+    fun startStepTimer(blockId: String, subtaskId: String) {
+        viewModelScope.launch {
+            val step = stepOf(subtaskId) ?: return@launch
+            val goal = step.duration ?: return@launch
+            if (subtaskRepository.findTimer(blockId, subtaskId) != null) return@launch
+            subtaskRepository.startTimer(blockId, subtaskId, goal)
+            taskStartCoordinator.reschedule()
+        }
+    }
+
+    fun pauseStepTimer(blockId: String, subtaskId: String) {
+        viewModelScope.launch {
+            subtaskRepository.pauseTimer(blockId, subtaskId)
+            taskStartCoordinator.reschedule()
+        }
+    }
+
+    fun resumeStepTimer(blockId: String, subtaskId: String) {
+        viewModelScope.launch {
+            subtaskRepository.resumeTimer(blockId, subtaskId)
+            taskStartCoordinator.reschedule()
+        }
+    }
+
+    /**
+     * "Ende" on a step: the count is kept, the step ticked, the routine moves
+     * on. Ended short, the screen says so — as for a task — and whether the
+     * "Zielzeit" lets it count.
+     */
+    fun endStepTimer(blockId: String, subtaskId: String) {
+        viewModelScope.launch {
+            val step = stepOf(subtaskId) ?: return@launch
+            subtaskRepository.endTimer(blockId, subtaskId)
+            taskStartCoordinator.reschedule()
+            val timer = subtaskRepository.findTimer(blockId, subtaskId) ?: return@launch
+            if (timer.worked < timer.goal) {
+                _timerResult.value = TimerResult(
+                    name = step.name,
+                    worked = timer.worked,
+                    goal = timer.goal,
+                    missesIncrement = step.isGrowingStep &&
+                        setupRepository.find()?.allowPartialTimerGrowth != true,
+                    frameOver = false,
+                )
+            }
+        }
     }
 
     /**

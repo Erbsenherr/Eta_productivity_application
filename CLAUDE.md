@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (714 tests
-as of step 48), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (723 tests
+as of step 49), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -403,6 +403,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-46-setup-rhythm-audio.md` | *Step 46*: the setup rebuilt (`SetupPage`, the checklist, `CustomTask`, "Folgetag", `SetupWeekReview`), every other week (`ItemExtras.rhythm`, `RhythmField`, the hatching), a task's own colour (`Item.color`, `colorOf(item)`, the Wochenschema's bars), "Termine anzeigen" and the timetable on any seven days (`WeekTabViewModel(from)`, `weekAdjust`), and the audio modes (`AudioMode`) |
 | `step-47-rewards-fixed-stats-look.md` | *Step 47*: a reward is made and deleted, never changed (no `RewardRepository.update`, a tap does nothing), and the Statistiken page's three grounds (`StatCard`, `StatTile`, `ShareBar`) |
 | `step-48-streaks-tolerance.md` | *Step 48*: Streaks (`HabitStreak`, `streakOutcomes`, `seriesOutcome`, the evening's `Step.STREAKS`, the tab, `resumeSeries`), the Tagesabschluss-Serie as a streak, what counts as on time (`punctualTolerance`, `SleepLog.tolerance`), a breach that costs 10 (`CONTRACT_BREACH_PENALTY`), the sleep bonuses in the Belohn-o-mat (`SleepBonus`), "Menü umsortieren" (`tabOrder`, `orderTabs`, `reorderVisible`), ignoring every overlap at once, "Guten Morgen" ended by the routine (`morningDone`) |
+| `step-49-routine-step-goals.md` | *Step 49*: a routine's steps as Timer-Tasks with "Zielzeit" and with a Mengen-Inkrement (`StepExtras`, `asItem` / `withItemFields`, `withStepExtras`, `StepFamily`, `SubtaskTimer` and `asBlock`, `StepTimerActions`, `stepTimerEntries`), and "Subtask von …" in the "Ziele" tab |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -490,7 +491,7 @@ own, and icons · 45. "Aktuell" on the week timetable changes one
 occurrence · 46. The setup rebuilt, every other week, a task's own colour, and
 audio modes · 47. Rewards that are not changed, and a Statistiken page easier
 to read · 48. Streaks, a tolerance for "on time", a breach that costs, and a
-menu of one's own order.
+menu of one's own order · 49. A routine's steps as Timer-Tasks and with a count.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

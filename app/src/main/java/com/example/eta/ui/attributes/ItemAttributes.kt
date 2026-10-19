@@ -1,5 +1,7 @@
 package com.example.eta.ui.attributes
 
+import com.example.eta.domain.subtask.DEFAULT_STEP_DURATION
+import com.example.eta.domain.subtask.StepExtras
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1075,6 +1077,8 @@ fun ExtrasBox(
         }
         ColorRow(extras = extras, onExtras = onExtras)
         if (subtasks != null && onSubtasks != null) {
+            // Step 49: a standing routine's steps can be Timer-Tasks and count.
+            val stepExtras = offerQuantity && extras.routineMode
             Column(
                 modifier = Modifier.tutorialSpot(TutorialSpot.EXTRA_SUBTASKS),
                 verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
@@ -1085,6 +1089,8 @@ fun ExtrasBox(
                     candidates = foldCandidates,
                     routineMode = extras.routineMode,
                     onRoutineMode = { onExtras(extras.copy(routineMode = it)) },
+                    stepExtras = stepExtras,
+                    routineLength = timerTime,
                 )
             }
         }
@@ -1106,6 +1112,8 @@ private fun SubtaskSection(
     candidates: List<FoldCandidate>,
     routineMode: Boolean,
     onRoutineMode: (Boolean) -> Unit,
+    stepExtras: Boolean = false,
+    routineLength: Duration? = null,
 ) {
     var open by remember { mutableStateOf(false) }
 
@@ -1135,7 +1143,8 @@ private fun SubtaskSection(
             onCheckedChange = onRoutineMode,
             label = "Routine-Modus",
             hint = "Die Schritte werden der Reihe nach abgearbeitet: „Gerade“ zeigt " +
-                "immer nur den anstehenden, und Abhaken hält die Uhrzeit fest.",
+                "immer nur den anstehenden, und Abhaken hält die Uhrzeit fest. Ein " +
+                "Schritt kann dann auch Timer-Task sein oder ein Mengen-Inkrement tragen.",
         )
     }
 
@@ -1143,6 +1152,8 @@ private fun SubtaskSection(
         SubtaskBuilderDialog(
             setting = setting,
             candidates = candidates,
+            stepExtras = stepExtras,
+            routineLength = routineLength,
             onDismiss = { open = false },
             onSave = {
                 onChange(it)
@@ -1421,6 +1432,12 @@ private fun TimerRow(
     growth: GrowthSetting?,
     onGrowth: (GrowthSetting?) -> Unit,
     issues: List<GrowthFitIssue>,
+    /** False for a routine's step, which is placed by its routine (step 49). */
+    offerDynamic: Boolean = true,
+    /** What the box is called and says — a step is not a task of its own. */
+    timerHint: String = "Für Aufgaben, bei denen es um investierte Zeit geht statt um ein " +
+        "Ergebnis — »2 h lernen«. Im Dashboard steht dann »Start« statt " +
+        "»Erledigt«, und ein Timer zählt die Zeit herunter.",
 ) {
     val timer = extras.timer
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
@@ -1429,9 +1446,7 @@ private fun TimerRow(
             // Unticking takes the "Zielzeit" along — the caller's `onExtras` does it.
             onCheckedChange = { on -> onExtras(extras.copy(timer = if (on) TimerSetting() else null)) },
             label = "Timer-Task",
-            hint = "Für Aufgaben, bei denen es um investierte Zeit geht statt um ein " +
-                "Ergebnis — »2 h lernen«. Im Dashboard steht dann »Start« statt " +
-                "»Erledigt«, und ein Timer zählt die Zeit herunter.",
+            hint = timerHint,
         )
         if (timer == null) return@Column
 
@@ -1515,7 +1530,7 @@ private fun TimerRow(
             )
         }
         UpdateConditionField(every = growth.every, onEvery = { onGrowth(growth.copy(every = it)) })
-        CheckRow(
+        if (offerDynamic) CheckRow(
             checked = growth.dynamic,
             onCheckedChange = { onGrowth(growth.copy(dynamic = it)) },
             label = "Dynamische Zeitsetzung",
@@ -1802,3 +1817,58 @@ fun RecurringAttributes.toEdit(name: String, note: String?) = RecurringEdit(
     subtasks = subtasks,
     folded = foldedItemIds,
 )
+
+/**
+ * What a routine's step can be beyond its name (step 49): everything a
+ * Timer-Task is — the time on its timer, a buffer, a "Zielzeit", a pomodoro
+ * rhythm — and a Mengen-Inkrement. The task's own rows, so a step is set up in
+ * the words a task is; only "Dynamische Zeitsetzung" is missing, a step being
+ * placed by its routine.
+ */
+@Composable
+fun StepExtrasFields(value: StepExtras, onChange: (StepExtras) -> Unit) {
+    val asItemExtras = ItemExtras(
+        pomodoroWork = value.pomodoroWork,
+        pomodoroPause = value.pomodoroPause,
+        quantity = value.quantity,
+        timer = value.timer,
+    )
+    fun fromItemExtras(extras: ItemExtras) = value.copy(
+        timer = extras.timer,
+        pomodoroWork = extras.pomodoroWork,
+        pomodoroPause = extras.pomodoroPause,
+        quantity = extras.quantity,
+        // The "Zielzeit" goes with the timer, in the same write.
+        growth = if (extras.timer == null) null else value.growth,
+        duration = if (extras.timer != null) value.duration ?: DEFAULT_STEP_DURATION else value.duration,
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+        TimerRow(
+            extras = asItemExtras,
+            onExtras = { onChange(fromItemExtras(it)) },
+            timerTime = value.duration,
+            growth = value.growth,
+            onGrowth = { growth -> onChange(value.copy(growth = growth, duration = growth?.start ?: value.duration)) },
+            issues = emptyList(),
+            offerDynamic = false,
+            timerHint = "Statt des Häkchens steht im Dashboard »Start«, und ein Timer " +
+                "zählt die Zeit des Schritts herunter. »Ende« hakt ihn ab.",
+        )
+        if (value.timer != null && value.growth == null) {
+            EtaField(label = "Timer-Zeit", hint = "Liegt innerhalb der Länge der Routine.") {
+                EtaDurationPicker(
+                    value = value.duration ?: DEFAULT_STEP_DURATION,
+                    onValueChange = { onChange(value.copy(duration = it)) },
+                    step = 1.minutes,
+                    minimum = MIN_GROWTH_DURATION,
+                    precise = true,
+                )
+            }
+        }
+        if (value.timer != null) {
+            PomodoroRow(extras = asItemExtras, onExtras = { onChange(fromItemExtras(it)) })
+        }
+        QuantityRow(extras = asItemExtras, onExtras = { onChange(fromItemExtras(it)) })
+    }
+}

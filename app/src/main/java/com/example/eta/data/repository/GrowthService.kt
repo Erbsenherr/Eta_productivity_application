@@ -11,6 +11,14 @@ import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.growth.quantityFamily
 import com.example.eta.domain.growth.workedInFull
 import com.example.eta.domain.model.Item
+import com.example.eta.domain.model.Subtask
+import com.example.eta.domain.subtask.StepFamily
+import com.example.eta.domain.subtask.advanced
+import com.example.eta.domain.subtask.asItem
+import com.example.eta.domain.subtask.familyIn
+import com.example.eta.domain.subtask.isGrowingStep
+import com.example.eta.domain.subtask.withProgressOf
+import com.example.eta.domain.subtask.stepWorkedInFull
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -37,6 +45,8 @@ class GrowthService(
      */
     private val allowPartialGrowth: suspend () -> Boolean = { false },
     private val clock: Clock = Clock.System,
+    /** Step 49: the steps of routines grow and count as well; null leaves them be. */
+    private val subtaskRepository: SubtaskRepository? = null,
 ) {
 
     /** Every live growth task, in the order the Growth-Tasks tab shows them. */
@@ -107,6 +117,7 @@ class GrowthService(
         // to its goal, or ticked off by hand without a shorter time being given
         // — unless the settings say otherwise. See `workedInFull`.
         val lenient = allowPartialGrowth()
+        advanceSteps(date, lenient)
         val completed = planRepository.completedOn(date)
         // The count each was done with, before it moves on: the definition only
         // knows where it stands now, and the statistics draw where it stood.
@@ -148,6 +159,49 @@ class GrowthService(
         // none of this: every occurrence reads it off the definition.
         scheduleMaintenance.relayOccurrences(grown.map { it.id })
         return grown
+    }
+
+    /**
+     * The steps of routines ticked off on [date], one completion counted for
+     * each (step 49) — by the task's rules: the time only for a sitting whose
+     * timer counted the whole goal, unless [lenient]; the count either way.
+     *
+     * A step counts when it was **ticked**, whatever became of the routine's
+     * block — the step was done. Per family, so the seven weekday rows of the
+     * morning routine's "Duschen" grow as one. Nothing is relaid: a step's time
+     * lies inside its routine's.
+     */
+    private suspend fun advanceSteps(date: LocalDate, lenient: Boolean) {
+        val repository = subtaskRepository ?: return
+        val now = clock.now()
+        val steps = repository.stepsByItem()
+        val checks = repository.checkedByBlock(date)
+        val timers = repository.timersBetween(date, date).associateBy { it.blockId to it.subtaskId }
+        val day = planRepository.findDay(date).filter { it.item.routineMode }
+
+        val advanced = mutableMapOf<StepFamily, Subtask>()
+        day.forEach { entry ->
+            val ticked = checks[entry.block.id].orEmpty()
+            steps[entry.item.id].orEmpty()
+                .filter { it.id in ticked && (it.isGrowingStep || it.asItem().hasQuantity) }
+                .forEach { step ->
+                    val family = step.familyIn(entry.item)
+                    if (family in advanced) return@forEach
+                    val full = timers[entry.block.id to step.id].stepWorkedInFull()
+                    advanced[family] = step.advanced(timeCounts = lenient || full)
+                }
+        }
+        if (advanced.isEmpty()) return
+
+        val parents = itemDao.findRecurringDefinitions().associateBy { it.id }
+        val rows = steps.flatMap { (itemId, list) ->
+            val parent = parents[itemId] ?: return@flatMap emptyList()
+            list.mapNotNull { row ->
+                val next = advanced[row.familyIn(parent)] ?: return@mapNotNull null
+                row.withProgressOf(next).takeIf { it != row }?.copy(updatedAt = now)
+            }
+        }
+        repository.update(rows)
     }
 }
 

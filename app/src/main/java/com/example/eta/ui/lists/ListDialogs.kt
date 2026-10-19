@@ -654,7 +654,11 @@ fun RecurringGroupDialog(
                     label = "Schritte",
                     hint = "Im Routine-Modus: einer nach dem anderen. Gilt für jeden Morgen.",
                 ) {
-                    MorningRoutineSteps(steps = morningSteps, onSave = onMorningSteps)
+                    MorningRoutineSteps(
+                        steps = morningSteps,
+                        onSave = onMorningSteps,
+                        routineLength = item.estimatedDuration,
+                    )
                 }
             }
             EtaText(

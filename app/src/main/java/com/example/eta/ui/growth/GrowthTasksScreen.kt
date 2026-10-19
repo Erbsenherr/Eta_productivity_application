@@ -1,5 +1,9 @@
 package com.example.eta.ui.growth
 
+import com.example.eta.domain.growth.growthSetting
+import com.example.eta.domain.setup.isMorningRoutine
+import com.example.eta.domain.subtask.asItem
+import com.example.eta.domain.subtask.quantityLabel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -83,7 +87,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
             }
 
             EtaText(text = "Zielzeit", style = EtaTheme.typography.heading)
-            if (state.groups.isEmpty()) {
+            if (state.groups.isEmpty() && state.growingSteps.isEmpty()) {
                 EtaSurface(modifier = Modifier.fillMaxWidth()) {
                     EtaText(
                         text = "Noch keine. Eine Timer-Task zählt die Zeit, die du " +
@@ -95,24 +99,27 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                     )
                 }
             } else {
-                ReorderableList(
-                    groups = state.groups,
-                    onOpen = { editing = it },
-                    onReorder = viewModel::reorder,
-                )
-                EtaText(
-                    text = "Lange drücken und ziehen ändert die Reihenfolge. Wollen zwei " +
-                        "Aufgaben mit dynamischer Zeitsetzung denselben Slot, bekommt ihn " +
-                        "die weiter oben.",
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textMuted,
-                )
+                if (state.groups.isNotEmpty()) {
+                    ReorderableList(
+                        groups = state.groups,
+                        onOpen = { editing = it },
+                        onReorder = viewModel::reorder,
+                    )
+                    EtaText(
+                        text = "Lange drücken und ziehen ändert die Reihenfolge. Wollen zwei " +
+                            "Aufgaben mit dynamischer Zeitsetzung denselben Slot, bekommt ihn " +
+                            "die weiter oben.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
+                StepGoalRows(state.growingSteps, onOpen = { editing = it })
             }
 
             EtaButton(text = "Timer-Task mit Zielzeit erstellen", onClick = { creating = true })
 
             EtaText(text = "Mengen-Inkrement", style = EtaTheme.typography.heading)
-            if (state.counted.isEmpty()) {
+            if (state.counted.isEmpty() && state.countedSteps.isEmpty()) {
                 EtaText(
                     text = "Noch keine. Ein Mengen-Inkrement schaltest du in den Extras " +
                         "einer wiederkehrenden Aufgabe ein — etwa »Klimmzüge, beginnend " +
@@ -127,6 +134,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                             CountedRow(group = group, onClick = { editing = group })
                         }
                     }
+                    StepGoalRows(state.countedSteps, onOpen = { editing = it })
                 }
             }
             Spacer(Modifier.size(EtaTheme.spacing.xl))
@@ -364,6 +372,77 @@ private fun GrowthRow(
                 style = EtaTheme.typography.label,
                 color = EtaTheme.colors.textMuted,
             )
+        }
+    }
+}
+
+/**
+ * Routine steps with a goal (step 49), each saying whose step it is. Not
+ * draggable — the order settles a slot, and a step has none. A tap opens the
+ * routine, whose Extras hold the steps; the morning routine's are edited in the
+ * settings, which the row says instead.
+ */
+@Composable
+private fun StepGoalRows(goals: List<StepGoal>, onOpen: (RecurringGroup) -> Unit) {
+    if (goals.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+        goals.forEach { goal ->
+            key(goal.parent.representative.id, goal.step.id) {
+                StepGoalRow(goal, onOpen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepGoalRow(goal: StepGoal, onOpen: (RecurringGroup) -> Unit) {
+    val step = goal.step
+    val parent = goal.parent.representative
+    val morning = isMorningRoutine(parent.id)
+    val growth = step.asItem().growthSetting
+    val interactionSource = remember { MutableInteractionSource() }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = !morning,
+                    onClick = { onOpen(goal.parent) },
+                ),
+        ) {
+            EtaText(
+                text = step.name,
+                style = EtaTheme.typography.bodyStrong,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            EtaText(
+                text = "Subtask von ${parent.name}",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+            growth?.let {
+                EtaText(
+                    text = "${step.duration?.formatShort() ?: "—"} → " +
+                        "${it.target.formatShort()} (+${it.increment.formatShort()}" +
+                        (if (it.every > 1) " alle ${it.every} Abschlüsse)" else ")"),
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.accent,
+                )
+            }
+            step.quantityLabel()?.let {
+                EtaText(text = it, style = EtaTheme.typography.bodyStrong, color = EtaTheme.colors.accent)
+            }
+            if (morning) {
+                EtaText(
+                    text = "Bearbeiten unter Einstellungen → Schlaf und Morgen.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
         }
     }
 }

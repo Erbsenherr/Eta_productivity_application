@@ -20,11 +20,18 @@ data class SubtaskDraft(
     val id: String? = null,
     val name: String,
     val note: String? = null,
+    /**
+     * Step 49: what a routine's step is beyond its name. Null leaves a saved
+     * row's as they are — every path that only moves names about passes none.
+     */
+    val extras: StepExtras? = null,
 )
 
 /** The rows of a saved group, as the builder wants them. */
 fun List<Subtask>.drafts(): List<SubtaskDraft> =
-    sortedBy { it.position }.map { SubtaskDraft(id = it.id, name = it.name, note = it.note) }
+    sortedBy { it.position }.map {
+        SubtaskDraft(id = it.id, name = it.name, note = it.note, extras = StepExtras.of(it))
+    }
 
 /** One row dragged to another place in the list. */
 fun <T> List<T>.moved(from: Int, to: Int): List<T> {

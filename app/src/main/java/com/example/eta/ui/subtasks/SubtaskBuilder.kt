@@ -1,5 +1,11 @@
 package com.example.eta.ui.subtasks
 
+import com.example.eta.domain.subtask.DEFAULT_STEP_DURATION
+import com.example.eta.domain.subtask.StepExtras
+import com.example.eta.domain.subtask.timedLength
+import com.example.eta.ui.attributes.StepExtrasFields
+import com.example.eta.ui.components.EtaExpander
+import com.example.eta.ui.format.formatShort
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -109,6 +115,8 @@ private data class BuilderRow(
     val id: String?,
     val name: String,
     val note: String?,
+    /** A routine's step as a Timer-Task or with a count (step 49); null is untouched. */
+    val extras: StepExtras? = null,
 )
 
 /**
@@ -158,12 +166,25 @@ fun SubtaskBuilderDialog(
      * user's to give — the morning routine is named by the app.
      */
     showName: Boolean = true,
+    /**
+     * Step 49: whether a step can be a Timer-Task and carry a Mengen-Inkrement —
+     * a standing task in Routine-Modus. [routineLength] is what the timed steps
+     * are set against.
+     */
+    stepExtras: Boolean = false,
+    routineLength: Duration? = null,
 ) {
     var name by remember { mutableStateOf(setting.groupName) }
     var rows by remember {
         mutableStateOf(
             setting.subtasks.map {
-                BuilderRow(key = it.id ?: UUID.randomUUID().toString(), id = it.id, name = it.name, note = it.note)
+                BuilderRow(
+                    key = it.id ?: UUID.randomUUID().toString(),
+                    id = it.id,
+                    name = it.name,
+                    note = it.note,
+                    extras = it.extras,
+                )
             },
         )
     }
@@ -185,8 +206,14 @@ fun SubtaskBuilderDialog(
         }
 
         EtaText(
-            text = "Subtasks bestehen nur aus Name und Notiz — keine Dauer, keine Kategorie, " +
-                "keine Punkte. Antippen zum Bearbeiten, gedrückt halten und ziehen zum Sortieren.",
+            text = if (stepExtras) {
+                "Schritte haben keine Kategorie und bringen keine Punkte; jeder kann aber " +
+                    "Timer-Task sein oder eine Anzahl tragen. Antippen zum Bearbeiten, " +
+                    "gedrückt halten und ziehen zum Sortieren."
+            } else {
+                "Subtasks bestehen nur aus Name und Notiz — keine Dauer, keine Kategorie, " +
+                    "keine Punkte. Antippen zum Bearbeiten, gedrückt halten und ziehen zum Sortieren."
+            },
             style = EtaTheme.typography.caption,
             color = EtaTheme.colors.textSecondary,
         )
@@ -203,6 +230,10 @@ fun SubtaskBuilderDialog(
                 onReorder = { rows = it },
                 onOpen = { editing = it },
             )
+        }
+
+        if (stepExtras && routineLength != null) {
+            StepFitWarning(rows.mapNotNull { it.extras }, routineLength)
         }
 
         EtaButton(
@@ -250,7 +281,14 @@ fun SubtaskBuilderDialog(
                             groupName = name.trim(),
                             subtasks = rows
                                 .filter { it.name.isNotBlank() }
-                                .map { SubtaskDraft(id = it.id, name = it.name.trim(), note = it.note) },
+                                .map {
+                                    SubtaskDraft(
+                                        id = it.id,
+                                        name = it.name.trim(),
+                                        note = it.note,
+                                        extras = it.extras,
+                                    )
+                                },
                             folded = folded,
                             released = released,
                         ),
@@ -282,6 +320,7 @@ fun SubtaskBuilderDialog(
     if (adding) {
         SubtaskEditDialog(
             row = null,
+            offerExtras = stepExtras,
             onDismiss = { adding = false },
             onSave = { edited ->
                 rows = rows + edited.copy(key = UUID.randomUUID().toString())
@@ -294,6 +333,7 @@ fun SubtaskBuilderDialog(
         rows.firstOrNull { it.key == key }?.let { row ->
             SubtaskEditDialog(
                 row = row,
+                offerExtras = stepExtras,
                 onDismiss = { editing = null },
                 onSave = { edited ->
                     rows = rows.map { if (it.key == key) edited else it }
@@ -426,9 +466,52 @@ private fun SubtaskRow(
                         color = EtaTheme.colors.textSecondary,
                     )
                 }
+                row.extras?.summary()?.let {
+                    EtaText(
+                        text = it,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.accent,
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * What a step's extras come to, in one line: "Timer 5 Min → 10 Min · Anzahl 3".
+ * Null where it has none.
+ */
+internal fun StepExtras.summary(): String? {
+    val parts = buildList {
+        if (timer != null) {
+            val now = (duration ?: DEFAULT_STEP_DURATION).formatShort()
+            add(growth?.let { "Timer $now → ${it.target.formatShort()}" } ?: "Timer $now")
+        }
+        quantity?.let { add(it.target?.let { target -> "Anzahl ${it.start} → $target" } ?: "Anzahl ab ${it.start}") }
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+}
+
+/**
+ * That the timed steps do not fit into the routine — or will not once they
+ * have grown. A warning, never a refusal: the steps lie inside the routine's
+ * length, and the routine does not grow with them.
+ */
+@Composable
+private fun StepFitWarning(extras: List<StepExtras>, routineLength: Duration) {
+    val now = extras.timedLength(grown = false)
+    val grown = extras.timedLength(grown = true)
+    val text = when {
+        now > routineLength ->
+            "Die Timer-Schritte brauchen zusammen ${now.formatShort()} — länger als die " +
+                "Routine mit ${routineLength.formatShort()}."
+        grown > routineLength ->
+            "Ausgewachsen brauchen die Timer-Schritte ${grown.formatShort()} — länger als " +
+                "die Routine mit ${routineLength.formatShort()}."
+        else -> return
+    }
+    EtaText(text = text, style = EtaTheme.typography.caption, color = EtaTheme.colors.warning)
 }
 
 /** Name and note, which is everything a subtask has. */
@@ -440,9 +523,12 @@ private fun SubtaskEditDialog(
     onDelete: (() -> Unit)? = null,
     /** Takes the step out of the group and back into the week list. */
     onRelease: (() -> Unit)? = null,
+    /** A routine's step: Timer-Task and Mengen-Inkrement on offer (step 49). */
+    offerExtras: Boolean = false,
 ) {
     var name by remember { mutableStateOf(row?.name ?: "") }
     var note by remember { mutableStateOf(row?.note ?: "") }
+    var extras by remember { mutableStateOf(row?.extras ?: StepExtras()) }
 
     EtaDialog(
         title = if (row == null) "Neue Subtask" else "Subtask bearbeiten",
@@ -462,6 +548,14 @@ private fun SubtaskEditDialog(
                 placeholder = "Nichts weiter",
                 singleLine = false,
             )
+        }
+        if (offerExtras) {
+            EtaExpander(
+                label = "Extras",
+                summary = extras.summary() ?: "Keine",
+            ) {
+                StepExtrasFields(value = extras, onChange = { extras = it })
+            }
         }
         if (onRelease != null) {
             EtaButton(
@@ -487,6 +581,8 @@ private fun SubtaskEditDialog(
                             id = row?.id,
                             name = name.trim(),
                             note = note.trim().takeIf { it.isNotBlank() },
+                            // Untouched outside a routine: what the row had stays.
+                            extras = if (offerExtras) extras else row?.extras,
                         ),
                     )
                 },
@@ -507,6 +603,8 @@ private fun SubtaskEditDialog(
 fun MorningRoutineSteps(
     steps: List<SubtaskDraft>,
     onSave: (List<SubtaskDraft>) -> Unit,
+    /** The routine's length, which timed steps are set against (step 49). */
+    routineLength: Duration? = null,
 ) {
     var editing by remember { mutableStateOf(false) }
 
@@ -520,7 +618,8 @@ fun MorningRoutineSteps(
         } else {
             steps.forEachIndexed { index, step ->
                 EtaText(
-                    text = "${index + 1}. ${step.name}",
+                    text = "${index + 1}. ${step.name}" +
+                        (step.extras?.summary()?.let { " · $it" } ?: ""),
                     style = EtaTheme.typography.body,
                     color = EtaTheme.colors.textSecondary,
                 )
@@ -538,6 +637,8 @@ fun MorningRoutineSteps(
             setting = SubtaskSetting(groupName = "", subtasks = steps),
             title = "Morgenroutine",
             showName = false,
+            stepExtras = true,
+            routineLength = routineLength,
             onDismiss = { editing = false },
             onSave = {
                 onSave(it.subtasks)

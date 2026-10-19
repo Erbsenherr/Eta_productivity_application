@@ -52,6 +52,17 @@ class TimerActions(
 )
 
 /**
+ * The four buttons of a routine step's timer (step 49), by block and step id —
+ * ids for the reason [TimerActions] takes one.
+ */
+class StepTimerActions(
+    val onStart: (blockId: String, subtaskId: String) -> Unit,
+    val onPause: (blockId: String, subtaskId: String) -> Unit,
+    val onResume: (blockId: String, subtaskId: String) -> Unit,
+    val onEnd: (blockId: String, subtaskId: String) -> Unit,
+)
+
+/**
  * The timer of a Timer-Task, where an ordinary task has "Erledigt".
  *
  * "Start" unfolds it. With a pomodoro rhythm the large figure counts down to the
@@ -69,6 +80,8 @@ fun TimerControls(
     entry: BlockWithItem,
     actions: TimerActions,
     modifier: Modifier = Modifier,
+    /** What "Start" counts down from, where it is not the block's own time — a step's (step 49). */
+    idleGoal: Duration? = null,
 ) {
     val block = entry.block
     val id = block.id
@@ -78,7 +91,7 @@ fun TimerControls(
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
         if (block.timerState == TimerState.IDLE) {
-            val goal = block.fullTimerGoal(entry.item.timerBufferOrZero)
+            val goal = idleGoal ?: block.fullTimerGoal(entry.item.timerBufferOrZero)
             EtaButton(
                 text = "Start · ${goal.formatShort()}",
                 style = EtaButtonStyle.Secondary,

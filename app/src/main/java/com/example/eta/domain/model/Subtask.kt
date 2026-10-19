@@ -4,11 +4,14 @@ import androidx.room3.Entity
 import androidx.room3.ForeignKey
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
+import kotlin.time.Duration
 import kotlin.time.Instant
 import java.util.UUID
 
 /**
- * One step inside a task — a name, optionally a note, and nothing else.
+ * One step inside a task — a name, optionally a note, and nothing else; except
+ * a routine's step, which since step 49 may be a Timer-Task and count (see the
+ * columns below).
  *
  * Deliberately **not** an [Item]. A subtask has no duration, no category, no
  * priority, no deadline, no role and no block of its own: it earns nothing, is
@@ -50,6 +53,32 @@ data class Subtask(
     val note: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /**
+     * Step 49: a step of a **routine** may be a Timer-Task, with everything a
+     * Timer-Task has — the time on its timer ([duration]), a buffer, a pomodoro
+     * rhythm, a "Zielzeit" growing it — and may carry a Mengen-Inkrement. The
+     * columns mirror the item's of the same names, and the arithmetic is the
+     * item's too: `StepExtras.kt` runs it on a stand-in [Item].
+     *
+     * The time lies **inside** the routine's own length; nothing about the block
+     * moves when a step grows.
+     */
+    val timerTask: Boolean = false,
+    val duration: Duration? = null,
+    val timerBuffer: Duration? = null,
+    val pomodoroWork: Duration? = null,
+    val pomodoroPause: Duration? = null,
+    val growthStart: Duration? = null,
+    val growthTarget: Duration? = null,
+    val growthIncrement: Duration? = null,
+    val growthEvery: Int = 1,
+    val growthProgress: Int = 0,
+    val quantity: Int? = null,
+    val quantityStart: Int? = null,
+    val quantityIncrement: Int? = null,
+    val quantityTarget: Int? = null,
+    val quantityEvery: Int = 1,
+    val quantityProgress: Int = 0,
 )
 
 /**
@@ -87,4 +116,40 @@ data class SubtaskCheck(
     val blockId: String,
     val subtaskId: String,
     val checkedAt: Instant,
+)
+
+/**
+ * The timer of one Timer-Task step on one day (step 49) — the three columns a
+ * block carries for its own timer, keyed like a tick.
+ *
+ * [goal] is what the sitting counts down from, [worked] what was counted at the
+ * last stop, [runningSince] when it was last set going. Ending it writes the
+ * count and ticks the step; the row stays, which is how the evening knows
+ * whether the step was worked in full.
+ */
+@Entity(
+    tableName = "subtask_timers",
+    primaryKeys = ["blockId", "subtaskId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = PlannedBlock::class,
+            parentColumns = ["id"],
+            childColumns = ["blockId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = Subtask::class,
+            parentColumns = ["id"],
+            childColumns = ["subtaskId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("subtaskId")],
+)
+data class SubtaskTimer(
+    val blockId: String,
+    val subtaskId: String,
+    val goal: Duration,
+    val worked: Duration = Duration.ZERO,
+    val runningSince: Instant? = null,
 )

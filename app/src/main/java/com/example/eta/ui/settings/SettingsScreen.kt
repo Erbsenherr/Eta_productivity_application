@@ -33,6 +33,7 @@ import com.example.eta.ui.theme.TabStyle
 import com.example.eta.ui.theme.accentOfHue
 import com.example.eta.ui.theme.colorsOf
 import androidx.compose.foundation.clickable
+import kotlin.time.Duration
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -279,7 +280,7 @@ fun SettingsScreen(
                                 )
                                 SleepStep(setup, viewModel::update)
                                 PunctualToleranceBox(setup, viewModel::update)
-                                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
+                                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps, setup.morningDuration)
                             }
 
                             SettingsPage.WAKE -> {
@@ -1459,6 +1460,7 @@ private fun MessageBox(message: SettingsMessage, onDismiss: () -> Unit) {
 private fun MorningRoutineBox(
     steps: List<SubtaskDraft>,
     onSave: (List<SubtaskDraft>) -> Unit,
+    routineLength: Duration? = null,
 ) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
@@ -1471,7 +1473,7 @@ private fun MorningRoutineBox(
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
-            MorningRoutineSteps(steps = steps, onSave = onSave)
+            MorningRoutineSteps(steps = steps, onSave = onSave, routineLength = routineLength)
         }
     }
 }

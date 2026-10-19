@@ -3,6 +3,9 @@ package com.example.eta.data.repository
 import com.example.eta.data.local.SubtaskDao
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
+import com.example.eta.domain.model.SubtaskTimer
+import com.example.eta.domain.subtask.withStepExtras
+import kotlin.time.Duration
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.subtask.matchedTo
 import kotlin.time.Clock
@@ -75,7 +78,7 @@ class SubtaskRepository(
 
         val rows = drafts.mapIndexed { index, draft ->
             val row = matched[index]?.let { existing[it] }
-            row?.copy(
+            val saved = row?.copy(
                 position = index,
                 name = draft.name.trim(),
                 note = draft.note?.trim()?.takeIf { it.isNotBlank() },
@@ -90,6 +93,8 @@ class SubtaskRepository(
                 createdAt = now,
                 updatedAt = now,
             )
+            // Each weekday's row keeps where its growing and counting have got to.
+            draft.extras?.let { saved.withStepExtras(it) } ?: saved
         }
 
         val gone = existing.values.filterNot { it.id in kept }
@@ -102,11 +107,54 @@ class SubtaskRepository(
         save(toItemId, subtasks.sortedBy { it.position }.map { SubtaskDraft(name = it.name, note = it.note) })
     }
 
+    /** Rows written as they are — what growing and counting move (step 49). */
+    suspend fun update(rows: List<Subtask>) {
+        if (rows.isNotEmpty()) dao.upsert(rows)
+    }
+
+    // --- the timer of a step (step 49) ---------------------------------------
+
+    /** One day's step timers, by block and then by step. */
+    fun observeTimers(date: LocalDate): Flow<Map<String, Map<String, SubtaskTimer>>> =
+        dao.observeTimersForDate(date).map { rows ->
+            rows.groupBy { it.blockId }.mapValues { (_, list) -> list.associateBy { it.subtaskId } }
+        }
+
+    suspend fun timersBetween(from: LocalDate, to: LocalDate): List<SubtaskTimer> = dao.timersBetween(from, to)
+
+    suspend fun findTimer(blockId: String, subtaskId: String): SubtaskTimer? = dao.findTimer(blockId, subtaskId)
+
+    /** "Start": the step's whole time, counted from now. */
+    suspend fun startTimer(blockId: String, subtaskId: String, goal: Duration) {
+        dao.upsertTimer(SubtaskTimer(blockId, subtaskId, goal = goal, runningSince = clock.now()))
+    }
+
+    suspend fun pauseTimer(blockId: String, subtaskId: String) {
+        val timer = dao.findTimer(blockId, subtaskId) ?: return
+        val since = timer.runningSince ?: return
+        val worked = (timer.worked + (clock.now() - since)).coerceIn(Duration.ZERO, timer.goal)
+        dao.upsertTimer(timer.copy(worked = worked, runningSince = null))
+    }
+
+    suspend fun resumeTimer(blockId: String, subtaskId: String) {
+        val timer = dao.findTimer(blockId, subtaskId) ?: return
+        if (timer.runningSince != null) return
+        dao.upsertTimer(timer.copy(runningSince = clock.now()))
+    }
+
+    /** "Ende": the count is kept and the step ticked — the routine moves on. */
+    suspend fun endTimer(blockId: String, subtaskId: String) {
+        pauseTimer(blockId, subtaskId)
+        setChecked(blockId, subtaskId, checked = true)
+    }
+
     suspend fun setChecked(blockId: String, subtaskId: String, checked: Boolean) {
         if (checked) {
             dao.check(SubtaskCheck(blockId = blockId, subtaskId = subtaskId, checkedAt = clock.now()))
         } else {
             dao.uncheck(blockId, subtaskId)
+            // A tick taken back takes its sitting with it, as for a task.
+            dao.deleteTimer(blockId, subtaskId)
         }
     }
 }

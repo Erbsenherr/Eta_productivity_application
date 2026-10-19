@@ -1,5 +1,9 @@
 package com.example.eta.ui.dashboard
 
+import com.example.eta.domain.model.SubtaskTimer
+import com.example.eta.domain.subtask.asBlock
+import com.example.eta.domain.subtask.isTimerStep
+import com.example.eta.domain.subtask.quantityLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
@@ -177,6 +181,9 @@ fun NowBox(
     onConfirm: (BlockWithItem) -> Unit = {},
     /** The timer of a Timer-Task, which stands where "Erledigt" would. */
     timer: TimerActions? = null,
+    /** Step 49: the timers of routine steps, by block id, and their buttons. */
+    stepTimers: Map<String, Map<String, SubtaskTimer>> = emptyMap(),
+    stepTimer: StepTimerActions? = null,
     /**
      * "Guten Morgen!" or "Gute Nacht!": the box's name while one of the two
      * windows is open, and what there is to answer in it. Above the pages, so it
@@ -278,6 +285,8 @@ fun NowBox(
                             },
                             onConfirm = { onConfirm(entry.entry) },
                             timer = timer,
+                            stepTimers = stepTimers[entry.entry.block.id].orEmpty(),
+                            stepTimer = stepTimer,
                         )
                     }
                 }
@@ -312,6 +321,8 @@ private fun NowLine(
     onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit = { _, _ -> },
     onConfirm: () -> Unit = {},
     timer: TimerActions? = null,
+    stepTimers: Map<String, SubtaskTimer> = emptyMap(),
+    stepTimer: StepTimerActions? = null,
 ) {
     val entry = now.entry
     val block = entry.block
@@ -370,6 +381,10 @@ private fun NowLine(
                 checkTimes = checkTimes,
                 running = running,
                 onCheckSubtask = onCheckSubtask,
+                entry = entry,
+                stepTimers = stepTimers,
+                stepTimer = stepTimer?.takeIf { timer != null },
+                now = timer?.now,
             )
         }
         (if (routine) emptyList() else steps.sortedBy { it.position }).forEach { step ->
@@ -450,6 +465,10 @@ private fun RoutineSteps(
     checkTimes: Map<String, Instant>,
     running: Boolean,
     onCheckSubtask: (subtaskId: String, checked: Boolean) -> Unit,
+    entry: BlockWithItem? = null,
+    stepTimers: Map<String, SubtaskTimer> = emptyMap(),
+    stepTimer: StepTimerActions? = null,
+    now: Instant? = null,
 ) {
     if (!running) {
         // Nothing has begun: the routine is announced, not started.
@@ -498,9 +517,15 @@ private fun RoutineSteps(
     }
 
     progress.current?.let { current ->
+        // Step 49: a Timer-Task step is worked, not ticked — its timer stands
+        // where the checkbox would, and "Ende" ticks it.
+        val timed = current.isTimerStep && stepTimer != null && now != null && entry != null
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 EtaText(text = current.name, style = EtaTheme.typography.bodyStrong)
+                current.quantityLabel()?.let { label ->
+                    EtaText(text = label, style = EtaTheme.typography.bodyStrong, color = EtaTheme.colors.accent)
+                }
                 current.note?.takeIf { it.isNotBlank() }?.let { note ->
                     EtaText(
                         text = note,
@@ -509,13 +534,34 @@ private fun RoutineSteps(
                     )
                 }
             }
-            Spacer(Modifier.width(EtaTheme.spacing.sm))
-            // Keyed by the step: the box that was just ticked must not be the
-            // one the next step is drawn with.
+            if (!timed) {
+                Spacer(Modifier.width(EtaTheme.spacing.sm))
+                // Keyed by the step: the box that was just ticked must not be the
+                // one the next step is drawn with.
+                key(current.id) {
+                    EtaCheckbox(
+                        checked = false,
+                        onCheckedChange = { onCheckSubtask(current.id, true) },
+                    )
+                }
+            }
+        }
+        if (timed && stepTimer != null && now != null && entry != null) {
+            val blockId = entry.block.id
             key(current.id) {
-                EtaCheckbox(
-                    checked = false,
-                    onCheckedChange = { onCheckSubtask(current.id, true) },
+                TimerControls(
+                    entry = BlockWithItem(
+                        block = stepTimers[current.id].asBlock(entry.block, current),
+                        item = entry.item.copy(name = current.name),
+                    ),
+                    actions = TimerActions(
+                        now = now,
+                        onStart = { stepTimer.onStart(blockId, current.id) },
+                        onPause = { stepTimer.onPause(blockId, current.id) },
+                        onResume = { stepTimer.onResume(blockId, current.id) },
+                        onEnd = { stepTimer.onEnd(blockId, current.id) },
+                    ),
+                    idleGoal = current.duration,
                 )
             }
         }

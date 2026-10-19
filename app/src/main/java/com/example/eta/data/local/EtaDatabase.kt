@@ -25,6 +25,7 @@ import com.example.eta.domain.model.SleepLog
 import com.example.eta.domain.model.RewardTask
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.model.SubtaskCheck
+import com.example.eta.domain.model.SubtaskTimer
 import com.example.eta.domain.model.Vacation
 import com.example.eta.domain.model.VacationRule
 import com.example.eta.domain.setup.UserSetup
@@ -53,8 +54,9 @@ import com.example.eta.domain.setup.UserSetup
         SleepLog::class,
         Note::class,
         HabitStreak::class,
+        SubtaskTimer::class,
     ],
-    version = 33,
+    version = 34,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1018,5 +1020,43 @@ val MIGRATION_32_33 = object : Migration(32, 33) {
             "ALTER TABLE `user_setup` ADD COLUMN `punctualTolerance` INTEGER NOT NULL DEFAULT 5",
         )
         connection.execSQL("ALTER TABLE `sleep_logs` ADD COLUMN `tolerance` INTEGER")
+    }
+}
+
+/**
+ * Step 49: a routine's steps as Timer-Tasks and with a Mengen-Inkrement — the
+ * item's columns of the same names on `subtasks` —, and `subtask_timers`, the
+ * timer of one step on one day.
+ */
+val MIGRATION_33_34 = object : Migration(33, 34) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `timerTask` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `duration` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `timerBuffer` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `pomodoroWork` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `pomodoroPause` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `growthStart` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `growthTarget` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `growthIncrement` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `growthEvery` INTEGER NOT NULL DEFAULT 1")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `growthProgress` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantity` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantityStart` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantityIncrement` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantityTarget` INTEGER")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantityEvery` INTEGER NOT NULL DEFAULT 1")
+        connection.execSQL("ALTER TABLE `subtasks` ADD COLUMN `quantityProgress` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `subtask_timers` (`blockId` TEXT NOT NULL, " +
+                "`subtaskId` TEXT NOT NULL, `goal` INTEGER NOT NULL, `worked` INTEGER NOT NULL, " +
+                "`runningSince` INTEGER, PRIMARY KEY(`blockId`, `subtaskId`), " +
+                "FOREIGN KEY(`blockId`) REFERENCES `planned_blocks`(`id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                "FOREIGN KEY(`subtaskId`) REFERENCES `subtasks`(`id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        connection.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_subtask_timers_subtaskId` ON `subtask_timers` (`subtaskId`)",
+        )
     }
 }

@@ -10,6 +10,8 @@ import com.example.eta.domain.growth.hasQuantity
 import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
+import com.example.eta.domain.subtask.asItem
+import com.example.eta.domain.subtask.isGrowingStep
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.groupRecurring
 import com.example.eta.ui.attributes.RecurringAttributes
@@ -19,6 +21,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/**
+ * A routine's step working towards something (step 49): a "Zielzeit" or a
+ * Mengen-Inkrement. Listed with the tasks, as "Subtask von …".
+ */
+data class StepGoal(
+    /** The routine it belongs to, one entry per task. */
+    val parent: RecurringGroup,
+    val step: Subtask,
+)
 
 data class GrowthTasksUiState(
     /** The growth tasks in their own order — one entry per task, not per weekday. */
@@ -36,6 +48,13 @@ data class GrowthTasksUiState(
     val subtasks: Map<String, List<Subtask>> = emptyMap(),
     /** ToDos a group can swallow as steps. */
     val foldable: List<Item> = emptyList(),
+    /**
+     * Steps of routines with a "Zielzeit" — not ordered: the order settles a
+     * slot, and a step has none of its own.
+     */
+    val growingSteps: List<StepGoal> = emptyList(),
+    /** Steps with a Mengen-Inkrement only. */
+    val countedSteps: List<StepGoal> = emptyList(),
 )
 
 /**
@@ -77,6 +96,9 @@ class GrowthTasksViewModel(
             },
             definitions = definitions,
             counted = groupRecurring(definitions.filter { it.hasQuantity && !it.isGrowthTask }),
+            growingSteps = stepGoals(definitions, subtasks).filter { it.step.isGrowingStep },
+            countedSteps = stepGoals(definitions, subtasks)
+                .filter { !it.step.isGrowingStep && it.step.asItem().hasQuantity },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -129,3 +151,16 @@ class GrowthTasksViewModel(
         viewModelScope.launch { recurringTaskService.endGroup(group.ids) }
     }
 }
+
+/**
+ * The steps of standing routines that grow or count, one per routine and step:
+ * the routine's rows share their steps, so its first row speaks for all.
+ */
+private fun stepGoals(definitions: List<Item>, subtasks: Map<String, List<Subtask>>): List<StepGoal> =
+    groupRecurring(definitions.filter { it.routineMode })
+        .distinctBy { it.representative.normalizedName }
+        .flatMap { group ->
+            subtasks[group.representative.id].orEmpty()
+                .filter { it.isGrowingStep || it.asItem().hasQuantity }
+                .map { StepGoal(group, it) }
+        }

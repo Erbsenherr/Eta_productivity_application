@@ -5,6 +5,8 @@ import com.example.eta.R
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.SetupRepository
+import com.example.eta.data.repository.SubtaskRepository
+import com.example.eta.domain.planning.stepTimerEntries
 import com.example.eta.domain.planning.PomodoroPhaseKind
 import com.example.eta.domain.planning.TaskAnnouncement
 import com.example.eta.domain.planning.TaskEventKind
@@ -62,6 +64,8 @@ class TaskStartCoordinator(
      * one would ring on the user's real phone — in place of their own.
      */
     private val enabled: Boolean = true,
+    /** Step 49: the timers of routine steps ring as well; null leaves them silent. */
+    private val subtaskRepository: SubtaskRepository? = null,
 ) {
 
     private val scheduler = TaskStartAlarmScheduler(context)
@@ -75,7 +79,8 @@ class TaskStartCoordinator(
      */
     suspend fun reschedule() {
         if (!enabled) return
-        val next = nextTaskEvent(blocksOfInterest(), clock.now(), timeZone, stillActivePerDay())
+        val blocks = blocksOfInterest()
+        val next = nextTaskEvent(blocks, clock.now(), timeZone, stillActivePerDay(), stepTimers(blocks))
         if (next == null) scheduler.cancel() else scheduler.schedule(next)
     }
 
@@ -87,7 +92,8 @@ class TaskStartCoordinator(
      * thing instead of the nearest thing.
      */
     suspend fun onRing(at: Instant) {
-        val events = eventsAt(blocksOfInterest(), at, timeZone, stillActivePerDay())
+        val blocks = blocksOfInterest()
+        val events = eventsAt(blocks, at, timeZone, stillActivePerDay(), stepTimers(blocks))
         val minute = at.toLocalDateTime(timeZone).time.minuteOfDay()
 
         events.forEach { event ->
@@ -141,6 +147,19 @@ class TaskStartCoordinator(
      * morning: looking only at today would leave the alarm cancelled overnight
      * and the first block of the next day silent.
      */
+    /** The steps' timers on the days of [blocks] — see `stepTimerEntries`. */
+    private suspend fun stepTimers(blocks: List<BlockWithItem>): List<BlockWithItem> {
+        val repository = subtaskRepository ?: return emptyList()
+        val today: LocalDate = clock.todayIn(timeZone)
+        val tomorrow = today.plus(DatePeriod(days = 1))
+        val timers = repository.timersBetween(today, tomorrow)
+        if (timers.isEmpty()) return emptyList()
+        val checked = (repository.checkedByBlock(today) + repository.checkedByBlock(tomorrow))
+            .flatMap { (block, ids) -> ids.map { block to it } }
+            .toSet()
+        return stepTimerEntries(blocks, timers, repository.stepsByItem(), checked)
+    }
+
     private suspend fun blocksOfInterest(): List<BlockWithItem> {
         val today: LocalDate = clock.todayIn(timeZone)
         return planRepository.findDay(today) +

@@ -33,6 +33,8 @@ time**. It changes exactly one thing: what the "Gerade" box draws.
   has left the screen.
 - On the **"Als Nächstes"** page it reads "Routine · 5 Schritte" and offers no
   checkbox, for the reason the ordinary steps are read-only there.
+- **Since step 49 a step can be a Timer-Task and carry a count** — its timer
+  stands where its checkbox would; see *Step 49*.
 - **Everything else is unchanged**: the planner still draws all the steps on the
   block, "Gruppe erledigt" still confirms the whole task, the evening still carries
   open steps over. A routine is a way of *showing* steps, not a second kind of step.

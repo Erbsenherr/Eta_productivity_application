@@ -18,6 +18,7 @@ abstract class ResetDao {
     /** Blocks first, then items: the cascade would do it, but the order documents intent. */
     @Transaction
     open suspend fun clearEverything() {
+        clearSubtaskTimers()
         clearSubtaskChecks()
         clearSubtasks()
         clearPlannedBlocks()
@@ -44,6 +45,9 @@ abstract class ResetDao {
 
     @Query("DELETE FROM streaks")
     abstract suspend fun clearStreaks()
+
+    @Query("DELETE FROM subtask_timers")
+    abstract suspend fun clearSubtaskTimers()
 
     @Query("DELETE FROM subtask_checks")
     abstract suspend fun clearSubtaskChecks()

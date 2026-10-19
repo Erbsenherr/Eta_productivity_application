@@ -256,7 +256,11 @@ fun SleepStep(
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
-                    MorningRoutineSteps(steps = morningSteps, onSave = onMorningSteps)
+                    MorningRoutineSteps(
+                        steps = morningSteps,
+                        onSave = onMorningSteps,
+                        routineLength = draft.morningDuration,
+                    )
                 }
             }
             if (mode != NightMode.PER_DAY) {

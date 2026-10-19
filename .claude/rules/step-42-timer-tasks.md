@@ -107,6 +107,10 @@ and four callbacks taking a block **id**).
 
 #### The "Ziele" tab
 
+Since step 49 it also lists routine steps with a goal, as "Subtask von …" —
+see *Step 49*.
+
+
 `EtaTab.Growth`, labelled "Ziele" (the entry keeps its name — a saved tab is
 restored by it). Timer-Tasks with a "Zielzeit" in their dragged order, as
 before, and under them `GrowthTasksUiState.counted`: standing tasks with a
