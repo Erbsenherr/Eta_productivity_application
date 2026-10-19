@@ -1,5 +1,6 @@
 package com.example.eta.ui.reevaluation
 
+import com.example.eta.domain.sound.SoundEvent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import com.example.eta.R
 import com.example.eta.alarm.EtaSound
 import com.example.eta.domain.model.StreakKind
 import com.example.eta.domain.streak.StreakOutcome
@@ -39,15 +39,15 @@ import kotlinx.coroutines.delay
 private const val STREAK_TURN_MILLIS = 900
 
 /**
- * The streaks' sounds — **placeholders**, like the Belohn-o-mat's: files the
- * app already ships, until the real ones exist.
+ * The streaks' sounds — chosen on the "Audio" page since step 51, their
+ * defaults still the placeholders they were, like the Belohn-o-mat's.
  */
 private object StreakSounds {
     /** A flame growing by one. */
-    val UP = R.raw.notification
+    val UP = SoundEvent.STREAK_UP
 
     /** A flame going out. */
-    val OUT = R.raw.pom_pause_start
+    val OUT = SoundEvent.STREAK_OUT
 }
 
 /**

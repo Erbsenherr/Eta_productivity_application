@@ -14,7 +14,17 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.annotation.RawRes
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import com.example.eta.R
+import com.example.eta.domain.sound.EtaSoundFile
+import com.example.eta.domain.sound.SoundChoice
+import com.example.eta.domain.sound.SoundEvent
+import com.example.eta.domain.sound.decodeSoundChoice
+import com.example.eta.domain.sound.encode
+import com.example.eta.domain.sound.etaFile
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -136,6 +146,7 @@ object EtaSound {
 
     private const val KEY_IGNORE_DND = "ignoreDoNotDisturb"
     private const val KEY_MODE = "audioMode"
+    private const val KEY_CHOICE = "choice_"
 
     fun mode(context: Context): AudioMode {
         val stored = prefs(context).getString(KEY_MODE, null)
@@ -174,8 +185,43 @@ object EtaSound {
         }
     }
 
-    /** Plays [sound] once, unless the phone was asked for quiet — see [isSilenced]. Never throws. */
-    fun play(context: Context, @RawRes sound: Int) {
+    /** What [event] plays: the user's choice on the "Audio" page, or what it always had. */
+    fun choiceOf(context: Context, event: SoundEvent): SoundChoice =
+        decodeSoundChoice(prefs(context).getString(KEY_CHOICE + event.name, null))
+
+    fun setChoice(context: Context, event: SoundEvent, choice: SoundChoice) {
+        prefs(context).edit {
+            val stored = choice.encode()
+            if (stored == null) remove(KEY_CHOICE + event.name) else putString(KEY_CHOICE + event.name, stored)
+        }
+    }
+
+    /**
+     * The address of what [choice] plays for [event]: one of Eta's files as an
+     * `android.resource` URI, a system sound as picked, and for the wake alarm's
+     * default the phone's own alarm tone. Null only where a phone has no alarm
+     * tone at all.
+     */
+    fun uriOf(context: Context, event: SoundEvent, choice: SoundChoice = choiceOf(context, event)): Uri? =
+        when (choice) {
+            is SoundChoice.System -> choice.uri.toUri()
+            else -> choice.etaFile(event)?.let { resourceUri(context, it) } ?: phoneAlarmTone()
+        }
+
+    /** What [event] had before anything was chosen: the fallback when a choice will not play. */
+    fun defaultUriOf(context: Context, event: SoundEvent): Uri? =
+        uriOf(context, event, SoundChoice.Default)
+
+    /** The phone's alarm tone, or its ringtone where it has none. */
+    fun phoneAlarmTone(): Uri? =
+        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
+    private fun resourceUri(context: Context, file: EtaSoundFile): Uri =
+        "android.resource://${context.packageName}/${rawOf(file)}".toUri()
+
+    /** Plays [event]'s sound once, unless the phone was asked for quiet — see [isSilenced]. Never throws. */
+    fun play(context: Context, event: SoundEvent) {
         val app = context.applicationContext
         when (mode(app)) {
             AudioMode.SILENT -> return
@@ -183,15 +229,44 @@ object EtaSound {
             AudioMode.SOUND -> Unit
         }
         if (isSilenced(app)) return
-        val audio: AudioManager? = app.getSystemService()
+        start(app, uriOf(app, event), fallback = defaultUriOf(app, event))
+    }
 
-        runCatching {
-            val player = MediaPlayer.create(
-                app,
-                sound,
-                attributes,
-                audio?.generateAudioSessionId() ?: AudioManager.AUDIO_SESSION_ID_GENERATE,
-            ) ?: return
+    /** The one preview sounding, stopped by the next — tapping through a list should not pile them up. */
+    private var preview: MediaPlayer? = null
+
+    /**
+     * Plays [choice] once, as a preview on the "Audio" page: whatever the mode
+     * and the phone's quiet say, since the user just asked to hear it. Only on
+     * the alarm stream's volume, which is what the real sound will have.
+     */
+    fun preview(context: Context, event: SoundEvent, choice: SoundChoice) {
+        stopPreview()
+        val app = context.applicationContext
+        preview = start(app, uriOf(app, event, choice), fallback = null)
+    }
+
+    fun stopPreview() {
+        preview?.let { player ->
+            runCatching { player.stop() }
+            runCatching { player.release() }
+            synchronized(playing) { playing.remove(player) }
+        }
+        preview = null
+    }
+
+    /**
+     * Starts [uri] once, or [fallback] if it will not play — a system sound can
+     * vanish with an update, or lie on storage Eta may not read. Never throws.
+     */
+    private fun start(app: Context, uri: Uri?, fallback: Uri?): MediaPlayer? {
+        val audio: AudioManager? = app.getSystemService()
+        val session = audio?.generateAudioSessionId() ?: AudioManager.AUDIO_SESSION_ID_GENERATE
+        fun create(target: Uri?): MediaPlayer? =
+            target?.let { runCatching { MediaPlayer.create(app, it, null, attributes, session) }.getOrNull() }
+
+        return runCatching {
+            val player = create(uri) ?: create(fallback.takeIf { it != uri }) ?: return null
             val focus = audio?.let { requestFocus(it) }
 
             player.setOnCompletionListener { done ->
@@ -201,7 +276,8 @@ object EtaSound {
             }
             synchronized(playing) { playing += player }
             player.start()
-        }
+            player
+        }.getOrNull()
     }
 
     /**
@@ -275,4 +351,15 @@ internal fun ensureSilentChannel(
             setSound(null, null)
         },
     )
+}
+
+/** The resource of one of Eta's files. */
+internal fun rawOf(file: EtaSoundFile): Int = when (file) {
+    EtaSoundFile.TASK_START -> R.raw.task_start
+    EtaSoundFile.TASK_END -> R.raw.task_end
+    EtaSoundFile.STILL_ACTIVE -> R.raw.still_active
+    EtaSoundFile.POM_WORK_START -> R.raw.pom_work_start
+    EtaSoundFile.POM_PAUSE_START -> R.raw.pom_pause_start
+    EtaSoundFile.PLANNING_START -> R.raw.planning_start
+    EtaSoundFile.NOTIFICATION -> R.raw.notification
 }

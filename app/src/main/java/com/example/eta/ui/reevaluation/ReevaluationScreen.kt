@@ -1,5 +1,6 @@
 package com.example.eta.ui.reevaluation
 
+import com.example.eta.domain.sound.SoundEvent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -35,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.eta.R
 import com.example.eta.alarm.EtaSound
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.RewardOutlook
@@ -968,18 +968,15 @@ private const val REWARD_FILL_PAUSE_MILLIS = 500
 private val REWARD_BAR_HEIGHT = 14.dp
 
 /**
- * The Belohn-o-mat's two sounds.
- *
- * **Placeholders**, as asked: files the app already ships, standing in until
- * the real ones exist. Swapping one in is a matter of copying it into `res/raw`
- * and naming it here.
+ * The Belohn-o-mat's two sounds — chosen on the "Audio" page since step 51,
+ * where their defaults are still the placeholders step 35 put here.
  */
 private object RewardSounds {
     /** While the bar runs. */
-    val FILL = R.raw.notification
+    val FILL = SoundEvent.REWARD_FILL
 
     /** When a reward is earned in full. */
-    val FULL = R.raw.pom_work_start
+    val FULL = SoundEvent.REWARD_FULL
 }
 
 @Composable

@@ -118,11 +118,19 @@ val EtaBrandRed = Color(0xFFE5322D)
 
 /**
  * A plain red that reads on a dark ground, for the one box that has to look like
- * an alarm by night — "Läuft bald ab" (step 48). The dark palettes' [EtaColors.danger]
+ * an alarm by night — "Läuft bald ab" (step 48) — and for a negative balance. The dark palettes' [EtaColors.danger]
  * is a rose there, which the user read as pink; changing the token itself would
  * repaint every locked contract slot as well.
  */
 val AlertRedOnDark = Color(0xFFF2564F)
+
+/**
+ * Red, by day and by night: [EtaColors.danger] in a light palette, [AlertRedOnDark]
+ * in a dark one. For what has to read as red rather than as the dark palette's
+ * rose — "Läuft bald ab" (step 48) and a balance below zero (step 51).
+ */
+val EtaColors.alertRed: Color
+    get() = if (isDark) AlertRedOnDark else danger
 
 /**
  * The palette of the [AppDesign.ETA] design by day: the app icon turned into a screen —

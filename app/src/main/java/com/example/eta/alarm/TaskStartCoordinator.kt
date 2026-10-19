@@ -1,7 +1,7 @@
 package com.example.eta.alarm
 
+import com.example.eta.domain.sound.SoundEvent
 import android.content.Context
-import com.example.eta.R
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.SetupRepository
@@ -123,14 +123,13 @@ class TaskStartCoordinator(
         }
     }
 
-    private fun soundOf(kind: TaskEventKind): Int = when (kind) {
-        TaskEventKind.START -> R.raw.task_start
-        TaskEventKind.END -> R.raw.task_end
-        TaskEventKind.STILL_ACTIVE -> R.raw.still_active
-        TaskEventKind.POMODORO_PAUSE -> R.raw.pom_pause_start
-        TaskEventKind.POMODORO_WORK -> R.raw.pom_work_start
-        // The user's choice: the timer running out sounds like a pause beginning.
-        TaskEventKind.TIMER_DONE -> R.raw.pom_pause_start
+    private fun soundOf(kind: TaskEventKind): SoundEvent = when (kind) {
+        TaskEventKind.START -> SoundEvent.TASK_START
+        TaskEventKind.END -> SoundEvent.TASK_END
+        TaskEventKind.STILL_ACTIVE -> SoundEvent.STILL_ACTIVE
+        TaskEventKind.POMODORO_PAUSE -> SoundEvent.POMODORO_PAUSE
+        TaskEventKind.POMODORO_WORK -> SoundEvent.POMODORO_WORK
+        TaskEventKind.TIMER_DONE -> SoundEvent.TIMER_DONE
     }
 
     /** Zero while the question is switched off, which asks nothing. */

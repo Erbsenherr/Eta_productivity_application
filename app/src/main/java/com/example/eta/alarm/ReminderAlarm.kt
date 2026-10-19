@@ -1,5 +1,6 @@
 package com.example.eta.alarm
 
+import com.example.eta.domain.sound.SoundEvent
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -93,7 +94,7 @@ class ReminderCoordinator(
     suspend fun onRing() {
         val due = repository.markDueAsFired(clock.now())
         if (due.isNotEmpty()) {
-            EtaSound.play(context, R.raw.notification)
+            EtaSound.play(context, SoundEvent.REMINDER)
             due.forEach { show(it) }
         }
         reschedule()

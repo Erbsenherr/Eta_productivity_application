@@ -1,12 +1,12 @@
 package com.example.eta.alarm
 
+import com.example.eta.domain.sound.SoundEvent
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -77,17 +77,12 @@ object WakeAlarmNotifications {
     }
 
     /**
-     * What the alarm actually rings with.
-     *
-     * The device's own alarm tone rather than one of the app's mp3s: it is what
-     * the user already recognises as an alarm, it is designed to be looped, and
-     * it is what their volume keys are aimed at. Swapping in a file of their own
-     * is one line — `"android.resource://…/${R.raw.some_file}".toUri()`, with the
-     * mp3 copied into `res/raw` the way `task_start` and `planning_start` are.
+     * What the alarm actually rings with: the "Weckruf" chosen on the "Audio"
+     * page (step 51), by default the device's own alarm tone — what the user
+     * already recognises as an alarm, designed to be looped, and what their
+     * volume keys are aimed at.
      */
-    fun soundUri(context: Context): Uri? =
-        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+    fun soundUri(context: Context): Uri? = EtaSound.uriOf(context, SoundEvent.WAKE)
 
     /** Alarm stream, so the ringer being silenced does not silence the alarm. */
     val audioAttributes: AudioAttributes = AudioAttributes.Builder()

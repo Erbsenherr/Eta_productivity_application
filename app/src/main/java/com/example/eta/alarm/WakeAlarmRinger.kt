@@ -2,6 +2,7 @@ package com.example.eta.alarm
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -30,21 +31,26 @@ object WakeAlarmRinger {
         if (player != null) return
         val uri = WakeAlarmNotifications.soundUri(context) ?: return
 
-        player = runCatching {
-            MediaPlayer().apply {
-                setAudioAttributes(WakeAlarmNotifications.audioAttributes)
-                setDataSource(context.applicationContext, uri)
-                // Looping is what separates an alarm from a notification: a tone
-                // that plays once and stops cannot wake anyone who slept through
-                // its twenty seconds.
-                isLooping = true
-                prepare()
-                start()
-            }
-        }.getOrNull()
+        // A chosen sound that will not play — gone with an update, or on storage
+        // Eta may not read — must not leave the morning silent: the phone's own
+        // alarm tone stands in.
+        player = loop(context, uri) ?: EtaSound.phoneAlarmTone()?.takeIf { it != uri }?.let { loop(context, it) }
 
         vibrate(context)
     }
+
+    private fun loop(context: Context, uri: Uri): MediaPlayer? = runCatching {
+        MediaPlayer().apply {
+            setAudioAttributes(WakeAlarmNotifications.audioAttributes)
+            setDataSource(context.applicationContext, uri)
+            // Looping is what separates an alarm from a notification: a tone
+            // that plays once and stops cannot wake anyone who slept through
+            // its twenty seconds.
+            isLooping = true
+            prepare()
+            start()
+        }
+    }.getOrNull()
 
     fun stop(context: Context) {
         player?.let { runCatching { it.stop() }; runCatching { it.release() } }

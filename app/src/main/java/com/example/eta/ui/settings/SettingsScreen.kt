@@ -298,6 +298,7 @@ fun SettingsScreen(
                             SettingsPage.ANNOUNCEMENT -> {
                                 AudioModeBox()
                                 TaskAnnouncementBox(setup, viewModel::update)
+                                SoundChoicesBox()
                             }
                             SettingsPage.PLANNING -> PlanningStep(setup, viewModel::update)
                             SettingsPage.FEATURES -> {

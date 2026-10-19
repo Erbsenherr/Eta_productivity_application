@@ -66,6 +66,10 @@ sound from a resource or a content URI, so they are **copied** into
 `app/src/main/res/raw/` — `sounds/` stays the source folder, `res/raw/` is what
 ships. Re-copy after changing one; nothing watches the folder.
 
+**Since step 51 every sound is chosen per moment** — one of Eta's files or a
+sound of the phone's, the wake alarm included — see *Step 51*. Where this file
+names a file for a moment, it describes the default.
+
 **Since step 46 there is a mode above all of it** — Ton, Vibration, Still
 (`AudioMode`, the "Audio" page) — see *Step 46*.
 

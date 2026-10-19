@@ -73,7 +73,7 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.ui.format.formatShort
-import com.example.eta.ui.theme.AlertRedOnDark
+import com.example.eta.ui.theme.alertRed
 import com.example.eta.ui.theme.EtaTheme
 import com.example.eta.ui.theme.colorOf
 import kotlin.time.Duration
@@ -103,7 +103,7 @@ fun CriticalBox(
 ) {
     if (critical.isEmpty()) return
     // Red by night as well, not the dark palette's rose — see [AlertRedOnDark].
-    val alert = if (EtaTheme.colors.isDark) AlertRedOnDark else EtaTheme.colors.danger
+    val alert = EtaTheme.colors.alertRed
 
     EtaSurface(
         modifier = modifier.fillMaxWidth(),
@@ -760,8 +760,9 @@ fun PointsBox(
                     EtaText(
                         text = formatPoints(balance),
                         style = EtaTheme.typography.display,
+                        // Red by night too: the dark palette's rose read as pink.
                         color = if (balance < 0) {
-                            EtaTheme.colors.danger
+                            EtaTheme.colors.alertRed
                         } else {
                             EtaTheme.colors.textPrimary
                         },
@@ -806,7 +807,7 @@ fun PointsBox(
 @Composable
 private fun signColour(value: Double) = when {
     value > 0 -> EtaTheme.colors.success
-    value < 0 -> EtaTheme.colors.danger
+    value < 0 -> EtaTheme.colors.alertRed
     else -> EtaTheme.colors.textMuted
 }
 

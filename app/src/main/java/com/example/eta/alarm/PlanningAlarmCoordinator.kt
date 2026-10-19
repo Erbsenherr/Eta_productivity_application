@@ -1,7 +1,7 @@
 package com.example.eta.alarm
 
+import com.example.eta.domain.sound.SoundEvent
 import android.content.Context
-import com.example.eta.R
 import com.example.eta.data.repository.PlanningPhaseService
 import com.example.eta.domain.planning.PlanningPhase
 import com.example.eta.domain.planning.deferredFrom
@@ -52,7 +52,7 @@ class PlanningAlarmCoordinator(
             PlanningNotifications.show(context, phase)
             // On every ring, the five-minute retries included: a silent nag is
             // not one. Played here rather than by the channel — see EtaSound.
-            EtaSound.play(context, R.raw.planning_start)
+            EtaSound.play(context, SoundEvent.PLANNING)
             // Keep asking every five minutes, as the concept insists.
             scheduler.schedule(phase, phaseService.retryAt())
             return
