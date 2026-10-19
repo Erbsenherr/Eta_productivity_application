@@ -30,6 +30,8 @@ data class Features(
     /** Step 43: the Statistiken tab (its own settings page) and the Notiz-Merger. */
     val statistics: Boolean = true,
     val notes: Boolean = true,
+    /** Step 48: the Streaks tab and the evening's streak page. */
+    val streaks: Boolean = true,
 )
 
 val LocalFeatures = staticCompositionLocalOf { Features() }

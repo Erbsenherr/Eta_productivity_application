@@ -55,6 +55,7 @@ import com.example.eta.ui.dashboard.TimerTickDialog
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.reevaluation.DailySettlement
 import com.example.eta.domain.reevaluation.FREE_UNPLANNED_HOURS
+import com.example.eta.domain.reevaluation.CONTRACT_BREACH_PENALTY
 import kotlinx.datetime.TimeZone
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
@@ -70,6 +71,7 @@ import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
+import com.example.eta.ui.format.formatFinePoints
 import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.EtaTheme
@@ -77,6 +79,9 @@ import kotlinx.coroutines.launch
 
 private enum class Step {
     TASKS,
+
+    /** Step 48: the streaks, before the contracts. Only while the feature is on. */
+    STREAKS,
     CONTRACTS,
     REWARD,
 
@@ -107,9 +112,11 @@ fun ReevaluationScreen(
     val pointsVisible = LocalPointsVisible.current
     val features = LocalFeatures.current
     val filling = state.rewards?.head != null && features.rewards
-    val steps = remember(pointsVisible, filling, features.contracts) {
+    val streaking = features.streaks && state.streaks.isNotEmpty()
+    val steps = remember(pointsVisible, filling, features.contracts, streaking) {
         Step.entries.filter { step ->
             when (step) {
+                Step.STREAKS -> streaking
                 // Not asked while the contracts are out of sight; an unanswered
                 // contract counts as kept, which is the default it always had.
                 Step.CONTRACTS -> features.contracts
@@ -174,6 +181,12 @@ fun ReevaluationScreen(
                     when (steps.getOrNull(page)) {
                         null -> Unit
                         Step.TASKS -> TasksStep(state, viewModel)
+                        Step.STREAKS -> StreaksStep(
+                            outcomes = state.streaks,
+                            restarts = state.restarts,
+                            onRestart = viewModel::setRestart,
+                            active = currentStep == Step.STREAKS,
+                        )
                         Step.CONTRACTS -> ContractsStep(state, viewModel)
                         Step.REWARD -> RewardStep(state.preview)
                         Step.REWARD_FILL -> RewardFillStep(
@@ -668,7 +681,12 @@ private fun ContractQuestion(
                 } else {
                     "Gehalten"
                 },
-                false to "Gebrochen",
+                // Step 48: a slot-holder broken costs ten points, once.
+                false to if (pointsVisible && contract.state == ContractState.ACTIVE) {
+                    "Gebrochen — kostet ${formatPoints(CONTRACT_BREACH_PENALTY)} Punkte"
+                } else {
+                    "Gebrochen"
+                },
             ),
             selected = kept,
             onSelect = onAnswer,
@@ -729,9 +747,24 @@ private fun RewardStep(settlement: DailySettlement?) {
             if (settlement.freeTimeForgone != 0.0) {
                 LedgerLine("Freizeit verzichtet", settlement.freeTimeForgone)
             }
+            if (settlement.streakPayout != 0.0) {
+                LedgerLine("Streaks", settlement.streakPayout, fine = true)
+            }
             if (settlement.wakeBonus != 0.0) LedgerLine("Pünktlich aufgestanden", settlement.wakeBonus)
             if (settlement.bedBonus != 0.0) {
                 LedgerLine("Pünktlich schlafen gegangen (Vortag)", settlement.bedBonus)
+            }
+            if (settlement.breachPenalty != 0.0) {
+                LedgerLine(
+                    if (settlement.contractsBroken == 1) "Vertrag gebrochen" else "Verträge gebrochen",
+                    -settlement.breachPenalty,
+                )
+            }
+            if (settlement.streakPenalty != 0.0) {
+                LedgerLine(
+                    if (settlement.streaksBroken == 1) "Streak gebrochen" else "Streaks gebrochen",
+                    -settlement.streakPenalty,
+                )
             }
             if (settlement.cancellationPenalty != 0.0) {
                 LedgerLine("Abgesagt", -settlement.cancellationPenalty)
@@ -950,7 +983,12 @@ private object RewardSounds {
 }
 
 @Composable
-private fun LedgerLine(label: String, amount: Double) {
+private fun LedgerLine(
+    label: String,
+    amount: Double,
+    /** To the thousandth — what a streak pays in an evening is that small. */
+    fine: Boolean = false,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         EtaText(
             text = label,
@@ -959,7 +997,7 @@ private fun LedgerLine(label: String, amount: Double) {
             modifier = Modifier.weight(1f),
         )
         EtaText(
-            text = (if (amount > 0) "+" else "") + formatPoints(amount),
+            text = (if (amount > 0) "+" else "") + if (fine) formatFinePoints(amount) else formatPoints(amount),
             style = EtaTheme.typography.bodyStrong,
             color = when {
                 amount > 0 -> EtaTheme.colors.success

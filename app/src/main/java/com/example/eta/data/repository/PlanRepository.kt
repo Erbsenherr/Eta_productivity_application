@@ -73,6 +73,10 @@ class PlanRepository(
     /** Every settled day, for the streak. */
     fun observeSettledDates(): Flow<List<LocalDate>> = dayPlanDao.observeSettledDates()
 
+    /** The same, once — for the Tagesabschluss-Serie at the evening's settlement. */
+    suspend fun settledDates(): Set<LocalDate> =
+        dayPlanDao.findSettledDates(LocalDate(1970, 1, 1), LocalDate(9999, 12, 31)).toSet()
+
     /**
      * Imported appointments still ahead of [after], soonest first.
      *

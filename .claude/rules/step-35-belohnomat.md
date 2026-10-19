@@ -62,7 +62,9 @@ rewards with a name and a price in points, worked off from the top.
   its own and **before anything is taken off** — ToDos, standing tasks, growth
   tasks, calendar appointments, Custom Earn. Not contracts, not free time given
   up, not a correction by hand; and not a Custom Spend, whose yield is negative —
-  points spent, not earned — so it takes nothing back out either.
+  points spent, not earned — so it takes nothing back out either. **Since step
+  48 the two sleep half points count as well**, and can be bound
+  (`SleepBonus`) — see *Step 48*.
 - **`ReevaluationService` is the only caller of `RewardRepository.pour`**, in
   `settle` and in `harvestLate`: a reward fills exactly when `HARVEST` is written
   and from the same blocks, so a day settled once fills once. A caught-up day

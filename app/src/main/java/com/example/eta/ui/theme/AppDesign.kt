@@ -67,6 +67,12 @@ data class DesignChoice(
     val accent: Int? = null,
     /** What the tab bar shows — a look, and so kept with the looks. */
     val tabStyle: TabStyle = TabStyle.DEFAULT,
+    /**
+     * The tabs in the user's own order, by name (step 48); empty is the app's.
+     * Hidden tabs keep their place in it, so switching a feature on brings its
+     * tab back where it was — see [orderTabs].
+     */
+    val tabOrder: List<String> = emptyList(),
 ) {
     fun colors(systemDark: Boolean): EtaColors {
         val base = colorsOf(design, brightness.isDark(systemDark))
@@ -180,6 +186,11 @@ class DesignStore(context: Context) {
             brightness = prefs.getString(KEY_BRIGHTNESS, null),
             accent = if (prefs.contains(KEY_ACCENT)) prefs.getInt(KEY_ACCENT, 0) else null,
             tabStyle = prefs.getString(KEY_TAB_STYLE, null),
+        ).copy(
+            tabOrder = prefs.getString(KEY_TAB_ORDER, null)
+                ?.split(',')
+                ?.filter { it.isNotBlank() }
+                .orEmpty(),
         ),
     )
     val choice: StateFlow<DesignChoice> = _choice.asStateFlow()
@@ -193,11 +204,15 @@ class DesignStore(context: Context) {
 
     fun select(tabStyle: TabStyle) = store(_choice.value.copy(tabStyle = tabStyle))
 
+    /** The tabs in an order of the user's own, every one of them by name. */
+    fun selectTabOrder(order: List<String>) = store(_choice.value.copy(tabOrder = order))
+
     private fun store(choice: DesignChoice) {
         prefs.edit()
             .putString(KEY_DESIGN, choice.design.name)
             .putString(KEY_BRIGHTNESS, choice.brightness.name)
             .putString(KEY_TAB_STYLE, choice.tabStyle.name)
+            .putString(KEY_TAB_ORDER, choice.tabOrder.joinToString(","))
             .apply { if (choice.accent == null) remove(KEY_ACCENT) else putInt(KEY_ACCENT, choice.accent) }
             .apply()
         _choice.value = choice
@@ -209,5 +224,34 @@ class DesignStore(context: Context) {
         const val KEY_BRIGHTNESS = "brightness"
         const val KEY_ACCENT = "accent"
         const val KEY_TAB_STYLE = "tabStyle"
+        const val KEY_TAB_ORDER = "tabOrder"
     }
+}
+
+/**
+ * The tabs in the order the user gave them (step 48).
+ *
+ * [defaults] is the app's own order, [stored] the user's. A name the stored
+ * order does not know — a tab added by a later update — goes in right after the
+ * tab it follows in the app's order, so it turns up where it would have stood
+ * rather than behind the settings. A stored name that no longer exists is
+ * dropped.
+ */
+fun orderTabs(defaults: List<String>, stored: List<String>): List<String> {
+    val result = stored.filter { it in defaults }.distinct().toMutableList()
+    defaults.forEachIndexed { index, name ->
+        if (name in result) return@forEachIndexed
+        val before = defaults.subList(0, index).lastOrNull { it in result }
+        result.add(if (before == null) 0 else result.indexOf(before) + 1, name)
+    }
+    return result
+}
+
+/**
+ * [full] with the tabs of [visible] put into the order given there, each hidden
+ * tab keeping the slot it had — the menu only lists what the bar shows.
+ */
+fun reorderVisible(full: List<String>, visible: List<String>): List<String> {
+    val queue = ArrayDeque(visible)
+    return full.map { name -> if (name in visible) queue.removeFirst() else name }
 }

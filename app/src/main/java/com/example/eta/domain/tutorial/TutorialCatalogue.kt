@@ -49,6 +49,11 @@ enum class TutorialId(
         summary = "Langfristige Belohnungen, die sich Abend für Abend füllen.",
         advanced = true,
     ),
+    STREAKS(
+        title = "Streaks",
+        summary = "Wie oft in Folge du etwas erledigst — und was eine erloschene Flamme kostet.",
+        advanced = true,
+    ),
     ;
 
     val steps: List<TutorialStep>
@@ -59,6 +64,7 @@ enum class TutorialId(
             GROWTH -> GROWTH_STEPS
             CONTRACTS -> CONTRACT_STEPS
             REWARDS -> REWARD_STEPS
+            STREAKS -> STREAK_STEPS
         }
 
     companion object {
@@ -336,7 +342,8 @@ val CONTRACT_STEPS: List<TutorialStep> = listOf(
         TutorialStage.CONTRACTS,
         "Drei Slots",
         "Mehr als drei Verträge laufen nie gleichzeitig. Wird einer gebrochen, " +
-            "bleibt sein Slot einen Monat ab Vertragsschluss gesperrt. Deshalb steht " +
+            "kostet das 10 Punkte, und sein Slot bleibt einen Monat ab Vertragsschluss " +
+            "gesperrt. Deshalb steht " +
             "vor jedem Vertrag, was als Bruch gilt — und deine Unterschrift.",
     ),
     TutorialStep(
@@ -407,5 +414,48 @@ val REWARD_STEPS: List<TutorialStep> = listOf(
         "Einlösen",
         "Ist eine Belohnung voll, löst du sie hier ein und gönnst sie dir. Ändern " +
             "lässt sich eine Belohnung nicht mehr; gedrückt halten löscht sie. $WHERE_TO_SWITCH",
+    ),
+)
+
+val STREAK_STEPS: List<TutorialStep> = listOf(
+    text(
+        TutorialStage.STREAKS,
+        "Streaks",
+        "Ein Streak zählt, wie oft in Folge du eine wiederkehrende Aufgabe erledigt " +
+            "hast — »Sport«, »Lesen«, oder pünktlich schlafen und aufstehen. Die " +
+            "Flamme zeigt die Zahl.",
+    ),
+    TutorialStep(
+        stage = TutorialStage.STREAKS,
+        title = "Einen beginnen",
+        text = {
+            "Tippe auf »Streak beginnen« und wähle eine Aufgabe aus der Liste — oder " +
+                "lege eine neue an. Das Fenster verdeckt diese Leiste; danach geht es " +
+                "hier weiter."
+        },
+        kind = StepKind.TASK,
+        checks = { listOf(TutorialCheck("Einen Streak beginnen", it.streaks > 0)) },
+    ),
+    text(
+        TutorialStage.STREAKS,
+        "Er wartet",
+        "Noch brennt nichts: Der Streak beginnt, sobald du die Aufgabe das erste " +
+            "Mal abhakst. Ab dann zählt der Tagesabschluss jeden Abend nach, auf " +
+            "einer eigenen Seite vor den Verträgen.",
+    ),
+    text(
+        TutorialStage.STREAKS,
+        "Wann er bricht",
+        "Ein Tag, an dem die Aufgabe nicht ansteht, unterbricht nichts — ein " +
+            "Arbeits-Streak überlebt das Wochenende. Stand sie an und blieb liegen, " +
+            "erlischt die Flamme, und das kostet 10 Punkte. Du kannst ihn dann gleich " +
+            "neu beginnen.",
+    ),
+    text(
+        TutorialStage.STREAKS,
+        "Was er bringt",
+        "Jeder Streak bringt am Abend 0,001 Punkte je Tag seiner Länge, höchstens 1 " +
+            "pro Streak und 3 für alle zusammen. Die Tagesabschluss-Serie läuft immer " +
+            "als Streak mit. Gedrückt halten beendet einen Streak. $WHERE_TO_SWITCH",
     ),
 )

@@ -42,9 +42,15 @@ data class SleepLog(
     /** Whether the evening's bedtime was kept. Null: not answered. */
     val bedOnTime: Boolean? = null,
     val updatedAt: Instant,
+    /**
+     * The minutes after [wakeDue] that counted as on time when the morning was
+     * answered (step 48) — stored for the reason [wakeDue] is. Null on a row
+     * from before, which counted [PUNCTUAL_WAKE_MINUTES].
+     */
+    val tolerance: Int? = null,
 ) {
     /**
-     * Up at the hour, or at most [PUNCTUAL_WAKE_MINUTES] after it. Earlier is on
+     * Up at the hour, or at most [tolerance] minutes after it. Earlier is on
      * time as well. Null while the morning has not been answered.
      */
     @get:Ignore
@@ -52,6 +58,6 @@ data class SleepLog(
         get() {
             val at = wokeAt ?: return null
             val due = wakeDue ?: return null
-            return at.minuteOfDay() <= due.minuteOfDay() + PUNCTUAL_WAKE_MINUTES
+            return at.minuteOfDay() <= due.minuteOfDay() + (tolerance ?: PUNCTUAL_WAKE_MINUTES)
         }
 }

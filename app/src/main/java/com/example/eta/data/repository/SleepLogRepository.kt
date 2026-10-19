@@ -27,10 +27,13 @@ class SleepLogRepository(
 
     suspend fun findRange(from: LocalDate, to: LocalDate): List<SleepLog> = dao.findSleepLogs(from, to)
 
-    /** "Bin um … aufgestanden", with the hour that was due that morning. */
-    suspend fun recordWake(date: LocalDate, at: LocalTime, due: LocalTime) {
+    /**
+     * "Bin um … aufgestanden", with the hour that was due that morning and the
+     * minutes after it that counted as on time.
+     */
+    suspend fun recordWake(date: LocalDate, at: LocalTime, due: LocalTime, tolerance: Int? = null) {
         val row = dao.findSleepLog(date) ?: SleepLog(date = date, updatedAt = clock.now())
-        dao.upsert(row.copy(wokeAt = at, wakeDue = due, updatedAt = clock.now()))
+        dao.upsert(row.copy(wokeAt = at, wakeDue = due, tolerance = tolerance, updatedAt = clock.now()))
     }
 
     /** "Gehe nun schlafen", or the next day's "Pünktlich" / "Unpünktlich". */

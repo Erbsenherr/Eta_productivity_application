@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,6 +69,7 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.ui.format.formatShort
+import com.example.eta.ui.theme.AlertRedOnDark
 import com.example.eta.ui.theme.EtaTheme
 import com.example.eta.ui.theme.colorOf
 import kotlin.time.Duration
@@ -96,17 +98,19 @@ fun CriticalBox(
     modifier: Modifier = Modifier,
 ) {
     if (critical.isEmpty()) return
+    // Red by night as well, not the dark palette's rose — see [AlertRedOnDark].
+    val alert = if (EtaTheme.colors.isDark) AlertRedOnDark else EtaTheme.colors.danger
 
     EtaSurface(
         modifier = modifier.fillMaxWidth(),
         color = EtaTheme.colors.surface,
-        borderColor = EtaTheme.colors.danger,
+        borderColor = alert,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaText(
                 text = "Läuft bald ab",
                 style = EtaTheme.typography.heading,
-                color = EtaTheme.colors.danger,
+                color = alert,
             )
             EtaText(
                 text = "Wandert sonst für ein halbes Jahr auf die Sperrliste.",
@@ -133,7 +137,7 @@ fun CriticalBox(
                             else -> "noch ${entry.daysLeft} Tage"
                         },
                         style = EtaTheme.typography.label,
-                        color = EtaTheme.colors.danger,
+                        color = alert,
                     )
                 }
             }
@@ -416,6 +420,9 @@ private fun NowLine(
             // one begun late is still running when the plan says "Pause".
             if (block.isOpen) TimerControls(entry = entry, actions = timer)
         } else if (running && now.phase == BlockPhase.TASK && block.isOpen) {
+            // Clear of the checkboxes above it (step 48): pressed right under the
+            // last step, it read as one more row of the list.
+            if (steps.isNotEmpty()) Spacer(Modifier.height(EtaTheme.spacing.md))
             EtaButton(
                 text = if (steps.isEmpty()) "Erledigt" else "Gruppe erledigt",
                 style = EtaButtonStyle.Secondary,

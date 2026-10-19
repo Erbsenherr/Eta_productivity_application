@@ -19,6 +19,7 @@ import com.example.eta.domain.planning.BlockConflict
 import com.example.eta.domain.planning.containerEndMinute
 import com.example.eta.domain.planning.containerStartMinute
 import com.example.eta.domain.planning.minuteToLocalTime
+import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaDialog
@@ -46,6 +47,9 @@ import kotlinx.datetime.LocalDate
  * Long press on a row: **Ignorieren** or **Lösen**. A long press rather than two
  * buttons per row, because the box is at the top of the screen and has to stay
  * small when it has three of them.
+ *
+ * Long press on the heading, once there are two or more: all of them ignored at
+ * once, after asking (step 48).
  */
 @Composable
 fun ConflictBox(
@@ -54,9 +58,14 @@ fun ConflictBox(
     onIgnore: (BlockConflict) -> Unit,
     onResolve: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    onIgnoreAll: (List<BlockConflict>) -> Unit = { all -> all.forEach(onIgnore) },
 ) {
     if (conflicts.isEmpty()) return
     var chosen by remember { mutableStateOf<BlockConflict?>(null) }
+    var ignoringAll by remember { mutableStateOf(false) }
+    val several = conflicts.size > 1
+    // Read through state inside `pointerInput`, which keeps what it closed over.
+    val currentSeveral by rememberUpdatedState(several)
 
     EtaSurface(
         modifier = modifier.fillMaxWidth(),
@@ -65,12 +74,20 @@ fun ConflictBox(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaText(
-                text = if (conflicts.size == 1) "Überschneidung" else "Überschneidungen",
+                text = if (several) "Überschneidungen" else "Überschneidung",
                 style = EtaTheme.typography.heading,
                 color = EtaTheme.colors.warning,
+                modifier = Modifier.pointerInput(Unit) {
+                    detectTapGestures(onLongPress = { if (currentSeveral) ignoringAll = true })
+                },
             )
             EtaText(
-                text = "Lange drücken: ignorieren oder lösen.",
+                text = if (several) {
+                    "Lange drücken: ignorieren oder lösen. Die Überschrift lange drücken: " +
+                        "alle ignorieren."
+                } else {
+                    "Lange drücken: ignorieren oder lösen."
+                },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textSecondary,
             )
@@ -82,6 +99,20 @@ fun ConflictBox(
                 )
             }
         }
+    }
+
+    if (ignoringAll) {
+        ConfirmDialog(
+            title = "Alle ignorieren?",
+            message = "Alle ${conflicts.size} Überschneidungen werden für ihren Tag ignoriert. " +
+                "Morgen wird wieder gefragt.",
+            confirm = "Ignorieren",
+            onDismiss = { ignoringAll = false },
+            onConfirm = {
+                onIgnoreAll(conflicts)
+                ignoringAll = false
+            },
+        )
     }
 
     chosen?.let { conflict ->

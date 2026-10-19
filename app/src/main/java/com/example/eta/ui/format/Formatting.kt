@@ -119,6 +119,19 @@ fun formatPoints(value: Double): String {
     return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
 }
 
+/**
+ * Points to the thousandth, trailing zeros dropped: "0.001", "0.03", "1" — for
+ * the streaks (step 48), whose evening is worth less than [formatPoints] shows.
+ */
+fun formatFinePoints(value: Double): String {
+    val rounded = Math.round(value * 1000.0) / 1000.0
+    return if (rounded % 1.0 == 0.0) {
+        rounded.toInt().toString()
+    } else {
+        java.math.BigDecimal.valueOf(rounded).stripTrailingZeros().toPlainString()
+    }
+}
+
 /** A change of points: "+1.5", "-5", "0". The minus comes from [formatPoints]. */
 fun formatSignedPoints(value: Double): String =
     formatPoints(value).let { if (value > 0 && it != "0") "+$it" else it }

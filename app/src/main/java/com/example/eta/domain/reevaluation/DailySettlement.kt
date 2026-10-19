@@ -12,6 +12,8 @@ import com.example.eta.domain.planning.cancellationCharged
 import com.example.eta.domain.planning.occupiesTime
 import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
 import com.example.eta.domain.reward.yieldOf
+import com.example.eta.domain.streak.StreakOutcome
+import com.example.eta.domain.streak.StreakVerdict
 import kotlinx.datetime.TimeZone
 
 /** Hours a day may go unplanned before it starts costing. */
@@ -25,6 +27,13 @@ const val FREE_TIME_FORGONE_PER_HOUR = 4.0
 
 /** The most legacy contracts can pay in one day, together. */
 const val LEGACY_DAILY_CAP = 2.0
+
+/**
+ * What breaking a contract costs (step 48): a slot-holder answered "gebrochen",
+ * once, whatever is decided after — let go or served out on probation. A legacy
+ * contract costs nothing, and neither does a probation not kept again.
+ */
+const val CONTRACT_BREACH_PENALTY = 10.0
 
 /**
  * One contract's answer in the evening check.
@@ -74,13 +83,21 @@ data class DailySettlement(
      */
     val wakeBonus: Double = 0.0,
     val bedBonus: Double = 0.0,
+    /** Contracts broken tonight, and what that costs — [CONTRACT_BREACH_PENALTY] each. */
+    val contractsBroken: Int = 0,
+    val breachPenalty: Double = 0.0,
+    /** Step 48: what the streaks pay tonight, inside their caps, and what breaking costs. */
+    val streakPayout: Double = 0.0,
+    val streaksBroken: Int = 0,
+    val streakPenalty: Double = 0.0,
 ) {
     /** Legacy contracts earned more than the cap allows — the dashboard's crown. */
     val crowned: Boolean get() = legacyGross > LEGACY_DAILY_CAP
 
     val total: Double
         get() = harvest + contractPayout + legacyCredited + freeTimeForgone +
-            wakeBonus + bedBonus - unplannedPenalty - cancellationPenalty
+            wakeBonus + bedBonus + streakPayout -
+            unplannedPenalty - cancellationPenalty - breachPenalty - streakPenalty
 }
 
 /**
@@ -179,6 +196,8 @@ fun settleDay(
     /** Up on time this morning, and in bed on time the night before. */
     wokeOnTime: Boolean = false,
     bedOnTime: Boolean = false,
+    /** Tonight's streaks, already worked out — see `streakOutcomes`. */
+    streaks: List<StreakOutcome> = emptyList(),
 ): DailySettlement {
     val harvest = blocks
         .filter { it.block.isCompleted }
@@ -193,6 +212,10 @@ fun settleDay(
     val cancelledHours = cancelledMinutes / 60.0
 
     val kept = verdicts.filter { it.kept }
+    // A slot-holder broken tonight. One already on probation is not ACTIVE, and
+    // a legacy contract is not one either.
+    val contractsBroken = verdicts.count { !it.kept && it.contract.state == ContractState.ACTIVE }
+    val streaksBroken = streaks.count { it.verdict == StreakVerdict.BROKEN }
     val contractPayout = kept
         .filter { it.contract.state == ContractState.ACTIVE }
         .sumOf { it.contract.dailyPayout }
@@ -232,5 +255,10 @@ fun settleDay(
         unplannedPenalty = chargeable * unplannedPenaltyPerHour.coerceAtLeast(0.0),
         wakeBonus = if (wokeOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
         bedBonus = if (bedOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
+        contractsBroken = contractsBroken,
+        breachPenalty = contractsBroken * CONTRACT_BREACH_PENALTY,
+        streakPayout = streaks.sumOf { it.payout },
+        streaksBroken = streaksBroken,
+        streakPenalty = streaks.sumOf { it.penalty },
     )
 }

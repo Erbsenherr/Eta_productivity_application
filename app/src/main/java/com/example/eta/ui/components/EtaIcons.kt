@@ -47,6 +47,9 @@ enum class EtaIcon {
     /** Notiz-Merger: a sheet with its corner folded. */
     NOTE,
 
+    /** Streaks: a flame. */
+    FLAME,
+
     /** Einstellungen: three sliders. */
     SLIDERS,
 }
@@ -159,9 +162,39 @@ private fun DrawScope.drawIcon(icon: EtaIcon, color: Color) {
             line(8f, 16f, 13.5f, 16f)
         }
 
+        EtaIcon.FLAME -> {
+            drawPath(flameOutline(unit), color, style = stroke)
+            drawPath(flameCore(unit), color, style = stroke)
+        }
+
         EtaIcon.SLIDERS -> listOf(6f to 9f, 12f to 15f, 18f to 8f).forEach { (y, knob) ->
             line(3.5f, y, 20.5f, y)
             dot(knob, y, 2.3f)
         }
     }
+}
+
+/**
+ * The flame of a streak, on the 24-unit grid of the icons: the outer tongue,
+ * and [flameCore] inside it. Shared by the tab's icon and the drawn flame of
+ * `StreakFlame`, so the two are the same shape.
+ */
+internal fun flameOutline(unit: Float): Path = Path().apply {
+    moveTo(12f * unit, 2.5f * unit)
+    cubicTo(13f * unit, 6f * unit, 19f * unit, 9f * unit, 19f * unit, 14.5f * unit)
+    cubicTo(19f * unit, 18.5f * unit, 16f * unit, 21.5f * unit, 12f * unit, 21.5f * unit)
+    cubicTo(8f * unit, 21.5f * unit, 5f * unit, 18.5f * unit, 5f * unit, 14.5f * unit)
+    cubicTo(5f * unit, 11.5f * unit, 7f * unit, 9.5f * unit, 8.5f * unit, 8f * unit)
+    cubicTo(8.5f * unit, 10.5f * unit, 9.5f * unit, 12f * unit, 11f * unit, 12.5f * unit)
+    cubicTo(10.5f * unit, 9f * unit, 11f * unit, 5.5f * unit, 12f * unit, 2.5f * unit)
+    close()
+}
+
+internal fun flameCore(unit: Float): Path = Path().apply {
+    moveTo(12f * unit, 20f * unit)
+    cubicTo(10f * unit, 20f * unit, 9f * unit, 18.5f * unit, 9f * unit, 17f * unit)
+    cubicTo(9f * unit, 15f * unit, 11f * unit, 14f * unit, 12f * unit, 12.5f * unit)
+    cubicTo(13f * unit, 14f * unit, 15f * unit, 15f * unit, 15f * unit, 17f * unit)
+    cubicTo(15f * unit, 18.5f * unit, 14f * unit, 20f * unit, 12f * unit, 20f * unit)
+    close()
 }

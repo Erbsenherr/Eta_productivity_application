@@ -3,6 +3,7 @@ package com.example.eta.ui.rewards
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eta.domain.reward.RewardTarget
+import com.example.eta.domain.reward.SleepBonus
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.RewardRepository
 import com.example.eta.data.repository.RewardWithTasks
@@ -63,7 +64,8 @@ class RewardsViewModel(
                 entry = entry,
                 boundTo = groups.filter { it.isBoundBy(entry.boundNames) }
                     .map { it.representative.name }
-                    .distinct(),
+                    .distinct() +
+                    SleepBonus.entries.filter { it.taskName in entry.boundNames }.map { it.label },
             )
         }
         RewardsUiState(

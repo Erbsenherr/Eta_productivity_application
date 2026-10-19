@@ -18,6 +18,9 @@ lived has not been skipped, and a streak that read zero every morning would say
 nothing. Miss an evening and the run is gone; there is no partial credit, and that
 consequence is the mechanic rather than a side effect of one.
 
+**Since step 48 the run is also a streak** — the Tagesabschluss-Serie on the
+Streaks tab, paid and charged while that feature is on; see *Step 48*.
+
 **"Done" means both halves.** `PlanningPhaseService.isCompleted(DAILY)` requires
 today to be *settled* and tomorrow *confirmed* — `DayPlan` carries `settledAt`
 beside `confirmedAt` for exactly this. Reading one as the other let a day be planned

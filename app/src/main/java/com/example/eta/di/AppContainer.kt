@@ -40,6 +40,7 @@ import com.example.eta.data.local.MIGRATION_28_29
 import com.example.eta.data.local.MIGRATION_29_30
 import com.example.eta.data.local.MIGRATION_30_31
 import com.example.eta.data.local.MIGRATION_31_32
+import com.example.eta.data.local.MIGRATION_32_33
 import com.example.eta.data.local.MIGRATION_9_10
 import com.example.eta.data.repository.CalendarImportService
 import com.example.eta.data.repository.CalendarRepository
@@ -51,6 +52,7 @@ import com.example.eta.data.repository.DayClosingService
 import com.example.eta.data.repository.GrowthService
 import com.example.eta.data.repository.NoteRepository
 import com.example.eta.data.repository.SleepLogRepository
+import com.example.eta.data.repository.StreakRepository
 import com.example.eta.data.repository.ItemRepository
 import com.example.eta.data.repository.NightService
 import com.example.eta.data.repository.PlanRepository
@@ -103,7 +105,7 @@ class AppContainer(
                 EtaDatabase::class.java,
                 EtaDatabase.NAME,
             )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33)
             .build()
     }
 
@@ -219,6 +221,10 @@ class AppContainer(
     /** What the user said about getting up and going to bed — step 43. */
     val sleepLogRepository: SleepLogRepository = SleepLogRepository(database.trackingDao(), clock)
 
+    /** Step 48: the Streaks tab's rows. */
+    val streakRepository: StreakRepository =
+        StreakRepository(database.streakDao(), pointsRepository, clock)
+
     /** The notes of the Notiz-Merger. */
     val noteRepository: NoteRepository = NoteRepository(database.trackingDao(), clock)
 
@@ -236,6 +242,7 @@ class AppContainer(
         clock = clock,
         nightService = nightService,
         sleepLogRepository = sleepLogRepository,
+        streakRepository = streakRepository,
     )
 
     val catchUpService: CatchUpService = CatchUpService(

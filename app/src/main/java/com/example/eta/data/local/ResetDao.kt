@@ -38,8 +38,12 @@ abstract class ResetDao {
         clearPlannerDismissals()
         clearSleepLogs()
         clearNotes()
+        clearStreaks()
         clearSetup()
     }
+
+    @Query("DELETE FROM streaks")
+    abstract suspend fun clearStreaks()
 
     @Query("DELETE FROM subtask_checks")
     abstract suspend fun clearSubtaskChecks()

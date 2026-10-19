@@ -49,6 +49,9 @@ here would overwrite every edit made on the Listen tab. The weekly social budget
 count, `UserSetup.conflicts()` having described answers that no longer describe the
 schedule.
 
+The **Design** page also holds "Menü umsortieren" (step 48), and "Schlaf und
+Morgen" the tolerance for "on time" — see *Step 48*.
+
 The **Design** card at the top chooses the look and applies at once, outside the
 draft — see *Step 30*; since step 44 it holds the accent, and **Navigation** is a
 page of its own below it. **The menu keeps its scroll position** across a page

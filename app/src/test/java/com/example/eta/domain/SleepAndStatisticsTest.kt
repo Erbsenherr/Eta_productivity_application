@@ -107,7 +107,9 @@ class SleepAndStatisticsTest {
         assertNull(prompts(at(22, 29)).eveningOf)
         assertEquals(tuesday, prompts(at(22, 30)).eveningOf)
         assertEquals(tuesday, prompts(at(22, 59)).eveningOf)
-        assertNull(prompts(at(23, 0)).eveningOf)
+        // Step 48: on offer for the five minutes of tolerance past the bedtime.
+        assertEquals(tuesday, prompts(at(23, 4)).eveningOf)
+        assertNull(prompts(at(23, 5)).eveningOf)
 
         val pressed = SleepLog(tuesday, bedOnTime = true, updatedAt = now)
         assertTrue(prompts(at(22, 45), listOf(pressed)).eveningAnswered)
@@ -126,7 +128,9 @@ class SleepAndStatisticsTest {
         assertEquals(monday, prompts(at(0, 10), with = late).eveningOf)
         // And Monday is not asked about as "yesterday" before its bedtime has passed.
         assertNull(prompts(at(0, 10), with = late).bedOwedFor)
-        assertEquals(monday, prompts(at(0, 30), with = late).bedOwedFor)
+        // Not before the tolerance is over either (step 48).
+        assertNull(prompts(at(0, 34), with = late).bedOwedFor)
+        assertEquals(monday, prompts(at(0, 35), with = late).bedOwedFor)
     }
 
     @Test

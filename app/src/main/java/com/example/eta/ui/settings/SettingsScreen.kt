@@ -25,6 +25,7 @@ import com.example.eta.alarm.ClockAppAlarms
 import com.example.eta.domain.setup.clockAlarms
 import com.example.eta.ui.components.EtaSwatch
 import com.example.eta.ui.components.EtaIcon
+import com.example.eta.ui.components.EtaTabItem
 import com.example.eta.ui.components.EtaIconImage
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.theme.ACCENT_PRESETS
@@ -66,6 +67,7 @@ import com.example.eta.alarm.alarmReadiness
 import com.example.eta.data.backup.BACKUP_FILE_NAME
 import com.example.eta.domain.planning.STILL_ACTIVE_MAX_PER_DAY
 import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.setup.RECOMMENDED_MAX_PUNCTUAL_TOLERANCE
 import com.example.eta.domain.stats.StatSection
 import com.example.eta.domain.stats.showsStat
 import com.example.eta.domain.stats.withStat
@@ -86,6 +88,7 @@ import com.example.eta.ui.setup.OnSetupChange
 import com.example.eta.ui.setup.PlanningStep
 import com.example.eta.ui.setup.SleepStep
 import com.example.eta.ui.components.EtaField
+import com.example.eta.ui.components.EtaCountPicker
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
@@ -136,7 +139,9 @@ fun SettingsScreen(
     onAccentChange: (Int?) -> Unit = {},
     onTabStyleChange: (TabStyle) -> Unit = {},
     /** The tabs as the bar shows them, for the Navigation page to list. */
-    tabs: List<Pair<String, EtaIcon>> = emptyList(),
+    tabs: List<EtaTabItem> = emptyList(),
+    /** The visible tabs, by id, in a new order — "Menü umsortieren". */
+    onTabOrderChange: (List<String>) -> Unit = {},
     onDebugReset: (() -> Unit)? = null,
     onOpenVacation: () -> Unit = {},
     /**
@@ -229,7 +234,10 @@ fun SettingsScreen(
                         onDiscard = viewModel::discard,
                     )
 
-                    SettingsPage.DESIGN -> DesignBox(design, onDesignChange, onBrightnessChange, onAccentChange)
+                    SettingsPage.DESIGN -> {
+                        DesignBox(design, onDesignChange, onBrightnessChange, onAccentChange)
+                        TabOrderBox(tabs = tabs, onReorder = onTabOrderChange)
+                    }
                     SettingsPage.NAVIGATION -> NavigationBox(design.tabStyle, onTabStyleChange, tabs)
                     SettingsPage.ALARMS -> AlarmBox(alarms)
                     SettingsPage.CALENDAR -> CalendarSettingsBox(calendarViewModel)
@@ -270,6 +278,7 @@ fun SettingsScreen(
                                     color = EtaTheme.colors.textMuted,
                                 )
                                 SleepStep(setup, viewModel::update)
+                                PunctualToleranceBox(setup, viewModel::update)
                                 MorningRoutineBox(morningSteps, viewModel::saveMorningSteps)
                             }
 
@@ -551,7 +560,7 @@ private fun AccentField(choice: DesignChoice, onAccentChange: (Int?) -> Unit) {
 private fun NavigationBox(
     style: TabStyle,
     onStyleChange: (TabStyle) -> Unit,
-    tabs: List<Pair<String, EtaIcon>>,
+    tabs: List<EtaTabItem>,
 ) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
@@ -575,11 +584,11 @@ private fun NavigationBox(
             }
 
             EtaText(text = "Die Icons", style = EtaTheme.typography.bodyStrong)
-            tabs.forEach { (name, icon) ->
+            tabs.forEach { tab ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    EtaIconImage(icon = icon, color = EtaTheme.colors.accent)
+                    tab.icon?.let { EtaIconImage(icon = it, color = EtaTheme.colors.accent) }
                     Spacer(Modifier.size(EtaTheme.spacing.md))
-                    EtaText(text = name, style = EtaTheme.typography.body)
+                    EtaText(text = tab.label, style = EtaTheme.typography.body)
                 }
             }
         }
@@ -700,6 +709,47 @@ private fun ClockAlarmsBox(setup: UserSetup, dirty: Boolean) {
  * Off by default. The count is per day across all tasks rather than per task, so
  * a day of meetings is not asked more often than a day with one long session.
  */
+/**
+ * What still counts as on time (step 48): minutes after the hour of getting up
+ * and of going to bed alike. Any number may be chosen; past
+ * [RECOMMENDED_MAX_PUNCTUAL_TOLERANCE] the box says it is not recommended.
+ * A morning already answered keeps the tolerance it was answered under.
+ */
+@Composable
+private fun PunctualToleranceBox(setup: UserSetup, onChange: OnSetupChange) {
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Was gilt als pünktlich?", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "So viele Minuten nach deiner Aufstehzeit und nach deiner " +
+                    "Schlafenszeit zählen noch als pünktlich.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            EtaField(label = "Toleranz", hint = "Antippen, um die Zahl einzutippen.") {
+                EtaCountPicker(
+                    value = setup.punctualTolerance,
+                    onValueChange = { minutes -> onChange { it.copy(punctualTolerance = minutes) } },
+                    range = 0..MAX_PUNCTUAL_TOLERANCE,
+                    format = { "$it Min." },
+                    title = "Minuten eingeben",
+                )
+            }
+            if (setup.punctualTolerance > RECOMMENDED_MAX_PUNCTUAL_TOLERANCE) {
+                EtaText(
+                    text = "Mehr als $RECOMMENDED_MAX_PUNCTUAL_TOLERANCE Minuten werden nicht " +
+                        "empfohlen: Pünktlich soll pünktlich bleiben.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
+        }
+    }
+}
+
+/** The most the tolerance picker offers — two hours is no longer "on time" at all. */
+private const val MAX_PUNCTUAL_TOLERANCE = 120
+
 @Composable
 private fun StillActiveBox(setup: UserSetup, onChange: OnSetupChange) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
@@ -903,6 +953,13 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
                 onCheckedChange = { on -> onChange { it.copy(rewards = on) } },
                 label = "Belohn-o-mat",
                 hint = "Der Reiter, und die Seite am Abend, auf der sich die Belohnung füllt.",
+            )
+            CheckRow(
+                checked = setup.streaks,
+                onCheckedChange = { on -> onChange { it.copy(streaks = on) } },
+                label = "Streaks",
+                hint = "Der Reiter, eine Seite im Tagesabschluss, und die Tagesabschluss-Serie " +
+                    "als Streak. Ausgeschaltet wird nichts gezählt, bezahlt oder gebrochen.",
             )
             CheckRow(
                 checked = setup.notes,

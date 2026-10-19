@@ -136,6 +136,7 @@ fun tutorialSetup(now: Instant, advanced: Boolean = false): UserSetup = UserSetu
         growthTasks = advanced,
         contracts = advanced,
         rewards = advanced,
+        streaks = advanced,
         completedAt = now,
         updatedAt = now,
     )

@@ -41,6 +41,8 @@ import com.example.eta.ui.growth.GrowthTasksScreen
 import com.example.eta.ui.lists.SmartListsScreen
 import com.example.eta.ui.root.smartListsViewModelFactory
 import com.example.eta.ui.rewards.RewardsScreen
+import com.example.eta.ui.streaks.StreaksScreen
+import com.example.eta.ui.root.streaksViewModelFactory
 import com.example.eta.ui.root.contractsViewModelFactory
 import com.example.eta.ui.root.growthTasksViewModelFactory
 import com.example.eta.ui.root.rewardsViewModelFactory
@@ -140,7 +142,14 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
                 // in a tutorial about one of them.
                 LocalPointsVisible provides true,
                 LocalFeatures provides tutorial.tutorial.advanced.let { on ->
-                    Features(growthTasks = on, contracts = on, rewards = on, statistics = false, notes = false)
+                    Features(
+                        growthTasks = on,
+                        contracts = on,
+                        rewards = on,
+                        statistics = false,
+                        notes = false,
+                        streaks = on,
+                    )
                 },
             ) {
                 StageScreen(step.stage, session, tutorial)
@@ -242,6 +251,10 @@ private fun StageScreen(
 
         TutorialStage.REWARDS -> RewardsScreen(
             viewModel = viewModel(key = "tutorial-rewards", factory = rewardsViewModelFactory(container)),
+        )
+
+        TutorialStage.STREAKS -> StreaksScreen(
+            viewModel = viewModel(key = "tutorial-streaks", factory = streaksViewModelFactory(container)),
         )
     }
 }

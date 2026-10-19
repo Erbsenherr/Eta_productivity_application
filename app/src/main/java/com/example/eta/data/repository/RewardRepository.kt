@@ -5,7 +5,9 @@ import com.example.eta.data.local.ItemDao
 import com.example.eta.data.local.RewardDao
 import com.example.eta.domain.model.Reward
 import com.example.eta.domain.model.RewardTask
+import com.example.eta.domain.reward.Earning
 import com.example.eta.domain.reward.RewardGain
+import com.example.eta.domain.reward.SleepBonus
 import com.example.eta.domain.reward.RewardTarget
 import com.example.eta.domain.reward.earningsOf
 import com.example.eta.domain.reward.pourInto
@@ -74,8 +76,15 @@ class RewardRepository(
      * it counts as unbound instead.
      */
     private suspend fun boundNames(itemIds: Collection<String>, live: Set<String>): Set<String> =
-        itemIds.mapNotNull { itemDao.findById(it)?.normalizedName }
-            .filterTo(mutableSetOf()) { it in live }
+        itemIds.mapNotNull { nameOf(it) }
+            .filterTo(mutableSetOf()) { it in live || SleepBonus.byTaskName(it) != null }
+
+    /**
+     * The name a bound row stands for: a standing task's, or one of the two
+     * sleep bonuses', which have an id of their own and no row (step 48).
+     */
+    private suspend fun nameOf(itemId: String): String? =
+        SleepBonus.byItemId(itemId)?.taskName ?: itemDao.findById(itemId)?.normalizedName
 
     /** A new reward, last in the list. */
     suspend fun create(name: String, cost: Double, itemIds: Collection<String>) {
@@ -98,11 +107,11 @@ class RewardRepository(
      */
     private suspend fun bind(rewardId: String, itemIds: Collection<String>) {
         rewardDao.clearTasks(rewardId)
-        val names = itemIds.mapNotNullTo(mutableSetOf()) { itemDao.findById(it)?.normalizedName }
+        val names = itemIds.mapNotNullTo(mutableSetOf()) { nameOf(it) }
         if (names.isNotEmpty()) {
             rewardDao.tasks()
                 .filter { it.rewardId != rewardId }
-                .filter { itemDao.findById(it.itemId)?.normalizedName in names }
+                .filter { nameOf(it.itemId) in names }
                 .forEach { rewardDao.deleteTask(it.rewardId, it.itemId) }
         }
         if (itemIds.isNotEmpty()) {
@@ -151,21 +160,25 @@ class RewardRepository(
         }
     }
 
-    /** What finishing [blocks] would pour into the list, without writing anything. */
-    suspend fun outlook(blocks: List<BlockWithItem>): RewardOutlook {
+    /**
+     * What finishing [blocks] would pour into the list, without writing anything.
+     * [extra] is what else the evening earns for the Belohn-o-mat — the two
+     * sleep bonuses, see `sleepEarnings`.
+     */
+    suspend fun outlook(blocks: List<BlockWithItem>, extra: List<Earning> = emptyList()): RewardOutlook {
         val targets = targets()
         val head = targets.firstOrNull { !it.isBound && it.reward.isFilling }
             ?: targets.firstOrNull { it.reward.isFilling }
         return RewardOutlook(
             head = head?.reward,
             headBound = head?.boundNames?.isNotEmpty() == true,
-            gains = pourInto(targets, earningsOf(blocks)),
+            gains = pourInto(targets, earningsOf(blocks) + extra),
         )
     }
 
     /** Pours what [blocks] earned into the list, and says what went where. */
-    suspend fun pour(blocks: List<BlockWithItem>): List<RewardGain> {
-        val gains = pourInto(targets(), earningsOf(blocks))
+    suspend fun pour(blocks: List<BlockWithItem>, extra: List<Earning> = emptyList()): List<RewardGain> {
+        val gains = pourInto(targets(), earningsOf(blocks) + extra)
         if (gains.isNotEmpty()) {
             val now = clock.now()
             rewardDao.upsertAll(gains.map { it.reward.copy(progress = it.after, updatedAt = now) })

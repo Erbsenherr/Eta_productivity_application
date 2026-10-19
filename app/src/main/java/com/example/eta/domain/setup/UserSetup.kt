@@ -307,6 +307,12 @@ const val SETUP_ID = 0
 /** One point per called-off hour, which is the rate the rule was described with. */
 const val DEFAULT_CANCELLATION_PENALTY = 1.0
 
+/** Minutes after the hour that still count as on time, unless the user says otherwise. */
+const val DEFAULT_PUNCTUAL_TOLERANCE = 5
+
+/** Past this the settings say a tolerance is not recommended. */
+const val RECOMMENDED_MAX_PUNCTUAL_TOLERANCE = 15
+
 /**
  * The answers to the setup questionnaire — the app's standing configuration.
  *
@@ -462,6 +468,19 @@ data class UserSetup(
     val statsHidden: String = "",
     /** The Notiz-Merger tab — an Advanced Feature, off until asked for. */
     val notes: Boolean = false,
+    /**
+     * Step 48: the Streaks tab — an Advanced Feature, off for everyone. Off, no
+     * streak is counted, paid or broken, the Tagesabschluss-Serie included: it
+     * goes back to being the number on the dashboard it always was.
+     */
+    val streaks: Boolean = false,
+    /**
+     * Step 48: how many minutes after the hour still count as on time, for
+     * getting up and for going to bed alike. Five unless the user says
+     * otherwise; past [RECOMMENDED_MAX_PUNCTUAL_TOLERANCE] the settings say
+     * that it is not recommended.
+     */
+    val punctualTolerance: Int = DEFAULT_PUNCTUAL_TOLERANCE,
     /**
      * The Pausenchecker: whether the day planner says when a day holds too
      * little rest, and what "too little" is — [breakPerTwoHours] of rest for

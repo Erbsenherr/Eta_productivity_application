@@ -1,5 +1,6 @@
 package com.example.eta.ui.tutorial
 
+import com.example.eta.domain.model.StreakKind
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -199,6 +200,8 @@ class TutorialViewModel(
             )
         }.combine(made) { facts, (growth, contracts, rewards) ->
             facts.copy(growthTasks = growth, contracts = contracts, rewards = rewards)
+        }.combine(container.streakRepository.observeRunning()) { facts, streaks ->
+            facts.copy(streaks = streaks.count { it.kind != StreakKind.SERIES })
         }.scan(TutorialFacts()) { earlier, now -> now.remembering(earlier) }
     }
 

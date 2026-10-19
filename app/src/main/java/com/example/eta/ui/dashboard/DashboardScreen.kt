@@ -32,6 +32,7 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.nowAndNext
 import com.example.eta.domain.planning.sleepPrompts
+import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.planning.timerWasUsed
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.LocalEtaClock
@@ -232,13 +233,22 @@ private fun TodayPage(
         // Getting up and going to bed: worked out against the ticking clock, so
         // a window opens and closes at its minute.
         val sleepCheck by viewModel.sleepCheck.collectAsStateWithLifecycle()
+        // The morning routine ticked off in full ends "Guten Morgen!" (step 48).
+        val morningDone = state.todayBlocks.any { entry ->
+            entry.item.role == ItemRole.MORNING && (
+                entry.block.isCompleted || state.subtasks[entry.item.id].orEmpty().let { steps ->
+                    steps.isNotEmpty() && steps.all { it.id in state.checked[entry.block.id].orEmpty() }
+                }
+                )
+        }
         val sleep = sleepCheck?.let { check ->
-            remember(check, now.epochSeconds / 60) {
+            remember(check, now.epochSeconds / 60, morningDone) {
                 sleepPrompts(
                     setup = check.setup,
                     overrides = check.overrides,
                     logs = check.logs,
                     now = now.toLocalDateTime(TimeZone.currentSystemDefault()),
+                    morningDone = morningDone,
                 )
             }
         }

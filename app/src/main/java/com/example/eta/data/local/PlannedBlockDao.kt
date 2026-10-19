@@ -119,6 +119,10 @@ interface PlannedBlockDao {
      * What is left is what was actually taken on — ToDos, a "Nachholen von …", an
      * imported appointment, a points entry — and a recurring task that was worth
      * carrying over arrives here anyway, as the ToDo the evening made of it.
+     *
+     * **Breaks are left out as well** (step 48): the dashboard slips one in after
+     * every finished task, so they drowned out what they followed. Filtered here
+     * rather than at creation, so the ones already ticked off leave too.
      */
     @Transaction
     @Query(
@@ -126,6 +130,7 @@ interface PlannedBlockDao {
         SELECT b.* FROM planned_blocks AS b
         JOIN items AS i ON i.id = b.itemId
         WHERE b.completedAt IS NOT NULL AND i.type != 'RECURRING'
+            AND (i.role IS NULL OR i.role != 'BREAK')
         ORDER BY b.completedAt DESC
         """,
     )

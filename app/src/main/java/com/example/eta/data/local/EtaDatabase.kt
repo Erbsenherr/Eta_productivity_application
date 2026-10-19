@@ -11,6 +11,7 @@ import com.example.eta.domain.model.CalendarSource
 import com.example.eta.domain.model.ConflictDismissal
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.DayPlan
+import com.example.eta.domain.model.HabitStreak
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.JournalEntry
 import com.example.eta.domain.model.NightOverride
@@ -51,8 +52,9 @@ import com.example.eta.domain.setup.UserSetup
         PlannerDismissal::class,
         SleepLog::class,
         Note::class,
+        HabitStreak::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -72,6 +74,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun rewardDao(): RewardDao
     abstract fun plannerExtrasDao(): PlannerExtrasDao
     abstract fun trackingDao(): TrackingDao
+    abstract fun streakDao(): StreakDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -994,5 +997,26 @@ val MIGRATION_30_31 = object : Migration(30, 31) {
 val MIGRATION_31_32 = object : Migration(31, 32) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `items` ADD COLUMN `color` INTEGER")
+    }
+}
+
+/**
+ * Step 48: the `streaks` table, the Streaks switch (off for everyone), how late
+ * still counts as on time (five minutes, what it was as a constant), and the
+ * tolerance a morning was answered under.
+ */
+val MIGRATION_32_33 = object : Migration(32, 33) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `streaks` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                "`taskName` TEXT, `label` TEXT NOT NULL, `length` INTEGER NOT NULL, " +
+                "`lastCountedOn` TEXT, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, " +
+                "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `streaks` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL(
+            "ALTER TABLE `user_setup` ADD COLUMN `punctualTolerance` INTEGER NOT NULL DEFAULT 5",
+        )
+        connection.execSQL("ALTER TABLE `sleep_logs` ADD COLUMN `tolerance` INTEGER")
     }
 }

@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.example.eta.domain.model.PUNCTUAL_WAKE_MINUTES
 import com.example.eta.domain.planning.SleepPrompts
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
@@ -53,7 +52,7 @@ fun SleepGreeting(
                 WakeButtons(due = due, offerNow = true, onWake = onWake)
                 if (pointsVisible) {
                     EtaText(
-                        text = "Pünktlich heißt: höchstens $PUNCTUAL_WAKE_MINUTES Minuten nach der " +
+                        text = "Pünktlich heißt: höchstens ${prompts.tolerance} Minuten nach der " +
                             "Aufstehzeit. Dafür gibt es am Abend einen halben Punkt.",
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
@@ -136,8 +135,8 @@ fun SleepCatchUpBoxes(
                 }
                 if (info) {
                     EtaText(
-                        text = "»Pünktlich« heißt: Du lagst innerhalb deiner Bettgehzeit im Bett " +
-                            "und hast zu schlafen versucht.",
+                        text = "»Pünktlich« heißt: Du lagst spätestens ${prompts.tolerance} " +
+                            "Minuten nach deiner Schlafenszeit im Bett und hast zu schlafen versucht.",
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )

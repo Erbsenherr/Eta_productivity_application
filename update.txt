@@ -1,4 +1,17 @@
+Bugfixes:
+-Aus der "Elerdigt" Liste die Pauseneinträge rausnehmen / nicht mehr reintun.
+-Wenn die Morgenroutine vollständig abgehakt ist, soll "Guten Morgen" von der Box entfernt werden
+-In der "Gerade" Box soll etwas mehr spacing zwischen den checkboxen und dem "Gruppe Erledigt" Button hin, um es übersichtlicher zu machen.
+
+
 Changes:
--Belohnomat Einträge sollen nicht veränderbar, nur löschbar sein.
--Nimm ein anderes Beispiel für den Belohn-o-mat (Eis)
--hübsche die Statistik page etwas auf. Sorge dafür, dass die boxen besser voneinander unterscheidbar sind.
+-Bei Task-Bindung für Belohnohmat sollen auch die Punkte fürs pünktliche ins Bett gehen/ aufstehen verwendet werden können.
+-Wenn man mehr als eine Überschneidung hat, soll man über das Gedrückthalten des "Überschneidungen" Titels alle auf einmal ignorieren können.
+-die "Läuft bald ab Box": Im Dark mode soll die Box / Schrift nicht pink, sondern rot sein.
+-unter "Schlaf und Morgen" soll eingestellt werden können, was noch als pünktlich gilt. (Standardmäßig sind es 5 Minuten, der Nutzer kann aber frei die Zeit wählen. Wenn es über 15 Minuten hinaus geht, bekommt der Nutzer die Notiz, dass das nicht empfohlen wird.
+-Bricht man einen Vertrag, kostet das dem Nutzer 10 Punkte.
+
+Features:
+-Unter dem Design reiter in den Einstellungen gibt es noch "Menü umsortieren". Wenn der Nutzer den button drückt, werden ihm alle sichtbaren Menüelemente angezeigt (Dashboard, Statistiken, etc...). Die Reihenfolge dieser Elemente kann der Nutzer dann nach belieben anpassen.
+-Einen neuen Reiter "Streaks" (aufgeführt unter "Advanced Features" und standardmäßig inaktiv). Er funktioniert ähnlich zum "Verträge" Reiter, mit dem Unterschied, dass hier ein Streak an eine Wiederkehrende Aufgabe gebunden wird. Er bekommt also auf dem Reiter unter "Streak beginnen" ein Menü mit einer Liste der bestehenden Tasks + die Option, eine neue zu erstellen. Pünktlich ins Bett gehen / aufstehen kann hier auch gewählt werden und gilt als eine einzelne Streak option (gilt also nur als erfüllt, wenn beide Zeiten im Toleranzbereich liegen.). Wählt er eine Task/Erstellt er eine neue, wird diese Task als Streak angelegt. Dahinter steht dann "Schließe die Task ab um den Streak zu starten". Wurde dieselbe Aufgabe an diesem Tag bereits abgeschlossen und abgehakt, dann steht dort eine Flamme mit der Zahl aufeinanderfolgender Absolvierungen. Ein Streak bricht nicht zwangsläufig ab, wenn die Aufgabe an einem Tag nicht erledigt wurde, sofern sie für den Tag nicht geplant war. Mein Streak für "Arbeiten" kann am Wochenende also nicht abbrechen, weil es am Wochenende nicht anfällt. Bei Aufgaben, die jeden Tag anfallen (pünktlich schlafen, aufstehen, etc.), kann der Streak wiederum jeden Tag brechen. Es soll auch am Tagesabschluss vor dem Bestätigen der eingehaltenen Verträge den Streakbildschirm geben. Dort werden nacheinander (ohne User-input) die Streaks verlängert (Die Zahl neben der Flamme geht um einen hoch mit animation und sound), wenn die betroffene Task an diesem Tag bearbeitet wurde (also spätestens im Tagesabschluss abgehakt wurde). Gab es die betreffende Aufgabe an diesem Tag nicht, zählt der Streak nicht hoch, bleibt allerdings gleich. Gab es die Aufgabe an diesem Tag und wurde nicht bearbeitet, erlischt die Flamme und der Streak wird entfernt. Der Nutzer wird dann gefragt, ob er den Streak direkt neu starten möchte (dann beginnt er wieder, wenn die Aufgabe das nächste mal bearbeitet wurde) oder ob er ihn verfallen lassen möchte. Ein Streak bringt standardmäßig 0.001 Punkte pro Streak-Tag, aber maximal 1 pro Streak und maximal 3 über alle Streaks verteilt. Bricht ein streak ab, werden dem Nutzerkonto 10 Punkte abgezogen.
+-Der "Tagesabschluss Streak" bzw. die Serie soll immer als Streak laufen und ebenso die 0.001 Punkte liefern. Dieser Streak erscheint also auch bei der Streak-Abrechnung und kostet allerdings auch 10 Punkte, wenn er gebrochen wird.

@@ -35,6 +35,13 @@ enum class PointsReason {
     PUNCTUAL_WAKE,
     PUNCTUAL_BED,
 
+    /** Step 48: a slot-holding contract broken, ten points. */
+    CONTRACT_BREACH,
+
+    /** Step 48: what a streak pays in an evening, and what breaking one costs. */
+    STREAK,
+    STREAK_BROKEN,
+
     /** Reward time claimed via a Custom Spend. */
     SPEND,
     MANUAL,

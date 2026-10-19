@@ -61,6 +61,7 @@ import com.example.eta.domain.reward.plannedYield
 import com.example.eta.domain.reward.yieldOf
 import com.example.eta.domain.streak.Streak
 import com.example.eta.domain.streak.streakOf
+import com.example.eta.domain.setup.DEFAULT_PUNCTUAL_TOLERANCE
 import com.example.eta.domain.staging.daysUntilBan
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -641,7 +642,9 @@ class DashboardViewModel(
         val repository = sleepLogRepository ?: return
         viewModelScope.launch {
             val time = at ?: clock.now().toLocalDateTime(timeZone).time.let { LocalTime(it.hour, it.minute) }
-            repository.recordWake(today, time, due)
+            // The tolerance that applies now, stored with the answer like the hour.
+            val tolerance = sleepCheck.value?.setup?.punctualTolerance ?: DEFAULT_PUNCTUAL_TOLERANCE
+            repository.recordWake(today, time, due, tolerance)
         }
     }
 

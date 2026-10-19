@@ -61,6 +61,9 @@ hold the rules; `ReevaluationService` is the only thing that writes to the ledge
   would otherwise make *planning free time in order to skip it* the most lucrative
   thing in the app. Confirmed with the user.
 
+**A breach costs 10 points** since step 48 — once, for a slot-holder, not for a
+legacy contract or a probation; see *Step 48*.
+
 Contract verdicts default to **kept**. The question is "did you hold it", and a
 breach is the exception; defaulting the other way would punish a skipped screen.
 

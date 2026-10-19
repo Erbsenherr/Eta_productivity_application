@@ -17,6 +17,13 @@ import com.example.eta.domain.reevaluation.ContractVerdict
 import com.example.eta.domain.reevaluation.DailySettlement
 import com.example.eta.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
 import com.example.eta.domain.reevaluation.settleDay
+import com.example.eta.domain.reward.Earning
+import com.example.eta.domain.model.ContractState
+import com.example.eta.domain.reevaluation.CONTRACT_BREACH_PENALTY
+import com.example.eta.domain.streak.StreakOutcome
+import com.example.eta.domain.streak.seriesOutcome
+import com.example.eta.domain.streak.streakOutcomes
+import com.example.eta.domain.reward.sleepEarnings
 import com.example.eta.domain.reward.yieldOf
 import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
 import com.example.eta.domain.setup.UserSetup
@@ -49,6 +56,8 @@ class ReevaluationService(
     private val nightService: NightService? = null,
     /** What was said about getting up and going to bed; null books no bonus. */
     private val sleepLogRepository: SleepLogRepository? = null,
+    /** The Streaks tab's rows (step 48); null counts none. */
+    private val streakRepository: StreakRepository? = null,
 ) {
 
     /** Contracts that still owe an answer for [date]. */
@@ -87,7 +96,11 @@ class ReevaluationService(
      * The reevaluation shows this to the user before booking it — "Belohnung!" is
      * a step of its own in the concept, not a silent side effect.
      */
-    suspend fun preview(date: LocalDate, verdicts: List<ContractVerdict>): DailySettlement {
+    suspend fun preview(
+        date: LocalDate,
+        verdicts: List<ContractVerdict>,
+        streaks: List<StreakOutcome>? = null,
+    ): DailySettlement {
         val setup = setupRepository.find()
         return settleDay(
             blocks = blockDao.findForDateWithItems(date),
@@ -98,10 +111,30 @@ class ReevaluationService(
             cancellationPenaltyPerHour = setup?.cancellationPenaltyPerHour
                 ?: DEFAULT_CANCELLATION_PENALTY,
             unplannedPenaltyPerHour = setup?.unplannedRate ?: UNPLANNED_PENALTY_PER_HOUR,
-            // This morning, and the night it woke from — filed under the day
-            // before, whose evening it was.
-            wokeOnTime = sleepLogRepository?.find(date)?.wokeOnTime == true,
-            bedOnTime = sleepLogRepository?.find(date.minus(DatePeriod(days = 1)))?.bedOnTime == true,
+            wokeOnTime = wokeOnTime(date),
+            bedOnTime = bedOnTime(date),
+            streaks = streaks ?: previewStreaks(date),
+        )
+    }
+
+    /**
+     * What tonight does to every streak, without writing anything (step 48).
+     *
+     * Nothing while the feature is off — no streak counted, paid or broken, the
+     * Tagesabschluss-Serie included. The series' row is made here the first
+     * time an evening asks for it.
+     */
+    suspend fun previewStreaks(date: LocalDate): List<StreakOutcome> {
+        val repository = streakRepository ?: return emptyList()
+        if (setupRepository.find()?.streaks != true) return emptyList()
+        val series = seriesOutcome(repository.series(), planRepository.settledDates(), date)
+        return streakOutcomes(
+            streaks = repository.running(),
+            date = date,
+            blocks = blockDao.findForDateWithItems(date),
+            wokeOnTime = wokeOnTime(date),
+            bedOnTime = bedOnTime(date),
+            series = series,
         )
     }
 
@@ -112,7 +145,31 @@ class ReevaluationService(
      * no reward being filled there is nothing to watch fill.
      */
     suspend fun previewRewards(date: LocalDate): RewardOutlook =
-        rewardRepository.outlook(blockDao.findForDateWithItems(date))
+        rewardRepository.outlook(blockDao.findForDateWithItems(date), sleepEarningsOf(date))
+
+    /**
+     * The evening's two half points as the Belohn-o-mat sees them (step 48) —
+     * the same answers [preview] books.
+     */
+    private suspend fun sleepEarningsOf(date: LocalDate): List<Earning> {
+        val settlement = settleDay(
+            blocks = emptyList(),
+            verdicts = emptyList(),
+            sleepMinutes = 0,
+            freeTimeAllowanceMinutes = 0,
+            wokeOnTime = wokeOnTime(date),
+            bedOnTime = bedOnTime(date),
+        )
+        return sleepEarnings(settlement.wakeBonus, settlement.bedBonus)
+    }
+
+    /** This morning's answer. */
+    private suspend fun wokeOnTime(date: LocalDate): Boolean =
+        sleepLogRepository?.find(date)?.wokeOnTime == true
+
+    /** The night this day woke from — filed under the day before, whose evening it was. */
+    private suspend fun bedOnTime(date: LocalDate): Boolean =
+        sleepLogRepository?.find(date.minus(DatePeriod(days = 1)))?.bedOnTime == true
 
     /**
      * Books the day: contract verdicts, then every points movement as its own
@@ -126,12 +183,21 @@ class ReevaluationService(
         date: LocalDate,
         verdicts: List<ContractVerdict>,
         journal: Map<String, String>,
+        /** Broken streaks the user chose to start again; the rest are let go. */
+        restartStreaks: Set<String> = emptySet(),
+        /**
+         * False for a day made up after the fact: streaks are attested on the
+         * evening itself, like contracts, and are left alone.
+         */
+        evening: Boolean = true,
     ): DailySettlement {
+        // Before the verdicts are written: the states they are read against.
+        val streaks = if (evening) previewStreaks(date) else emptyList()
+        val settlement = preview(date, verdicts, streaks)
+
         verdicts.forEach {
             contractRepository.recordVerdict(it.contract, it.kept, date, it.keepServing)
         }
-
-        val settlement = preview(date, verdicts)
 
         if (settlement.harvest != 0.0) {
             pointsRepository.record(settlement.harvest, PointsReason.HARVEST, note = date.toString())
@@ -156,6 +222,19 @@ class ReevaluationService(
         if (settlement.bedBonus != 0.0) {
             pointsRepository.record(settlement.bedBonus, PointsReason.PUNCTUAL_BED, note = date.toString())
         }
+        verdicts.filter { !it.kept && it.contract.state == ContractState.ACTIVE }.forEach {
+            pointsRepository.record(-CONTRACT_BREACH_PENALTY, PointsReason.CONTRACT_BREACH, note = it.contract.title)
+        }
+        streaks.forEach { outcome ->
+            if (outcome.payout > 0.0) {
+                pointsRepository.record(outcome.payout, PointsReason.STREAK, note = outcome.streak.label)
+            }
+            if (outcome.penalty > 0.0) {
+                pointsRepository.record(-outcome.penalty, PointsReason.STREAK_BROKEN, note = outcome.streak.label)
+            }
+        }
+        streakRepository?.apply(streaks, restartStreaks, date)
+
         if (settlement.cancellationPenalty != 0.0) {
             pointsRepository.record(
                 amount = -settlement.cancellationPenalty,
@@ -174,7 +253,10 @@ class ReevaluationService(
         // The Belohn-o-mat fills from the same blocks the harvest was just read
         // off, and here rather than anywhere else for the same reason HARVEST is
         // written here: a day is settled once, so a reward is filled once.
-        rewardRepository.pour(blockDao.findForDateWithItems(date))
+        rewardRepository.pour(
+            blockDao.findForDateWithItems(date),
+            sleepEarnings(settlement.wakeBonus, settlement.bedBonus),
+        )
 
         val answered = journal.filterValues { it.isNotBlank() }
         if (answered.isNotEmpty()) {

@@ -65,7 +65,9 @@ evening — also when the bedtime itself lies after midnight.
   (`MORNING_WINDOW_MINUTES`). `NowBox(greeting, greetingContent)` — the box is
   called "Guten Morgen!" for all of the window, answered or not — and
   `SleepGreeting` offers jetzt / pünktlich / an hour of one's own. On time is at
-  most `PUNCTUAL_WAKE_MINUTES` (5) after; earlier counts too.
+  most `PUNCTUAL_WAKE_MINUTES` (5) after; earlier counts too — since step 48
+  the user's `punctualTolerance`, stored with the answer, and a finished morning
+  routine ends the window; see *Step 48*.
 - **Evening**: while winding down, `[bedPrepOffset, sleepOffset)` of **either**
   night that touches today. A bedtime after midnight puts the window into the
   small hours of the next date and it is still filed under the day before.

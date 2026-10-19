@@ -149,7 +149,8 @@ fun SignContractDialog(
                         EtaText(
                             text = "Ich garantiere, die Regeln dieses Vertrags nach bestem " +
                                 "Ermessen zu verfolgen, und nehme an, dass ein Vertragsbruch " +
-                                "den Vertrag beendet und den Slot für einen Monat ab heute sperrt.",
+                                "den Vertrag beendet, den Slot für einen Monat ab heute sperrt und " +
+                                "10 Punkte kostet.",
                             style = EtaTheme.typography.caption,
                             color = EtaTheme.colors.textSecondary,
                         )

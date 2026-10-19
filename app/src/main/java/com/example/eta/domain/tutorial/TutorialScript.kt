@@ -23,6 +23,9 @@ enum class TutorialStage {
     GROWTH,
     CONTRACTS,
     REWARDS,
+
+    /** Step 48: the Streaks tab. */
+    STREAKS,
 }
 
 /**
@@ -166,6 +169,8 @@ data class TutorialFacts(
     val growthTasks: Int = 0,
     val contracts: Int = 0,
     val rewards: Int = 0,
+    /** Streaks begun, the Tagesabschluss-Serie not counted. */
+    val streaks: Int = 0,
     /** The latest value of each signal, and every "key=value" ever reported. */
     val signals: Map<String, String> = emptyMap(),
     val seen: Set<String> = emptySet(),

@@ -77,6 +77,7 @@ class CatchUpService(
         val settlement = reevaluationService.settle(
             date = date,
             verdicts = emptyList(),
+            evening = false,
             journal = mapOf(CATCH_UP_PHRASE to "Nachgetragen am $today."),
         )
         return CatchUpResult.Resolved(date, settlement)

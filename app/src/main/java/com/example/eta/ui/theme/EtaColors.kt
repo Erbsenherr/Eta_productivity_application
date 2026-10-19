@@ -117,6 +117,14 @@ val LegacyDarkColors = EtaColors(
 val EtaBrandRed = Color(0xFFE5322D)
 
 /**
+ * A plain red that reads on a dark ground, for the one box that has to look like
+ * an alarm by night — "Läuft bald ab" (step 48). The dark palettes' [EtaColors.danger]
+ * is a rose there, which the user read as pink; changing the token itself would
+ * repaint every locked contract slot as well.
+ */
+val AlertRedOnDark = Color(0xFFF2564F)
+
+/**
  * The palette of the [AppDesign.ETA] design by day: the app icon turned into a screen —
  * white, with its red wherever the app answers a touch.
  *

@@ -226,9 +226,9 @@ class TutorialTest {
     fun `a tutorial about a feature has the features switched on`() {
         val setup = tutorialSetup(now, advanced = true)
 
-        assertTrue(setup.pointsSystem && setup.growthTasks && setup.contracts && setup.rewards)
+        assertTrue(setup.pointsSystem && setup.growthTasks && setup.contracts && setup.rewards && setup.streaks)
         assertEquals(
-            setOf(TutorialId.GROWTH, TutorialId.CONTRACTS, TutorialId.REWARDS),
+            setOf(TutorialId.GROWTH, TutorialId.CONTRACTS, TutorialId.REWARDS, TutorialId.STREAKS),
             TutorialId.entries.filter { it.advanced }.toSet(),
         )
     }

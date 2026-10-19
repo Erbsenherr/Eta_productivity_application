@@ -13,6 +13,7 @@ import com.example.eta.data.repository.CatchUpResult
 import com.example.eta.data.repository.CatchUpService
 import com.example.eta.data.repository.PlanningPhaseService
 import com.example.eta.data.repository.SetupRepository
+import com.example.eta.data.repository.StreakRepository
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.planning.nextTaskEvent
 import com.example.eta.domain.reminder.nextReminderAlarm
@@ -69,6 +70,8 @@ class SettingsViewModel(
     private val taskStartCoordinator: TaskStartCoordinator,
     private val planRepository: PlanRepository,
     private val reminderRepository: ReminderRepository,
+    /** For the Streaks switch — see [setFeature]. */
+    private val streakRepository: StreakRepository? = null,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -194,6 +197,12 @@ class SettingsViewModel(
      * The draft is changed too, or the next save would write the old answer back.
      */
     fun setFeature(transform: (UserSetup) -> UserSetup) {
+        // Streaks switched on (step 48): the series takes the run of settled days
+        // as it stands. An evening missed while they were off is not charged.
+        val before = stored.value
+        if (before != null && !before.streaks && transform(before).streaks) {
+            viewModelScope.launch { streakRepository?.resumeSeries() }
+        }
         _draft.update { it?.let(transform) }
         // The same change on both sides, so a switch flipped is not "unsaved".
         stored.update { it?.let(transform) }

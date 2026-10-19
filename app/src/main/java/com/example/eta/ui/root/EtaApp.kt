@@ -13,6 +13,10 @@ import androidx.compose.ui.Alignment
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaText
+import com.example.eta.ui.theme.orderTabs
+import com.example.eta.ui.streaks.StreaksScreen
+import com.example.eta.ui.streaks.StreaksViewModel
+import com.example.eta.ui.theme.reorderVisible
 import com.example.eta.ui.theme.EtaTheme
 import com.example.eta.ui.week.WeekView
 import androidx.compose.foundation.layout.Box
@@ -185,6 +189,7 @@ fun EtaApp(
                         rewards = stored.rewards,
                         statistics = stored.statistics,
                         notes = stored.notes,
+                        streaks = stored.streaks,
                     ),
                 ) {
                     MainScaffold(
@@ -232,7 +237,10 @@ private fun MainScaffold(
     // The tabs of the features that are switched on. One that was open when its
     // feature went — or was saved before a restart — falls back to the first.
     val features = LocalFeatures.current
-    val tabs = EtaTab.entries.filter { it.isShown(features) }
+    // In the user's own order (step 48), every tab included so a hidden one
+    // keeps its place for when its feature comes back.
+    val tabOrder = orderTabs(EtaTab.entries.map { it.name }, design.tabOrder)
+    val tabs = tabOrder.map(EtaTab::valueOf).filter { it.isShown(features) }
     val tab = savedTab.takeIf { it in tabs } ?: EtaTab.Today
     var flow by rememberSaveable(stateSaver = FLOW_SAVER) { mutableStateOf<AppFlow?>(null) }
     // Where today's planner opens, when it was asked for from an entry of the
@@ -446,6 +454,13 @@ private fun MainScaffold(
                     ),
                 )
 
+                EtaTab.Streaks -> StreaksScreen(
+                    viewModel = viewModel(
+                        key = "streaks-$dateKey",
+                        factory = streaksViewModelFactory(container),
+                    ),
+                )
+
                 EtaTab.Statistics -> StatisticsScreen(
                     viewModel = viewModel(
                         key = "statistics-$dateKey",
@@ -476,7 +491,10 @@ private fun MainScaffold(
                     },
                     onAccentChange = container.designStore::selectAccent,
                     onTabStyleChange = { chosen -> container.designStore.select(chosen) },
-                    tabs = tabs.map { it.label to it.icon },
+                    tabs = tabs.map { EtaTabItem(it.name, it.label, it.icon) },
+                    onTabOrderChange = { visible ->
+                        container.designStore.selectTabOrder(reorderVisible(tabOrder, visible))
+                    },
                     onDebugReset = rootViewModel::resetEverything,
                     onOpenVacation = { flow = AppFlow.Vacation },
                     onStartTutorial = { id -> container.tutorialStore.request(id?.name) },
@@ -545,6 +563,9 @@ private enum class EtaTab(val label: String, val icon: EtaIcon) {
     Statistics("Statistiken", EtaIcon.CHART),
     Notes("Notiz-Merger", EtaIcon.NOTE),
 
+    /** Step 48: streaks bound to standing tasks, beside the contracts they resemble. */
+    Streaks("Streaks", EtaIcon.FLAME),
+
     /** Far right, as the user asked: it is the tab opened least. */
     Settings("Einstellungen", EtaIcon.SLIDERS),
 }
@@ -556,6 +577,7 @@ private fun EtaTab.isShown(features: Features): Boolean = when (this) {
     EtaTab.Rewards -> features.rewards
     EtaTab.Statistics -> features.statistics
     EtaTab.Notes -> features.notes
+    EtaTab.Streaks -> features.streaks
     else -> true
 }
 
@@ -831,6 +853,8 @@ private fun settingsViewModelFactory(container: AppContainer): ViewModelProvider
                 taskStartCoordinator = container.taskStartCoordinator,
                 planRepository = container.planRepository,
                 reminderRepository = container.reminderRepository,
+                streakRepository = container.streakRepository,
+                clock = container.clock,
             )
         }
     }
@@ -858,6 +882,19 @@ internal fun rewardsViewModelFactory(container: AppContainer): ViewModelProvider
             RewardsViewModel(
                 rewardRepository = container.rewardRepository,
                 recurringTaskService = container.recurringTaskService,
+            )
+        }
+    }
+
+internal fun streaksViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer {
+            StreaksViewModel(
+                streakRepository = container.streakRepository,
+                recurringTaskService = container.recurringTaskService,
+                planRepository = container.planRepository,
+                sleepLogRepository = container.sleepLogRepository,
+                clock = container.clock,
             )
         }
     }

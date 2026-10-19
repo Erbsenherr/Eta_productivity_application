@@ -21,6 +21,7 @@ import com.example.eta.domain.reevaluation.ContractVerdict
 import com.example.eta.domain.reevaluation.DailySettlement
 import com.example.eta.domain.reevaluation.DiscardConsequence
 import com.example.eta.domain.subtask.stillOpen
+import com.example.eta.domain.streak.StreakOutcome
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,6 +93,13 @@ data class ReevaluationUiState(
      * a null head inside it means there is no reward to fill — and no page.
      */
     val rewards: RewardOutlook? = null,
+    /**
+     * Step 48: what tonight does to every streak, the series first. Empty while
+     * the feature is off — and then the page is not shown.
+     */
+    val streaks: List<StreakOutcome> = emptyList(),
+    /** Broken streaks the user wants to start again, by id; unanswered ones are let go. */
+    val restarts: Map<String, Boolean> = emptyMap(),
     val settled: DailySettlement? = null,
     val loading: Boolean = true,
 ) {
@@ -200,6 +208,8 @@ class ReevaluationViewModel(
             _state.update {
                 it.copy(
                     preview = reevaluationService.preview(date, state.toVerdicts()),
+                    // Off the blocks as well: a tick taken back changes a streak.
+                    streaks = reevaluationService.previewStreaks(date),
                     // Off the same blocks, so a tick taken back on the first
                     // page takes its points back out of the bar as well.
                     rewards = reevaluationService.previewRewards(date),
@@ -348,6 +358,11 @@ class ReevaluationViewModel(
         _state.update { it.copy(continuations = it.continuations + (contract.id to keepServing)) }
     }
 
+    /** A broken streak: start it again, or let it go. */
+    fun setRestart(streakId: String, restart: Boolean) {
+        _state.update { it.copy(restarts = it.restarts + (streakId to restart)) }
+    }
+
     fun answer(question: String, answer: String) {
         _journal.update { it + (question to answer) }
     }
@@ -365,7 +380,12 @@ class ReevaluationViewModel(
         viewModelScope.launch {
             val state = _state.value
             if (state.settled != null) return@launch
-            val settlement = reevaluationService.settle(date, state.toVerdicts(), _journal.value)
+            val settlement = reevaluationService.settle(
+                date = date,
+                verdicts = state.toVerdicts(),
+                journal = _journal.value,
+                restartStreaks = state.restarts.filterValues { it }.keys,
+            )
             _state.update { it.copy(settled = settlement) }
             onDone()
         }

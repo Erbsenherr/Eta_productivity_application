@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.eta.domain.recurrence.RecurringGroup
+import com.example.eta.domain.reward.SleepBonus
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaCheckbox
@@ -55,7 +56,8 @@ internal fun RewardEditDialog(
 ) {
     val bound = groups.filter { group -> group.ids.any { it in draft.itemIds } }
         .map { it.representative.name }
-        .distinct()
+        .distinct() +
+        SleepBonus.entries.filter { it.itemId in draft.itemIds }.map { it.label }
 
     EtaDialog(title = "Neue Belohnung", onDismiss = onDismiss) {
         EtaText(
@@ -169,6 +171,28 @@ internal fun BindingDialog(
             style = EtaButtonStyle.Secondary,
             onClick = onNewTask,
         )
+
+        // The two half points of the evening (step 48): no task behind them,
+        // but bound and held exactly like one.
+        EtaText(text = "Schlaf", style = EtaTheme.typography.bodyStrong)
+        SleepBonus.entries.forEach { bonus ->
+            key(bonus.itemId) {
+                val checked = bonus.itemId in selected
+                val heldBy = taken[bonus.taskName].takeUnless { checked }
+                BindingLine(
+                    id = bonus.itemId,
+                    title = bonus.label,
+                    subtitle = heldBy?.let { "Gebunden an »$it«" } ?: "Der halbe Punkt am Abend",
+                    checked = checked,
+                    enabled = heldBy == null,
+                    onToggle = {
+                        if (heldBy == null) {
+                            onChange(if (checked) selected - bonus.itemId else selected + bonus.itemId)
+                        }
+                    },
+                )
+            }
+        }
         Row {
             Spacer(Modifier.weight(1f))
             EtaButton(text = "Fertig", onClick = onDone)
@@ -184,27 +208,47 @@ private fun BindingRow(
     heldBy: String?,
     onToggle: () -> Unit,
 ) {
+    BindingLine(
+        id = group.representative.id,
+        title = group.representative.name,
+        subtitle = if (heldBy != null) "Gebunden an »$heldBy«" else recurringSummary(group),
+        checked = checked,
+        enabled = heldBy == null,
+        onToggle = onToggle,
+    )
+}
+
+/** A line of the binding menu: a box, a name and what is under it. */
+@Composable
+private fun BindingLine(
+    id: String,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
     val toggle = rememberUpdatedState(onToggle)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(group.representative.id) {
+            .pointerInput(id) {
                 detectTapGestures(onTap = { toggle.value() })
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EtaCheckbox(checked = checked, enabled = heldBy == null, onCheckedChange = { onToggle() })
+        EtaCheckbox(checked = checked, enabled = enabled, onCheckedChange = { onToggle() })
         Spacer(Modifier.size(EtaTheme.spacing.md))
         Column(Modifier.weight(1f)) {
             EtaText(
-                text = group.representative.name,
+                text = title,
                 style = EtaTheme.typography.body,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             EtaText(
-                text = if (heldBy != null) "Gebunden an »$heldBy«" else recurringSummary(group),
+                text = subtitle,
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
                 maxLines = 1,
