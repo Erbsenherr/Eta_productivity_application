@@ -1,7 +1,39 @@
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+/**
+ * The minute this build was made, `2026-10-19-1412`: its `versionName`, the name
+ * of its APK in `dist/`, and the tag of its release on GitHub, against which the
+ * app's "App-Update" page compares itself.
+ *
+ * `tools/build-apk.ps1` hands it in (`-PetaStamp=…`) so the three agree. Without
+ * one it is the current minute, read through a ValueSource so the configuration
+ * cache asks again every build instead of keeping the first one's.
+ */
+abstract class CurrentStamp : ValueSource<String, ValueSourceParameters.None> {
+    override fun obtain(): String =
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"))
+}
+
+val buildStamp: String = providers.gradleProperty("etaStamp")
+    .orElse(providers.of(CurrentStamp::class) {})
+    .get()
+
+/**
+ * The stamp as the minutes since 2026, plus a thousand to stay clear of the
+ * `versionCode = 1` every build carried before. Android only needs it to grow.
+ */
+fun versionCodeOf(stamp: String): Int {
+    val built = LocalDateTime.parse(stamp, DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"))
+    val base = LocalDateTime.of(2026, 1, 1, 0, 0)
+    return 1000 + Duration.between(base, built).toMinutes().toInt()
 }
 
 android {
@@ -16,8 +48,9 @@ android {
         applicationId = "com.example.erik_iteration_2"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // The stamp of the build — see `buildStamp` below and `tools/build-apk.ps1`.
+        versionCode = versionCodeOf(buildStamp)
+        versionName = buildStamp
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

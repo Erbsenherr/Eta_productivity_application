@@ -49,6 +49,9 @@ here would overwrite every edit made on the Listen tab. The weekly social budget
 count, `UserSetup.conflicts()` having described answers that no longer describe the
 schedule.
 
+**App-Update** (step 50) follows "Deine Daten" and is left out in the tutorial's
+sandbox — see *Step 50*.
+
 The **Design** page also holds "Menü umsortieren" (step 48), and "Schlaf und
 Morgen" the tolerance for "on time" — see *Step 48*.
 

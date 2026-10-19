@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (723 tests
-as of step 49), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (729 tests
+as of step 50), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -68,15 +68,18 @@ says otherwise, and check them on the phone before trusting them.
 
 **Every session that changed code ends with a fresh APK in `dist/`**, without being
 asked — it is how the user gets the work onto the phone. Once the suite,
-`assembleRelease` and `lint` are green, as the last step:
+`assembleRelease` and `lint` are green:
 
 ```powershell
-$bt  = "C:\Users\paul_\AppData\Local\Android\Sdk\build-tools\36.1.0"
-$out = "dist\eta-release-$(Get-Date -Format 'yyyy-MM-dd-HHmm').apk"
-& "$bt\apksigner.bat" sign --ks "$env:USERPROFILE\.android\debug.keystore" `
-    --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey `
-    --out $out app\build\outputs\apk\release\app-release-unsigned.apk
+$stamp = .\tools\build-apk.ps1    # builds with that stamp, signs into dist\, prints it
 ```
+
+The script builds the release with `-PetaStamp=<stamp>` — the build's
+`versionName`, from which its `versionCode` is worked out — and signs it into
+`dist\eta-release-<stamp>.apk`. **Build through the script**, not with a bare
+`assembleRelease` and apksigner: without the stamp handed in, the APK's version
+and its file name disagree, and the app's update check compares against the
+version. See *Step 50*.
 
 - **The release build, signed with the debug keystore.** `assembleRelease` leaves
   `app-release-unsigned.apk`, which a phone refuses; there is no release signing
@@ -84,7 +87,7 @@ $out = "dist\eta-release-$(Get-Date -Format 'yyyy-MM-dd-HHmm').apk"
   has to stay that one: Android only installs an update over an app signed with
   the same key, so another key means uninstalling first — and losing the database.
   The Google Calendar grant is matched against that key's SHA-1 as well.
-- The name is `eta-release-<date>-<time>.apk`; the `.idsig` beside it is
+- The name is `eta-release-<stamp>.apk`, the stamp `yyyy-MM-dd-HHmm`; the `.idsig` beside it is
   apksigner's and can be ignored. Old APKs stay — `dist/` is the history.
 - Say in the closing message which file it is. A session that only touched
   documentation builds none.
@@ -93,7 +96,8 @@ $out = "dist\eta-release-$(Get-Date -Format 'yyyy-MM-dd-HHmm').apk"
 
 **Every session that changed something a user can see also writes a file into
 `patchnotes/`**, without being asked: `patchnotes/<date>-<time>.md`, the same stamp
-the APK carries, written after signing so the two match. It is **for the people
+the APK carries, written after signing so the two match. It is also the text of
+the session's GitHub release, which the app's "App-Update" page shows. It is **for the people
 using the app** — the user hands it to their testers — so it is in German, says what
 changed and where to find it, and leaves out everything about how it was built.
 Sections as they apply: *Neu*, *Geändert*, *Behoben*, *Gut zu wissen*.
@@ -116,6 +120,14 @@ changed; documentation-only sessions push too.
   and eight APKs were gone until restored from history.
 - `dist/`, `build/` and `local.properties` are ignored, so the APK itself is never
   pushed. Look at `git status` before committing all the same.
+
+### …and a release
+
+**Every session that built an APK publishes it as a GitHub release**, after the
+push, as the very last step: `.\tools\publish-release.ps1 $stamp`. The tag is the
+stamp, the text the patch notes, the APK attached — this is where the app's
+"App-Update" button finds it. The APK goes into the release, **never into git**.
+Needs `gh`, signed in as `Erbsenherr` (`gh auth status`). See *Step 50*.
 
 ## Toolchain notes that will bite you
 
@@ -404,6 +416,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-47-rewards-fixed-stats-look.md` | *Step 47*: a reward is made and deleted, never changed (no `RewardRepository.update`, a tap does nothing), and the Statistiken page's three grounds (`StatCard`, `StatTile`, `ShareBar`) |
 | `step-48-streaks-tolerance.md` | *Step 48*: Streaks (`HabitStreak`, `streakOutcomes`, `seriesOutcome`, the evening's `Step.STREAKS`, the tab, `resumeSeries`), the Tagesabschluss-Serie as a streak, what counts as on time (`punctualTolerance`, `SleepLog.tolerance`), a breach that costs 10 (`CONTRACT_BREACH_PENALTY`), the sleep bonuses in the Belohn-o-mat (`SleepBonus`), "Menü umsortieren" (`tabOrder`, `orderTabs`, `reorderVisible`), ignoring every overlap at once, "Guten Morgen" ended by the routine (`morningDone`) |
 | `step-49-routine-step-goals.md` | *Step 49*: a routine's steps as Timer-Tasks with "Zielzeit" and with a Mengen-Inkrement (`StepExtras`, `asItem` / `withItemFields`, `withStepExtras`, `StepFamily`, `SubtaskTimer` and `asBlock`, `StepTimerActions`, `stepTimerEntries`), and "Subtask von …" in the "Ziele" tab |
+| `step-50-app-update.md` | *Step 50*: the build stamp (`-PetaStamp`, `versionCodeOf`, `tools/build-apk.ps1`), releases on GitHub (`tools/publish-release.ps1`), and the "App-Update" page (`UpdateService`, `UpdateViewModel`, `isNewer`, the `FileProvider`, `REQUEST_INSTALL_PACKAGES`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -491,7 +504,8 @@ own, and icons · 45. "Aktuell" on the week timetable changes one
 occurrence · 46. The setup rebuilt, every other week, a task's own colour, and
 audio modes · 47. Rewards that are not changed, and a Statistiken page easier
 to read · 48. Streaks, a tolerance for "on time", a breach that costs, and a
-menu of one's own order · 49. A routine's steps as Timer-Tasks and with a count.
+menu of one's own order · 49. A routine's steps as Timer-Tasks and with a count · 50. Updates from
+GitHub releases.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

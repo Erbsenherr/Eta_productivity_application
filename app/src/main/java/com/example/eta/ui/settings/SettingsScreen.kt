@@ -66,6 +66,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.example.eta.alarm.alarmReadiness
 import com.example.eta.data.backup.BACKUP_FILE_NAME
+import com.example.eta.domain.update.formatMegabytes
+import com.example.eta.domain.update.plainNotes
+import androidx.compose.runtime.LaunchedEffect
 import com.example.eta.domain.planning.STILL_ACTIVE_MAX_PER_DAY
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.RECOMMENDED_MAX_PUNCTUAL_TOLERANCE
@@ -132,6 +135,8 @@ fun SettingsScreen(
      * meanings. Passed in the way the dashboard is passed its Quick-Add.
      */
     calendarViewModel: CalendarSettingsViewModel,
+    /** "App-Update": the newest release from GitHub. Null leaves the page out. */
+    updateViewModel: UpdateViewModel? = null,
     design: DesignChoice,
     onDesignChange: (AppDesign) -> Unit,
     onBrightnessChange: (Brightness) -> Unit,
@@ -225,6 +230,7 @@ fun SettingsScreen(
                                     setup?.pointsSystem == true
                                 SettingsPage.DEBUG -> onDebugReset != null
                                 SettingsPage.TUTORIAL -> onStartTutorial != null
+                                SettingsPage.UPDATE -> updateViewModel != null
                                 else -> true
                             }
                         },
@@ -255,6 +261,7 @@ fun SettingsScreen(
                         onCatchUp = viewModel::catchUp,
                     )
 
+                    SettingsPage.UPDATE -> updateViewModel?.let { UpdateBox(it) }
                     SettingsPage.TUTORIAL -> onStartTutorial?.let { TutorialBox(onStart = it) }
                     SettingsPage.DEBUG -> onDebugReset?.let { DebugBox(onReset = it) }
 
@@ -346,6 +353,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     ALARMS("Alarme", SettingsSection.APP),
     CALENDAR("Google Kalender", SettingsSection.APP),
     DATA("Deine Daten", SettingsSection.APP),
+    UPDATE("App-Update", SettingsSection.APP),
     CATCH_UP("Offene Tage", SettingsSection.APP),
 
     SLEEP("Schlaf und Morgen", SettingsSection.SETUP),
@@ -1317,6 +1325,111 @@ private fun DataBox(onExport: () -> Unit, onImport: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * "App-Update": asks GitHub for the newest release, and installs it.
+ *
+ * Nothing is looked up until the button is pressed — the page is opened rarely,
+ * and Eta otherwise talks to no server but Google's calendar. Android's installer
+ * does the installing and asks for it itself; the data stays, since the update
+ * is signed with the same key.
+ */
+@Composable
+private fun UpdateBox(viewModel: UpdateViewModel) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val launch by viewModel.launch.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(launch) {
+        launch?.let { intent ->
+            viewModel.launched()
+            runCatching { context.startActivity(intent) }
+        }
+    }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "App-Update", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Installiert: ${viewModel.running.ifEmpty { "unbekannt" }}",
+                style = EtaTheme.typography.body,
+            )
+            EtaText(
+                text = "Sucht auf GitHub nach einer neueren Version. Installiert wird über " +
+                    "den Installer von Android, der noch einmal fragt — deine Daten bleiben.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+
+            when (val current = state) {
+                UpdateState.Idle -> Unit
+                UpdateState.Checking -> UpdateNote("Suche …")
+                is UpdateState.UpToDate -> UpdateNote("Du hast die neueste Version.")
+                is UpdateState.Failed -> UpdateNote(current.reason, color = EtaTheme.colors.danger)
+                is UpdateState.NeedsPermission -> UpdateNote(
+                    "Erlaube Eta in den Systemeinstellungen, Apps zu installieren, " +
+                        "komm zurück und tippe noch einmal auf „Installieren“.",
+                    color = EtaTheme.colors.warning,
+                )
+                is UpdateState.Downloading -> UpdateNote(
+                    "Lädt herunter … ${(current.progress * 100).toInt()} % " +
+                        "von ${formatMegabytes(current.release.apkSize)}",
+                )
+                is UpdateState.Ready -> UpdateNote(
+                    "Heruntergeladen. Falls der Installer nicht aufgegangen ist, " +
+                        "tippe noch einmal auf „Installieren“.",
+                )
+                is UpdateState.Available -> Unit
+            }
+
+            val release = when (val current = state) {
+                is UpdateState.Available -> current.release
+                is UpdateState.NeedsPermission -> current.release
+                is UpdateState.Downloading -> current.release
+                is UpdateState.Ready -> current.release
+                is UpdateState.Failed -> current.release
+                else -> null
+            }
+            if (release != null) {
+                EtaText(
+                    text = "Neue Version: ${release.tag}",
+                    style = EtaTheme.typography.bodyStrong,
+                    color = EtaTheme.colors.accent,
+                )
+                val notes = plainNotes(release.notes)
+                if (notes.isNotEmpty()) {
+                    EtaText(
+                        text = notes,
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textSecondary,
+                    )
+                }
+            }
+
+            val busy = state is UpdateState.Checking || state is UpdateState.Downloading
+            Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                if (release != null) {
+                    EtaButton(
+                        text = "Installieren (${formatMegabytes(release.apkSize)})",
+                        enabled = !busy,
+                        onClick = { viewModel.install(release) },
+                    )
+                } else {
+                    EtaButton(
+                        text = "Nach Updates suchen",
+                        enabled = !busy,
+                        onClick = viewModel::check,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateNote(text: String, color: Color = EtaTheme.colors.textPrimary) {
+    EtaText(text = text, style = EtaTheme.typography.body, color = color)
 }
 
 /**

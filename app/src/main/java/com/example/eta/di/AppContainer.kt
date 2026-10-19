@@ -7,6 +7,7 @@ import com.example.eta.alarm.ReminderCoordinator
 import com.example.eta.alarm.TaskStartCoordinator
 import com.example.eta.alarm.WakeAlarmCoordinator
 import com.example.eta.data.backup.BackupService
+import com.example.eta.data.update.UpdateService
 import com.example.eta.data.calendar.GoogleAuth
 import com.example.eta.data.calendar.GoogleCalendarApi
 import com.example.eta.data.local.EtaDatabase
@@ -111,6 +112,9 @@ class AppContainer(
     }
 
     val backupService: BackupService = BackupService(appContext)
+
+    /** Eta's own updates, from the releases on GitHub. */
+    val updateService: UpdateService = UpdateService(appContext)
 
     /** Which design is on; read by every activity before its first frame. */
     val designStore: DesignStore = DesignStore(appContext)

@@ -83,6 +83,7 @@ import com.example.eta.ui.components.Features
 import com.example.eta.ui.components.LocalFeatures
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.eta.ui.settings.CalendarSettingsViewModel
+import com.example.eta.ui.settings.UpdateViewModel
 import com.example.eta.ui.settings.SettingsScreen
 import com.example.eta.ui.settings.SettingsViewModel
 import com.example.eta.ui.setup.SetupScreen
@@ -480,6 +481,10 @@ private fun MainScaffold(
                     calendarViewModel = viewModel(
                         factory = calendarSettingsViewModelFactory(container),
                     ),
+                    // The practice day has nothing to update.
+                    updateViewModel = if (container.sandbox) null else viewModel(
+                        factory = updateViewModelFactory(container),
+                    ),
                     design = design,
                     onDesignChange = { chosen ->
                         container.designStore.select(chosen)
@@ -839,6 +844,11 @@ private fun calendarSettingsViewModelFactory(container: AppContainer): ViewModel
                 syncService = container.calendarSyncService,
             )
         }
+    }
+
+private fun updateViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer { UpdateViewModel(container.updateService) }
     }
 
 private fun settingsViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
