@@ -1328,12 +1328,12 @@ private fun DataBox(onExport: () -> Unit, onImport: () -> Unit) {
 }
 
 /**
- * "App-Update": asks GitHub for the newest release, and installs it.
+ * "App-Update": asks GitHub for the newest release, and hands it to the browser.
  *
  * Nothing is looked up until the button is pressed — the page is opened rarely,
- * and Eta otherwise talks to no server but Google's calendar. Android's installer
- * does the installing and asks for it itself; the data stays, since the update
- * is signed with the same key.
+ * and Eta otherwise talks to no server but Google's calendar. The browser
+ * downloads the APK and Android's installer installs it; the data stays, since
+ * the update is signed with the same key. Why not Eta itself: see `UpdateService`.
  */
 @Composable
 private fun UpdateBox(viewModel: UpdateViewModel) {
@@ -1356,8 +1356,9 @@ private fun UpdateBox(viewModel: UpdateViewModel) {
                 style = EtaTheme.typography.body,
             )
             EtaText(
-                text = "Sucht auf GitHub nach einer neueren Version. Installiert wird über " +
-                    "den Installer von Android, der noch einmal fragt — deine Daten bleiben.",
+                text = "Sucht auf GitHub nach einer neueren Version. Heruntergeladen wird " +
+                    "sie im Browser — tippe dort auf die fertige Datei, um sie zu " +
+                    "installieren. Deine Daten bleiben.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
@@ -1367,58 +1368,39 @@ private fun UpdateBox(viewModel: UpdateViewModel) {
                 UpdateState.Checking -> UpdateNote("Suche …")
                 is UpdateState.UpToDate -> UpdateNote("Du hast die neueste Version.")
                 is UpdateState.Failed -> UpdateNote(current.reason, color = EtaTheme.colors.danger)
-                is UpdateState.NeedsPermission -> UpdateNote(
-                    "Erlaube Eta in den Systemeinstellungen, Apps zu installieren, " +
-                        "komm zurück und tippe noch einmal auf „Installieren“.",
-                    color = EtaTheme.colors.warning,
-                )
-                is UpdateState.Downloading -> UpdateNote(
-                    "Lädt herunter … ${(current.progress * 100).toInt()} % " +
-                        "von ${formatMegabytes(current.release.apkSize)}",
-                )
-                is UpdateState.Ready -> UpdateNote(
-                    "Heruntergeladen. Falls der Installer nicht aufgegangen ist, " +
-                        "tippe noch einmal auf „Installieren“.",
-                )
-                is UpdateState.Available -> Unit
-            }
-
-            val release = when (val current = state) {
-                is UpdateState.Available -> current.release
-                is UpdateState.NeedsPermission -> current.release
-                is UpdateState.Downloading -> current.release
-                is UpdateState.Ready -> current.release
-                is UpdateState.Failed -> current.release
-                else -> null
-            }
-            if (release != null) {
-                EtaText(
-                    text = "Neue Version: ${release.tag}",
-                    style = EtaTheme.typography.bodyStrong,
-                    color = EtaTheme.colors.accent,
-                )
-                val notes = plainNotes(release.notes)
-                if (notes.isNotEmpty()) {
+                is UpdateState.Available -> {
                     EtaText(
-                        text = notes,
-                        style = EtaTheme.typography.caption,
-                        color = EtaTheme.colors.textSecondary,
+                        text = "Neue Version: ${current.release.tag}",
+                        style = EtaTheme.typography.bodyStrong,
+                        color = EtaTheme.colors.accent,
                     )
+                    val notes = plainNotes(current.release.notes)
+                    if (notes.isNotEmpty()) {
+                        EtaText(
+                            text = notes,
+                            style = EtaTheme.typography.caption,
+                            color = EtaTheme.colors.textSecondary,
+                        )
+                    }
+                    if (current.opened) {
+                        UpdateNote(
+                            "Der Download läuft im Browser. Ist er fertig, tippe auf die " +
+                                "Datei. Fragt Android, ob der Browser Apps installieren " +
+                                "darf: erlauben und noch einmal auf die Datei tippen.",
+                        )
+                    }
                 }
             }
 
-            val busy = state is UpdateState.Checking || state is UpdateState.Downloading
             Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-                if (release != null) {
-                    EtaButton(
-                        text = "Installieren (${formatMegabytes(release.apkSize)})",
-                        enabled = !busy,
-                        onClick = { viewModel.install(release) },
+                when (val current = state) {
+                    is UpdateState.Available -> EtaButton(
+                        text = "Herunterladen (${formatMegabytes(current.release.apkSize)})",
+                        onClick = { viewModel.download(current.release) },
                     )
-                } else {
-                    EtaButton(
+                    else -> EtaButton(
                         text = "Nach Updates suchen",
-                        enabled = !busy,
+                        enabled = state != UpdateState.Checking,
                         onClick = viewModel::check,
                     )
                 }

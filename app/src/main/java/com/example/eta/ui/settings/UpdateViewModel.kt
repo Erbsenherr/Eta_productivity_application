@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.eta.data.update.UpdateService
 import com.example.eta.domain.update.Release
 import com.example.eta.domain.update.isNewer
-import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -20,21 +19,17 @@ sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data class UpToDate(val latest: String) : UpdateState
-    data class Available(val release: Release) : UpdateState
-    /** Waiting for the user to allow Eta to install apps, in the system settings. */
-    data class NeedsPermission(val release: Release) : UpdateState
-    data class Downloading(val release: Release, val progress: Float) : UpdateState
-    data class Ready(val release: Release, val apk: File) : UpdateState
-    data class Failed(val reason: String, val release: Release? = null) : UpdateState
+    /** [opened]: the download has been handed to the browser at least once. */
+    data class Available(val release: Release, val opened: Boolean = false) : UpdateState
+    data class Failed(val reason: String) : UpdateState
 }
 
 /**
  * The "App-Update" page of the settings tab.
  *
  * Its own view model, like the calendar's: it shares nothing with the draft of
- * the stored answers. Held by the tab, so a download goes on while another page
- * is open, and the intents it asks for are handed out one at a time through
- * [launch] for the screen to start — a view model has no activity to start them from.
+ * the stored answers. The browser intent it asks for is handed out through
+ * [launch] for the screen to start — a view model has no activity to start it from.
  */
 class UpdateViewModel(private val service: UpdateService) : ViewModel() {
 
@@ -69,36 +64,10 @@ class UpdateViewModel(private val service: UpdateService) : ViewModel() {
         }
     }
 
-    /**
-     * Downloads [release] and opens the installer — or, while Eta may not
-     * install apps, the system page that allows it first. Pressed again after
-     * coming back from there, it carries on.
-     */
-    fun install(release: Release) {
-        if (job?.isActive == true) return
-        if (!service.mayInstall()) {
-            _state.value = UpdateState.NeedsPermission(release)
-            _launch.value = service.installPermissionIntent()
-            return
-        }
-        (_state.value as? UpdateState.Ready)?.takeIf { it.release == release && it.apk.exists() }?.let {
-            _launch.value = service.installIntent(it.apk)
-            return
-        }
-        job = viewModelScope.launch {
-            _state.value = UpdateState.Downloading(release, 0f)
-            _state.value = try {
-                val apk = service.download(release) { progress ->
-                    _state.value = UpdateState.Downloading(release, progress)
-                }
-                _launch.value = service.installIntent(apk)
-                UpdateState.Ready(release, apk)
-            } catch (failure: CancellationException) {
-                throw failure
-            } catch (failure: Exception) {
-                UpdateState.Failed(reasonOf(failure, "Der Download ist abgebrochen."), release)
-            }
-        }
+    /** Hands [release]'s APK to the browser. */
+    fun download(release: Release) {
+        _launch.value = service.downloadIntent(release)
+        _state.value = UpdateState.Available(release, opened = true)
     }
 
     /** The screen has started what [launch] asked for. */

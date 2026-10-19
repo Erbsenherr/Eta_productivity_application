@@ -21,10 +21,14 @@ try {
 
     $bt = "$env:ANDROID_HOME\build-tools\36.1.0"
     $out = "dist\eta-release-$stamp.apk"
+    # apksigner's JVM prints warnings to stderr, which Windows PowerShell turns
+    # into errors once stderr is redirected; the exit code is what counts.
+    $ErrorActionPreference = "Continue"
     & "$bt\apksigner.bat" sign --ks "$env:USERPROFILE\.android\debug.keystore" `
         --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey `
-        --out $out app\build\outputs\apk\release\app-release-unsigned.apk
+        --out $out app\build\outputs\apk\release\app-release-unsigned.apk 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
+    $ErrorActionPreference = "Stop"
 } finally {
     Pop-Location
 }

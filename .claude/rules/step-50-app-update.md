@@ -42,18 +42,15 @@ left out in the tutorial's sandbox. `UpdateViewModel` → `UpdateService`
 (`data/update/`, plain `HttpURLConnection` like the calendar).
 
 - **Nothing is fetched until the button is pressed.** No check at start.
-- The APK goes to `cacheDir/updates/` (earlier ones deleted first) and is
-  **read before it is handed over**: it must be a readable archive, this
-  package, and a higher `versionCode` — so a broken download is said in words
-  rather than as the installer's "App nicht installiert".
-- **Android's installer does the installing** — `ACTION_VIEW` on a
-  `FileProvider` URI (authority `<applicationId>.updates`,
-  `res/xml/update_paths.xml`). It asks the user each time; nothing installs
-  silently, and it refuses an APK signed with another key.
-- **`REQUEST_INSTALL_PACKAGES`** is in the manifest; from Android 8 the user
-  must also allow it per app. While `canRequestPackageInstalls` says no, the
-  button opens the system page instead (`NeedsPermission`), and pressed again
-  afterwards it carries on.
+- **Eta looks, the browser fetches.** "Herunterladen" opens the APK's
+  `browser_download_url` with `ACTION_VIEW`; the browser downloads it, and a tap
+  on the finished file brings up Android's installer. The browser needs
+  "unbekannte Apps installieren" once, not Eta.
+- **Never `REQUEST_INSTALL_PACKAGES`, never a download in Eta.** The first
+  build of this step had both — download into the cache, a `FileProvider`, the
+  installer opened on it — and Play Protect flagged that APK as harmful on
+  installing: an app that downloads APKs and may install them is what a dropper
+  looks like. Taken out the same day; do not put it back.
 - Failures are sentences: the service's own `IOException`s are written for the
   page; anything the network throws (subclasses, JSON) gets a fallback.
 

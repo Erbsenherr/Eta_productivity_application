@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The one folder FileProvider may lend out: updates downloaded by UpdateService. -->
-<paths>
-    <cache-path name="updates" path="updates/" />
-</paths>
