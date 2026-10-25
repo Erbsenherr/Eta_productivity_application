@@ -56,7 +56,7 @@ import com.example.eta.domain.setup.UserSetup
         HabitStreak::class,
         SubtaskTimer::class,
     ],
-    version = 34,
+    version = 35,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1057,6 +1057,41 @@ val MIGRATION_33_34 = object : Migration(33, 34) {
         )
         connection.execSQL(
             "CREATE INDEX IF NOT EXISTS `index_subtask_timers_subtaskId` ON `subtask_timers` (`subtaskId`)",
+        )
+    }
+}
+
+/**
+ * Step 52: the evening routine, one-off rewards, and the weekend in the planner.
+ *
+ * - The questionnaire's "Bettfertig machen" rows become the **Abendroutine**:
+ *   renamed where they still carry the old name, and `routineMode` on for every
+ *   one of them, as the settings would write it at their next save.
+ * - **`rewards.once`** (`NOT NULL DEFAULT 0`), `condition`, `dueAt`,
+ *   `achievedAt` and `expiredAt`, the last four nullable.
+ * - **`user_setup.weekendPlanning`**, `NOT NULL DEFAULT 0` — the weekend stays
+ *   grey in the planner for everyone who upgrades.
+ */
+val MIGRATION_34_35 = object : Migration(34, 35) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `rewards` ADD COLUMN `once` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE `rewards` ADD COLUMN `condition` TEXT")
+        connection.execSQL("ALTER TABLE `rewards` ADD COLUMN `dueAt` INTEGER")
+        connection.execSQL("ALTER TABLE `rewards` ADD COLUMN `achievedAt` INTEGER")
+        connection.execSQL("ALTER TABLE `rewards` ADD COLUMN `expiredAt` INTEGER")
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `weekendPlanning` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL(
+            """
+            UPDATE `items` SET `routineMode` = 1
+            WHERE `id` = 'setup:bedprep' OR `id` LIKE 'setup:bedprep-%'
+            """.trimIndent(),
+        )
+        connection.execSQL(
+            """
+            UPDATE `items` SET `name` = 'Abendroutine', `normalizedName` = 'abendroutine'
+            WHERE (`id` = 'setup:bedprep' OR `id` LIKE 'setup:bedprep-%')
+              AND `name` = 'Bettfertig machen'
+            """.trimIndent(),
         )
     }
 }

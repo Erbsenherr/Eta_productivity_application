@@ -66,6 +66,11 @@ sound from a resource or a content URI, so they are **copied** into
 `app/src/main/res/raw/` — `sounds/` stays the source folder, `res/raw/` is what
 ships. Re-copy after changing one; nothing watches the folder.
 
+**Since step 52 the sounds are two groups** — Alarme (wake alarm, planning) and
+Benachrichtigungen — each with its own DND switch, its own switch for a phone
+on silent or vibrate, and its own volume; see *Step 52*. What follows about
+one DND switch and an unbeatable mute is how it stood.
+
 **Since step 51 every sound is chosen per moment** — one of Eta's files or a
 sound of the phone's, the wake alarm included — see *Step 51*. Where this file
 names a file for a moment, it describes the default.

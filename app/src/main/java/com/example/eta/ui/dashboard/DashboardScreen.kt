@@ -35,6 +35,7 @@ import com.example.eta.domain.planning.sleepPrompts
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.planning.timerWasUsed
 import com.example.eta.ui.components.ConfirmDialog
+import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.components.tutorialSpot
@@ -270,6 +271,8 @@ private fun TodayPage(
         var pomodoroFor by remember { mutableStateOf<Pair<BlockWithItem, Boolean>?>(null) }
 
         var confirming by remember { mutableStateOf<BlockWithItem?>(null) }
+        // A routine ticked in "Heute anstehend" with steps still open, by block id.
+        var routineTickId by remember { mutableStateOf<String?>(null) }
         val followUp by viewModel.followUp.collectAsStateWithLifecycle()
 
         // Timer-Tasks: the buttons under them, and the three things they can
@@ -379,6 +382,22 @@ private fun TodayPage(
             )
         }
 
+        routineTickId?.let { id ->
+            val entry = state.todayBlocks.firstOrNull { it.block.id == id && it.block.isOpen }
+            if (entry == null) {
+                routineTickId = null
+            } else {
+                RoutineTickDialog(
+                    name = entry.item.name,
+                    onDismiss = { routineTickId = null },
+                    onAnswer = { all ->
+                        viewModel.completeRoutine(entry, allSteps = all)
+                        routineTickId = null
+                    },
+                )
+            }
+        }
+
         // What to do with the time that just came free. Only put where the tick was
         // about now — see `askFollowUp`.
         followUp?.let { question ->
@@ -478,7 +497,11 @@ private fun TodayPage(
             onToggle = { entry ->
                 // A Timer-Task is not simply ticked off: with its timer started
                 // the tick is "Ende", and without it the screen asks first.
+                val openSteps = state.subtasks[entry.item.id].orEmpty()
+                    .any { it.id !in state.checked[entry.block.id].orEmpty() }
                 when {
+                    entry.item.routineMode && entry.block.isOpen && openSteps ->
+                        routineTickId = entry.block.id
                     !entry.item.timerTask || !entry.block.isOpen -> viewModel.toggleCompleted(entry)
                     entry.block.timerWasUsed -> viewModel.endTimer(entry.block.id)
                     else -> tickingTimerId = entry.block.id
@@ -680,4 +703,33 @@ private fun rememberTickingNow(): Instant {
         }
     }
     return now
+}
+
+/**
+ * A routine ticked off in "Heute anstehend" while steps of it are still open
+ * (step 52): do the steps count as done too? "Ja" bills the whole routine,
+ * "Nur die Routine" leaves the steps to the evening, as a tick always did.
+ */
+@Composable
+private fun RoutineTickDialog(
+    name: String,
+    onDismiss: () -> Unit,
+    onAnswer: (allSteps: Boolean) -> Unit,
+) {
+    EtaDialog(title = "Ganze Routine erledigt?", onDismiss = onDismiss) {
+        EtaText(
+            text = "Gilt das Abhaken von »$name« für alle Schritte? Bei »Ja« werden alle " +
+                "noch offenen Schritte mit abgehakt, und die Routine zählt voll.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        EtaButton(text = "Ja, alle Schritte", modifier = Modifier.fillMaxWidth(), onClick = { onAnswer(true) })
+        EtaButton(
+            text = "Nur die Routine",
+            style = EtaButtonStyle.Secondary,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onAnswer(false) },
+        )
+        EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+    }
 }

@@ -237,6 +237,8 @@ sealed interface PendingPlacement {
         override val name: String,
         val attributes: TodoAttributes,
         override val note: String,
+        /** A "Termin": the same card, laid down as [BlockOrigin.APPOINTMENT] and fixed there. */
+        val appointment: Boolean = false,
     ) : PendingPlacement
 
     data class Spend(
@@ -561,7 +563,11 @@ class DayPlannerViewModel(
                 // On the block: a card made for one slot has one occurrence, and
                 // this is the note the edit dialog shows for it.
                 note = pending.note.ifBlank { null },
-                origin = BlockOrigin.DRAGGED,
+                origin = if (pending is PendingPlacement.Todo && pending.appointment) {
+                    BlockOrigin.APPOINTMENT
+                } else {
+                    BlockOrigin.DRAGGED
+                },
                 createdAt = now,
                 updatedAt = now,
             ).stampedWith(item),
@@ -1034,9 +1040,15 @@ class DayPlannerViewModel(
      * half past four tomorrow. This creates it already concretized and already on
      * the day, so a spontaneous thought does not have to wait for a phase.
      */
-    fun createTodo(name: String, attributes: TodoAttributes, note: String, atMinute: Int) {
+    fun createTodo(
+        name: String,
+        attributes: TodoAttributes,
+        note: String,
+        atMinute: Int,
+        appointment: Boolean = false,
+    ) {
         request(
-            PendingPlacement.Todo(name, attributes, note),
+            PendingPlacement.Todo(name, attributes, note, appointment),
             spanAt(
                 atMinute,
                 attributes.duration,

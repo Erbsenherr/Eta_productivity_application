@@ -88,7 +88,7 @@ data class Contract(
     val title: String,
     /** Was verlangt der Vertrag? */
     val conditions: String,
-    /** Was ist ein Vertragsbruch? */
+    /** "Ausnahmen, Sonderfälle" since step 52 — when the contract does not apply. The column kept its name. */
     val breachDefinition: String,
     val effort: ContractEffort,
     val signature: String,

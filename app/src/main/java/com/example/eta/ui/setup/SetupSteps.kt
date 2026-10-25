@@ -40,7 +40,7 @@ import com.example.eta.ui.attributes.CheckRow
 import com.example.eta.ui.attributes.RecurringAttributeFields
 import com.example.eta.ui.attributes.RecurringAttributes
 import com.example.eta.ui.components.EtaTextField
-import com.example.eta.ui.subtasks.MorningRoutineSteps
+import com.example.eta.ui.subtasks.SetupRoutineSteps
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.WEEK
 import com.example.eta.domain.setup.WeeklySlot
@@ -73,6 +73,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
+import com.example.eta.domain.setup.SetupRoutine
 
 /** Shorthand for the answer callbacks: every step edits the one draft. */
 typealias OnSetupChange = ((UserSetup) -> UserSetup) -> Unit
@@ -174,13 +175,15 @@ fun SleepStep(
     draft: UserSetup,
     onChange: OnSetupChange,
     /**
-     * The morning routine's steps, where they can be given here — the
+     * The steps of the two routines, where they can be given here — the
      * questionnaire, which holds them until there is a task to put them on.
-     * Null in the settings, which edit the stored ones in a box of their own.
+     * Null in the settings, which edit the stored ones in boxes of their own.
      */
-    morningSteps: List<SubtaskDraft>? = null,
-    onMorningSteps: (List<SubtaskDraft>) -> Unit = {},
+    routineSteps: Map<SetupRoutine, List<SubtaskDraft>>? = null,
+    onRoutineSteps: (SetupRoutine, List<SubtaskDraft>) -> Unit = { _, _ -> },
 ) {
+    val morningSteps = routineSteps?.let { it[SetupRoutine.MORNING].orEmpty() }
+    val eveningSteps = routineSteps?.let { it[SetupRoutine.EVENING].orEmpty() }
     StepCard(
         title = "Schlaf und Morgen",
         description = "Schlafzeiten werden im Tagesplaner farblich hinterlegt und aus den " +
@@ -196,7 +199,10 @@ fun SleepStep(
             // further down, and asking them here as well would be an eighth
             // answer that means nothing.
             if (mode != NightMode.PER_DAY) {
-                EtaField(label = "Bettfertig machen ab", hint = "Wird als tägliche Aufgabe angelegt.") {
+                EtaField(
+                    label = "Abendroutine ab",
+                    hint = "Wird als tägliche Aufgabe angelegt und dauert bis zum Schlafengehen.",
+                ) {
                     EtaTimePicker(
                         value = draft.bedPrepTime,
                         onValueChange = { time -> onChange { it.copy(bedPrepTime = time) } },
@@ -256,17 +262,36 @@ fun SleepStep(
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
-                    MorningRoutineSteps(
+                    SetupRoutineSteps(
                         steps = morningSteps,
-                        onSave = onMorningSteps,
+                        onSave = { onRoutineSteps(SetupRoutine.MORNING, it) },
                         routineLength = draft.morningDuration,
+                    )
+                }
+            }
+            if (eveningSteps != null) {
+                // Optional, like the morning's: without steps the evening is a block.
+                Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaText(text = "Schritte der Abendroutine", style = EtaTheme.typography.bodyStrong)
+                    EtaText(
+                        text = "Freiwillig — Zähneputzen, Tasche packen, Lesen. Abends zeigt " +
+                            "dir das Dashboard dann immer nur den nächsten Schritt. Geht " +
+                            "auch später in den Einstellungen.",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                    SetupRoutineSteps(
+                        steps = eveningSteps,
+                        onSave = { onRoutineSteps(SetupRoutine.EVENING, it) },
+                        routineLength = draft.bedPrepDuration().takeIf { mode != NightMode.PER_DAY },
+                        routine = SetupRoutine.EVENING,
                     )
                 }
             }
             if (mode != NightMode.PER_DAY) {
                 DerivedHint(
                     "Nacht: ${draft.sleepDuration().formatShort()} · " +
-                        "Bettfertig: ${draft.bedPrepDuration().formatShort()}",
+                        "Abendroutine: ${draft.bedPrepDuration().formatShort()}",
                 )
             }
 
@@ -318,7 +343,7 @@ fun SleepStep(
                 // midnight, which falls on the day of getting up.
                 val days = DEFAULT_WEEKEND
                 EtaField(
-                    label = "Bettfertig machen ab (${formatWeekdays(weekend.bedPrepDays(days))})",
+                    label = "Abendroutine ab (${formatWeekdays(weekend.bedPrepDays(days))})",
                 ) {
                     EtaTimePicker(
                         value = weekend.bedPrep,
@@ -350,7 +375,7 @@ fun SleepStep(
                 }
                 DerivedHint(
                     "Nacht am Wochenende: ${weekend.sleepDuration().formatShort()} · " +
-                        "Bettfertig: ${weekend.bedPrepDuration().formatShort()}",
+                        "Abendroutine: ${weekend.bedPrepDuration().formatShort()}",
                 )
             }
 
@@ -369,7 +394,7 @@ fun SleepStep(
                     ) {
                         val one = setOf(wakeDay)
                         EtaField(
-                            label = "Bettfertig machen ab (${formatWeekdays(night.bedPrepDays(one))})",
+                            label = "Abendroutine ab (${formatWeekdays(night.bedPrepDays(one))})",
                         ) {
                             EtaTimePicker(
                                 value = night.bedPrep,
@@ -401,7 +426,7 @@ fun SleepStep(
                         }
                         DerivedHint(
                             "Nacht: ${night.sleepDuration().formatShort()} · " +
-                                "Bettfertig: ${night.bedPrepDuration().formatShort()}",
+                                "Abendroutine: ${night.bedPrepDuration().formatShort()}",
                         )
                     }
                 }

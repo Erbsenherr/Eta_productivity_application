@@ -12,6 +12,7 @@ import com.example.eta.domain.reward.RewardTarget
 import com.example.eta.domain.reward.earningsOf
 import com.example.eta.domain.reward.pourInto
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -98,6 +99,42 @@ class RewardRepository(
         )
         rewardDao.upsert(reward)
         bind(reward.id, itemIds)
+    }
+
+    /**
+     * A one-off reward (step 52), last in the list: a goal in words and, if
+     * given, a date by which it is asked about. No price and no binding.
+     */
+    suspend fun createOnce(name: String, condition: String, dueAt: Instant?) {
+        val now = clock.now()
+        rewardDao.upsert(
+            Reward(
+                name = name,
+                cost = 0.0,
+                position = rewardDao.lastPosition() + 1,
+                once = true,
+                condition = condition.ifBlank { null },
+                dueAt = dueAt,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+    }
+
+    /** "Ziel erreicht": a one-off becomes full and can be taken. */
+    suspend fun achieve(id: String) {
+        val reward = rewardDao.findById(id) ?: return
+        if (!reward.once || reward.isPast || reward.achievedAt != null) return
+        val now = clock.now()
+        rewardDao.upsert(reward.copy(achievedAt = now, updatedAt = now))
+    }
+
+    /** "Nicht erreicht" at its date: a one-off goes into the history unearned. */
+    suspend fun expire(id: String) {
+        val reward = rewardDao.findById(id) ?: return
+        if (!reward.once || reward.isPast || reward.achievedAt != null) return
+        val now = clock.now()
+        rewardDao.upsert(reward.copy(expiredAt = now, updatedAt = now))
     }
 
     /**

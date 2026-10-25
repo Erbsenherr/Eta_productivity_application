@@ -627,7 +627,7 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
             "erledigt wird. Was nicht auf deiner Wochenliste steht, setzt du direkt " +
             "in den Tag: Halte eine freie Stelle gedrückt, schiebe die Box zurecht " +
             "und ziehe sie mit zwei Fingern länger oder kürzer. »Bestätigen« fragt " +
-            "dann, was daraus wird — ein neues ToDo, eine Pause oder »Custom«.",
+            "dann, was daraus wird — ein neues ToDo, ein Termin, eine Pause oder »Custom«.",
     ),
     text(
         TutorialStage.PLANNER,

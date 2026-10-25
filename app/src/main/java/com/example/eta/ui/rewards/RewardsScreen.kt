@@ -58,6 +58,10 @@ import com.example.eta.ui.theme.EtaTheme
 import kotlin.math.roundToInt
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.example.eta.ui.components.LocalEtaClock
+import com.example.eta.ui.format.formatClock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.toInstant
 
 /**
  * The Belohn-o-mat tab: long-term rewards, in the order they are worked off.
@@ -78,6 +82,14 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
     // dialog is a window on top of a window.
     var draft by remember { mutableStateOf<RewardDraft?>(null) }
     var stage by remember { mutableStateOf(EditorStage.REWARD) }
+    // Step 52: the question before either form, and the one-off's own draft.
+    var choosingKind by remember { mutableStateOf(false) }
+    var onceDraft by remember { mutableStateOf<OnceRewardDraft?>(null) }
+    val clock = LocalEtaClock.current
+    val zone = TimeZone.currentSystemDefault()
+    val today = clock.now().toLocalDateTime(zone).date
+    // A one-off whose date has come, asked about once per visit unless answered.
+    var postponed by remember { mutableStateOf(emptySet<String>()) }
     var deleting by remember { mutableStateOf<String?>(null) }
     val archive = rememberFold("rewards.redeemed")
 
@@ -114,6 +126,7 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
                     rows = state.open,
                     onDelete = { deleting = it },
                     onRedeem = viewModel::redeem,
+                    onAchieve = viewModel::achieve,
                     onReorder = viewModel::reorder,
                 )
                 EtaText(
@@ -128,10 +141,7 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
 
             EtaButton(
                 text = "Belohnung erstellen",
-                onClick = {
-                    draft = RewardDraft()
-                    stage = EditorStage.REWARD
-                },
+                onClick = { choosingKind = true },
             )
 
             if (state.redeemed.isNotEmpty()) {
@@ -146,6 +156,52 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
         }
     }
 
+    if (choosingKind) {
+        RewardKindDialog(
+            onOnce = {
+                choosingKind = false
+                onceDraft = OnceRewardDraft()
+            },
+            onDaily = {
+                choosingKind = false
+                draft = RewardDraft()
+                stage = EditorStage.REWARD
+            },
+            onDismiss = { choosingKind = false },
+        )
+    }
+
+    onceDraft?.let { current ->
+        OnceRewardDialog(
+            draft = current,
+            today = today,
+            onChange = { onceDraft = it },
+            onBack = {
+                onceDraft = null
+                choosingKind = true
+            },
+            onSave = {
+                viewModel.createOnce(
+                    name = current.name.trim(),
+                    condition = current.condition.trim(),
+                    dueAt = current.date?.let { LocalDateTime(it, current.time).toInstant(zone) },
+                )
+                onceDraft = null
+            },
+        )
+    }
+
+    // The small popup the date brings (step 52), one reward at a time.
+    state.open.firstOrNull { it.reward.isDue(clock.now()) && it.reward.id !in postponed }?.let { row ->
+        RewardDueDialog(
+            name = row.reward.name,
+            condition = row.reward.condition,
+            onReached = { viewModel.achieve(row.reward.id) },
+            onMissed = { viewModel.expire(row.reward.id) },
+            onLater = { postponed = postponed + row.reward.id },
+        )
+    }
+
     draft?.let { current ->
         when (stage) {
             EditorStage.REWARD -> RewardEditDialog(
@@ -153,7 +209,10 @@ fun RewardsScreen(viewModel: RewardsViewModel) {
                 groups = state.groups,
                 onChange = { draft = it },
                 onBind = { stage = EditorStage.BINDING },
-                onDismiss = { draft = null },
+                onDismiss = {
+                    draft = null
+                    choosingKind = true
+                },
                 onSave = {
                     viewModel.create(current.name.trim(), current.cost, current.itemIds)
                     draft = null
@@ -231,6 +290,7 @@ private fun RewardList(
     rows: List<RewardRow>,
     onDelete: (String) -> Unit,
     onRedeem: (String) -> Unit,
+    onAchieve: (String) -> Unit,
     onReorder: (List<String>) -> Unit,
 ) {
     // The order being shown: the stored one, except while a drag rearranges it.
@@ -259,6 +319,7 @@ private fun RewardList(
                     role = roles[id] ?: RewardRole.WAITING,
                     dragging = dragging,
                     onRedeem = { onRedeem(id) },
+                    onAchieve = { onAchieve(id) },
                     modifier = Modifier
                         .onSizeChanged { heights[id] = it.height }
                         .offset {
@@ -350,6 +411,7 @@ private fun RewardCard(
     role: RewardRole,
     dragging: Boolean,
     onRedeem: () -> Unit,
+    onAchieve: () -> Unit,
     modifier: Modifier = Modifier,
     handle: Modifier = Modifier,
 ) {
@@ -392,7 +454,9 @@ private fun RewardCard(
                     )
                     EtaText(
                         text = when {
+                            full && reward.once -> "Ziel erreicht — bereit zum Einlösen"
                             full -> "Erarbeitet — bereit zum Einlösen"
+                            reward.once -> "Einmalig" + (reward.dueAt?.let { " · bis ${formatDue(it)}" } ?: "")
                             role == RewardRole.FILLING -> "Füllt sich gerade"
                             role == RewardRole.COLLECTING -> "Sammelt aus gebundenen Aufgaben"
                             else -> "Wartet"
@@ -407,16 +471,19 @@ private fun RewardCard(
                     )
                 }
                 Spacer(Modifier.size(EtaTheme.spacing.md))
-                Column(horizontalAlignment = Alignment.End) {
-                    EtaText(
-                        text = "${formatPoints(reward.progress)} / ${formatPoints(reward.cost)}",
-                        style = EtaTheme.typography.heading,
-                    )
-                    EtaText(
-                        text = "${(reward.fraction * 100).toInt()} %",
-                        style = EtaTheme.typography.caption,
-                        color = EtaTheme.colors.textMuted,
-                    )
+                // A one-off collects no points, so it has no figures to show.
+                if (!reward.once) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        EtaText(
+                            text = "${formatPoints(reward.progress)} / ${formatPoints(reward.cost)}",
+                            style = EtaTheme.typography.heading,
+                        )
+                        EtaText(
+                            text = "${(reward.fraction * 100).toInt()} %",
+                            style = EtaTheme.typography.caption,
+                            color = EtaTheme.colors.textMuted,
+                        )
+                    }
                 }
                 EtaText(
                     text = "≡",
@@ -441,8 +508,20 @@ private fun RewardCard(
                 )
             }
 
+            reward.condition?.takeIf { reward.once }?.let { condition ->
+                EtaText(
+                    text = "Ziel: $condition",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
             if (full) {
                 EtaButton(text = "Einlösen", onClick = onRedeem)
+            } else if (reward.once) {
+                EtaButton(text = "Ziel erreicht", style = EtaButtonStyle.Secondary, onClick = onAchieve)
             }
         }
     }
@@ -465,7 +544,7 @@ private fun RedeemedBox(rows: List<RewardRow>, open: Boolean, onToggle: () -> Un
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 EtaText(
-                    text = "Eingelöst",
+                    text = if (rows.any { it.reward.isExpired }) "Eingelöst und verfallen" else "Eingelöst",
                     style = EtaTheme.typography.heading,
                     modifier = Modifier.weight(1f),
                 )
@@ -497,11 +576,13 @@ private fun RedeemedBox(rows: List<RewardRow>, open: Boolean, onToggle: () -> Un
                                 color = EtaTheme.colors.textMuted,
                             )
                         }
-                        EtaText(
-                            text = formatPoints(row.reward.cost),
-                            style = EtaTheme.typography.bodyStrong,
-                            color = EtaTheme.colors.success,
-                        )
+                        if (!row.reward.once) {
+                            EtaText(
+                                text = formatPoints(row.reward.cost),
+                                style = EtaTheme.typography.bodyStrong,
+                                color = EtaTheme.colors.success,
+                            )
+                        }
                     }
                 }
             }
@@ -509,9 +590,14 @@ private fun RedeemedBox(rows: List<RewardRow>, open: Boolean, onToggle: () -> Un
     }
 }
 
-private fun redeemedOn(reward: Reward): String =
-    reward.redeemedAt
-        ?.toLocalDateTime(TimeZone.currentSystemDefault())
-        ?.date
-        ?.formatLong()
-        .orEmpty()
+private fun redeemedOn(reward: Reward): String {
+    val zone = TimeZone.currentSystemDefault()
+    reward.expiredAt?.let { return "Verfallen am " + it.toLocalDateTime(zone).date.formatLong() }
+    return reward.redeemedAt?.toLocalDateTime(zone)?.date?.formatLong().orEmpty()
+}
+
+/** A one-off's date as the card says it: "12. Okt., 18:00". */
+private fun formatDue(at: kotlin.time.Instant): String {
+    val local = at.toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${local.date.formatLong()}, ${local.time.formatClock()}"
+}

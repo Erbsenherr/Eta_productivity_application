@@ -38,6 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Priority
+import com.example.eta.domain.planning.UnplannedTone
+import com.example.eta.domain.planning.unplannedMinutes
+import com.example.eta.domain.planning.unplannedTone
 import com.example.eta.domain.planning.BreakFindings
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.planning.PlannerWarning
@@ -59,10 +62,12 @@ import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatLong
+import com.example.eta.ui.format.formatMinutes
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.alertRed
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -523,13 +528,20 @@ fun DayPlannerScreen(
 
     newEntry?.let { (box, kind) ->
         when (kind) {
-            NewEntryKind.TODO -> NewTodoDialog(
+            NewEntryKind.TODO, NewEntryKind.APPOINTMENT -> NewTodoDialog(
                 today = state.date,
                 foldCandidates = state.foldable.foldCandidatesExcept(),
                 duration = box.duration,
+                appointment = kind == NewEntryKind.APPOINTMENT,
                 onDismiss = { newEntry = null },
                 onCreate = { name, attributes, note ->
-                    viewModel.createTodo(name, attributes, note, box.startMinute)
+                    viewModel.createTodo(
+                        name,
+                        attributes,
+                        note,
+                        box.startMinute,
+                        appointment = kind == NewEntryKind.APPOINTMENT,
+                    )
                     newEntry = null
                 },
             )
@@ -565,7 +577,7 @@ fun DayPlannerScreen(
             val usual = setup.nightEndingOn(wakeDate.dayOfWeek)
             NightEditDialog(
                 title = "Nacht auf ${wakeDate.formatLong()}",
-                scope = "Gilt nur für diese eine Nacht. Morgenroutine, »Bettfertig machen« " +
+                scope = "Gilt nur für diese eine Nacht. Morgen- und Abendroutine " +
                     "und der Weckruf wandern mit. Deine üblichen Zeiten änderst du im " +
                     "Dashboard unter »Woche« oder in den Einstellungen.",
                 night = setup.nightEndingOn(wakeDate, state.nightOverrides),
@@ -891,6 +903,7 @@ private fun PlannerHeader(
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textSecondary,
             )
+            UnplannedLine(state)
             // Here as well as on the dashboard, because this is where a rate is
             // chosen: placing a Custom Spend should visibly cost something.
             if (LocalPointsVisible.current) {
@@ -907,6 +920,30 @@ private fun PlannerHeader(
         }
         EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = onClose)
     }
+}
+
+/**
+ * How much of the waking day still carries nothing — always in sight while a
+ * day is planned (step 52). Red past the two hours the evening forgives, green
+ * up to them, grey on a weekend day unless Flexibilität asks for it there too.
+ */
+@Composable
+private fun UnplannedLine(state: PlannerUiState) {
+    val minutes = unplannedMinutes(state.blocks + state.freed, state.sleep)
+    val tone = unplannedTone(
+        minutes = minutes,
+        weekend = state.setup?.weekendDays?.contains(state.date.dayOfWeek) == true,
+        weekendPlanning = state.setup?.weekendPlanning == true,
+    )
+    EtaText(
+        text = "Unverplant: ${formatMinutes(minutes)}",
+        style = EtaTheme.typography.caption,
+        color = when (tone) {
+            UnplannedTone.OVER -> EtaTheme.colors.alertRed
+            UnplannedTone.WITHIN -> EtaTheme.colors.success
+            UnplannedTone.RELAXED -> EtaTheme.colors.textMuted
+        },
+    )
 }
 
 @Composable

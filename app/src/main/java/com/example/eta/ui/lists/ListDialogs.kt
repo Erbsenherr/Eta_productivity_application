@@ -59,13 +59,14 @@ import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.subtasks.FoldCandidate
 import com.example.eta.domain.subtask.SubtaskDraft
-import com.example.eta.ui.subtasks.MorningRoutineSteps
+import com.example.eta.ui.subtasks.SetupRoutineSteps
 import com.example.eta.ui.theme.EtaTheme
 import kotlin.time.Duration
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.example.eta.domain.setup.SetupRoutine
 
 @Composable
 private fun ListDialog(
@@ -609,10 +610,10 @@ fun recurringSummary(group: RecurringGroup): String = buildString {
 /**
  * A standing task, tapped in the list.
  *
- * [ownedBySettings] marks the two that hang off the night — Bettfertig machen and
+ * [ownedBySettings] marks the two that hang off the night — the Abendroutine and
  * the Morgenroutine. They are shown so the list is complete, and changed where
  * the night is: in the settings, which regenerate them from the sleep and wake
- * times. The one exception is the routine's **steps** ([morningSteps] non-null):
+ * times. The one exception is a routine's **steps** ([routine] non-null):
  * those are the user's, not derived from anything, and can be changed here too.
  */
 @Composable
@@ -622,8 +623,9 @@ fun RecurringGroupDialog(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onEnd: () -> Unit,
-    morningSteps: List<SubtaskDraft>? = null,
-    onMorningSteps: (List<SubtaskDraft>) -> Unit = {},
+    routine: SetupRoutine? = null,
+    routineSteps: Map<SetupRoutine, List<SubtaskDraft>> = emptyMap(),
+    onRoutineSteps: (SetupRoutine, List<SubtaskDraft>) -> Unit = { _, _ -> },
 ) {
     val item = group.representative
     var confirmingEnd by remember(group.ids) { mutableStateOf(false) }
@@ -649,20 +651,22 @@ fun RecurringGroupDialog(
         }
 
         if (ownedBySettings) {
-            if (morningSteps != null) {
+            if (routine != null) {
                 EtaField(
                     label = "Schritte",
-                    hint = "Im Routine-Modus: einer nach dem anderen. Gilt für jeden Morgen.",
+                    hint = "Im Routine-Modus: einer nach dem anderen. Gilt für jeden " +
+                        if (routine == SetupRoutine.MORNING) "Morgen." else "Abend.",
                 ) {
-                    MorningRoutineSteps(
-                        steps = morningSteps,
-                        onSave = onMorningSteps,
+                    SetupRoutineSteps(
+                        steps = routineSteps[routine].orEmpty(),
+                        onSave = { onRoutineSteps(routine, it) },
                         routineLength = item.estimatedDuration,
+                        routine = routine,
                     )
                 }
             }
             EtaText(
-                text = if (morningSteps != null) {
+                text = if (routine != null) {
                     "Uhrzeit und Dauer hängen an deinen Schlafzeiten und werden in den " +
                         "Einstellungen unter „Schlaf und Morgen“ geändert."
                 } else {

@@ -41,6 +41,9 @@ enum class RewardRole {
 
     /** Earned in full, waiting to be redeemed. */
     FULL,
+
+    /** A one-off (step 52): waits for its goal, not for points. */
+    GOAL,
 }
 
 /**
@@ -52,7 +55,7 @@ enum class RewardRole {
  * rather than quietly counting somewhere else; redeemed, it lets them go.
  */
 fun claimsOf(targets: List<RewardTarget>): Map<String, Reward> = buildMap {
-    targets.filter { !it.reward.isRedeemed }.forEach { target ->
+    targets.filter { !it.reward.isPast && !it.reward.once }.forEach { target ->
         target.boundNames.forEach { name -> putIfAbsent(name, target.reward) }
     }
 }
@@ -60,9 +63,10 @@ fun claimsOf(targets: List<RewardTarget>): Map<String, Reward> = buildMap {
 /** What each reward not yet redeemed is doing, by its id — see [RewardRole]. */
 fun rolesOf(targets: List<RewardTarget>): Map<String, RewardRole> {
     val head = targets.firstOrNull { !it.isBound && it.reward.isFilling }?.reward?.id
-    return targets.filter { !it.reward.isRedeemed }.associate { target ->
+    return targets.filter { !it.reward.isPast }.associate { target ->
         target.reward.id to when {
             target.reward.isFull -> RewardRole.FULL
+            target.reward.once -> RewardRole.GOAL
             target.isBound -> RewardRole.COLLECTING
             target.reward.id == head -> RewardRole.FILLING
             else -> RewardRole.WAITING

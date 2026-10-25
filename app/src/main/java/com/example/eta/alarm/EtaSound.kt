@@ -28,13 +28,20 @@ import com.example.eta.domain.sound.etaFile
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import com.example.eta.domain.sound.GroupAudio
+import com.example.eta.domain.sound.SoundGroup
+import com.example.eta.domain.sound.group
+import com.example.eta.domain.sound.mayPlay
+import com.example.eta.domain.sound.playbackVolume
 
 /**
  * Every sound Eta makes, played by Eta rather than by a notification channel.
  *
  * The user's rule, and it is a different rule from Android's: **"Nicht stören"
  * silences the app, and so does a phone switched to silent or vibrate** (the
- * second since step 44) — the notification *volume* does not. A notification
+ * second since step 44) — unless the user said a group plays through it, and
+ * since step 52 each of the two groups ([SoundGroup]) has both switches and a
+ * volume of its own. A notification
  * channel's sound rides whatever
  * stream its usage names and is scaled by that stream's volume, so turning the
  * notification volume down to nothing used to silence the task start along with
@@ -51,7 +58,7 @@ import androidx.core.content.getSystemService
  *   ignore the one switch the user *does* want to silence them. Any interruption
  *   filter other than "all" counts as on — priority-only, alarms-only, total
  *   silence — since each of them is the user having asked for quiet. The user
- *   can switch the check off ([ignoresDoNotDisturb]); what plays then is up to
+ *   can switch the check off per group ([groupAudio]); what plays then is up to
  *   the phone, which lets the alarm stream through everything but total silence.
  *
  * A useful side effect: the sound no longer depends on the notification
@@ -101,18 +108,33 @@ object EtaSound {
     }
 
     /**
-     * Whether the user chose to be told through Do-Not-Disturb as well.
+     * How [group] behaves under quiet and how loud it is (step 52) — the
+     * "Alarme" and "Benachrichtigungen" pages.
      *
-     * Off unless switched on in the Alarme card. In `SharedPreferences` rather
-     * than `user_setup`, because this object is called from receivers with a
-     * context and nothing else, and the answer has to be there without a
-     * database read between the alarm and its sound.
+     * In `SharedPreferences` rather than `user_setup`, because this object is
+     * called from receivers with a context and nothing else, and the answer has
+     * to be there without a database read between the alarm and its sound.
+     * Before step 52 there was one switch for Do-Not-Disturb, for every sound;
+     * a group that has not been answered yet inherits it.
      */
-    fun ignoresDoNotDisturb(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_IGNORE_DND, false)
+    fun groupAudio(context: Context, group: SoundGroup): GroupAudio {
+        val prefs = prefs(context)
+        val legacy = prefs.getBoolean(KEY_IGNORE_DND, false)
+        val prefix = KEY_GROUP + group.name
+        return GroupAudio(
+            throughDoNotDisturb = prefs.getBoolean("$prefix.dnd", legacy),
+            throughSilentRinger = prefs.getBoolean("$prefix.silent", false),
+            constantVolume = prefs.getInt("$prefix.volume", -1).takeIf { it >= 0 },
+        )
+    }
 
-    fun setIgnoresDoNotDisturb(context: Context, ignore: Boolean) {
-        prefs(context).edit().putBoolean(KEY_IGNORE_DND, ignore).apply()
+    fun setGroupAudio(context: Context, group: SoundGroup, audio: GroupAudio) {
+        val prefix = KEY_GROUP + group.name
+        prefs(context).edit {
+            putBoolean("$prefix.dnd", audio.throughDoNotDisturb)
+            putBoolean("$prefix.silent", audio.throughSilentRinger)
+            putInt("$prefix.volume", audio.constantVolume ?: -1)
+        }
     }
 
     /**
@@ -129,22 +151,38 @@ object EtaSound {
     }
 
     /**
-     * Whether a sound should stay unplayed right now: quiet was asked for, and
-     * is respected.
+     * Whether a sound of [group] should stay unplayed right now: quiet was asked
+     * for, and is respected — unless the user said this group plays through it.
      *
-     * Two ways of asking. **Do-Not-Disturb**, which the user may tell Eta to
-     * play through ([ignoresDoNotDisturb]) — and while it is on, that switch
-     * alone decides, since most phones report the ringer as silent under it and
-     * the switch would otherwise do nothing. And the **ringer on silent or
-     * vibrate**, which has no way round it. The wake alarm asks neither.
+     * Two ways of asking, **Do-Not-Disturb** and the **ringer on silent or
+     * vibrate**, each with a switch per group since step 52; see [mayPlay] for
+     * how they combine. The wake alarm asks neither.
      */
-    fun isSilenced(context: Context): Boolean =
-        if (isDoNotDisturbOn(context)) !ignoresDoNotDisturb(context) else isRingerMuted(context)
+    fun isSilenced(context: Context, group: SoundGroup): Boolean =
+        !mayPlay(groupAudio(context, group), isDoNotDisturbOn(context), isRingerMuted(context))
+
+    /** Where the phone's notification slider stands, 0–1. */
+    private fun notificationLevel(audio: AudioManager?): Float {
+        audio ?: return 1f
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+        if (max <= 0) return 1f
+        return audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION).toFloat() / max
+    }
+
+    /**
+     * What the alarm stream is set to while a sound of [group] plays — see
+     * [playbackVolume]. Null leaves it alone; zero means the sound is skipped.
+     */
+    fun volumeFor(context: Context, group: SoundGroup): Float? {
+        val app = context.applicationContext
+        return playbackVolume(group, groupAudio(app, group), notificationLevel(app.getSystemService()))
+    }
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences("sound", Context.MODE_PRIVATE)
 
     private const val KEY_IGNORE_DND = "ignoreDoNotDisturb"
+    private const val KEY_GROUP = "group."
     private const val KEY_MODE = "audioMode"
     private const val KEY_CHOICE = "choice_"
 
@@ -164,10 +202,11 @@ object EtaSound {
      * on a phone switched fully silent — vibrate mode is the phone asking for
      * exactly this, silent mode is it asking for nothing at all.
      */
-    private fun vibrate(context: Context) {
+    private fun vibrate(context: Context, group: SoundGroup) {
         val audio: AudioManager? = context.getSystemService()
-        if (isDoNotDisturbOn(context) && !ignoresDoNotDisturb(context)) return
-        if (audio?.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        val rules = groupAudio(context, group)
+        if (isDoNotDisturbOn(context) && !rules.throughDoNotDisturb) return
+        if (audio?.ringerMode == AudioManager.RINGER_MODE_SILENT && !rules.throughSilentRinger) return
         runCatching {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.getSystemService<VibratorManager>()?.defaultVibrator
@@ -220,46 +259,76 @@ object EtaSound {
     private fun resourceUri(context: Context, file: EtaSoundFile): Uri =
         "android.resource://${context.packageName}/${rawOf(file)}".toUri()
 
-    /** Plays [event]'s sound once, unless the phone was asked for quiet — see [isSilenced]. Never throws. */
+    /**
+     * Plays [event]'s sound once, unless the phone was asked for quiet and its
+     * group does not play through it — see [isSilenced] — and at its group's
+     * volume. Never throws.
+     */
     fun play(context: Context, event: SoundEvent) {
         val app = context.applicationContext
         when (mode(app)) {
             AudioMode.SILENT -> return
-            AudioMode.VIBRATE -> return vibrate(app)
+            AudioMode.VIBRATE -> return vibrate(app, event.group)
             AudioMode.SOUND -> Unit
         }
-        if (isSilenced(app)) return
-        start(app, uriOf(app, event), fallback = defaultUriOf(app, event))
+        if (isSilenced(app, event.group)) return
+        val volume = volumeFor(app, event.group)
+        if (volume != null && volume <= 0f) return
+        start(app, uriOf(app, event), fallback = defaultUriOf(app, event), volume = volume)
     }
 
     /** The one preview sounding, stopped by the next — tapping through a list should not pile them up. */
     private var preview: MediaPlayer? = null
 
+    /** Whether the preview playing holds the alarm stream at a volume of its own. */
+    private var previewHoldsVolume = false
+
     /**
      * Plays [choice] once, as a preview on the "Audio" page: whatever the mode
-     * and the phone's quiet say, since the user just asked to hear it. Only on
-     * the alarm stream's volume, which is what the real sound will have.
+     * and the phone's quiet say, since the user just asked to hear it. At the
+     * volume of its group, which is what the real sound will have.
      */
     fun preview(context: Context, event: SoundEvent, choice: SoundChoice) {
+        previewGroup(context, event.group, uriOf(context.applicationContext, event, choice))
+    }
+
+    /** "Probe hören" on a group's page: [group]'s typical sound at [audio]'s volume, not yet saved. */
+    fun previewGroup(context: Context, group: SoundGroup, audio: GroupAudio) {
+        val app = context.applicationContext
+        val event = if (group == SoundGroup.ALARM) SoundEvent.PLANNING else SoundEvent.TASK_START
+        val volume = playbackVolume(group, audio, notificationLevel(app.getSystemService()))
+        previewGroup(app, group, uriOf(app, event), volume ?: -1f)
+    }
+
+    private fun previewGroup(context: Context, group: SoundGroup, uri: Uri?, volume: Float = Float.NaN) {
         stopPreview()
         val app = context.applicationContext
-        preview = start(app, uriOf(app, event, choice), fallback = null)
+        val level = when {
+            !volume.isNaN() -> volume.takeIf { it >= 0f }
+            else -> volumeFor(app, group)
+        }
+        if (level != null && level <= 0f) return
+        previewHoldsVolume = level != null
+        preview = start(app, uri, fallback = null, volume = level)
     }
 
     fun stopPreview() {
         preview?.let { player ->
             runCatching { player.stop() }
             runCatching { player.release() }
-            synchronized(playing) { playing.remove(player) }
+            val stillPlaying = synchronized(playing) { playing.remove(player) }
+            // A preview stopped before its end hands the alarm stream back here.
+            if (stillPlaying && previewHoldsVolume) AlarmStreamVolume.release(player.hashCode())
         }
         preview = null
+        previewHoldsVolume = false
     }
 
     /**
      * Starts [uri] once, or [fallback] if it will not play — a system sound can
      * vanish with an update, or lie on storage Eta may not read. Never throws.
      */
-    private fun start(app: Context, uri: Uri?, fallback: Uri?): MediaPlayer? {
+    private fun start(app: Context, uri: Uri?, fallback: Uri?, volume: Float? = null): MediaPlayer? {
         val audio: AudioManager? = app.getSystemService()
         val session = audio?.generateAudioSessionId() ?: AudioManager.AUDIO_SESSION_ID_GENERATE
         fun create(target: Uri?): MediaPlayer? =
@@ -268,11 +337,15 @@ object EtaSound {
         return runCatching {
             val player = create(uri) ?: create(fallback.takeIf { it != uri }) ?: return null
             val focus = audio?.let { requestFocus(it) }
+            // The alarm stream at the group's volume for exactly as long as this plays.
+            val holder = player.hashCode()
+            if (volume != null) AlarmStreamVolume.acquire(app, holder, volume)
 
             player.setOnCompletionListener { done ->
-                synchronized(playing) { playing.remove(done) }
+                val wasPlaying = synchronized(playing) { playing.remove(done) }
                 runCatching { done.release() }
                 if (audio != null && focus != null) abandonFocus(audio, focus)
+                if (wasPlaying && volume != null) AlarmStreamVolume.release(holder)
             }
             synchronized(playing) { playing += player }
             player.start()

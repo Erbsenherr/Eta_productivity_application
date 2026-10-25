@@ -727,7 +727,7 @@ private fun clockAt(minute: Int): String =
     if (minute >= MINUTES_PER_DAY) "24:00" else minuteToLocalTime(minute).formatClock()
 
 /** What a box held into the day can become. */
-enum class NewEntryKind { TODO, BREAK, EARN, SPEND }
+enum class NewEntryKind { TODO, APPOINTMENT, BREAK, EARN, SPEND }
 
 /**
  * The box has its hours; this asks what it is.
@@ -804,6 +804,14 @@ fun NewEntryKindDialog(
                     )
                 }
             }
+            // Never refused by the week-first rule: a Termin is what turns up
+            // after the week was already settled, and it has its hour.
+            EtaButton(
+                text = "Termin",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onChoose(NewEntryKind.APPOINTMENT) },
+            )
             EtaButton(
                 text = "Pause",
                 style = EtaButtonStyle.Secondary,
@@ -947,6 +955,8 @@ fun NewTodoDialog(
     foldCandidates: List<FoldCandidate> = emptyList(),
     /** The length the box on the day was pinched to; the form opens on it. */
     duration: Duration? = null,
+    /** A "Termin": the same form, for a card that will stay where it is put. */
+    appointment: Boolean = false,
     onDismiss: () -> Unit,
     onCreate: (name: String, attributes: TodoAttributes, note: String) -> Unit,
 ) {
@@ -956,12 +966,20 @@ fun NewTodoDialog(
         mutableStateOf(TodoAttributes().let { if (duration != null) it.copy(duration = duration) else it })
     }
 
-    PlannerDialog(title = "Neues ToDo", onDismiss = onDismiss) {
+    PlannerDialog(title = if (appointment) "Neuer Termin" else "Neues ToDo", onDismiss = onDismiss) {
+        if (appointment) {
+            EtaText(
+                text = "Ein Termin ist ein ToDo, das an seiner Stelle bleibt: Einmal " +
+                    "eingetragen, lässt er sich nicht mehr verschieben.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+        }
         EtaField(label = "Name") {
             EtaTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = "Was ist dir eingefallen?",
+                placeholder = if (appointment) "Was steht an?" else "Was ist dir eingefallen?",
             )
         }
         // Directly under the name, as in the edit dialogs: it is read with it.

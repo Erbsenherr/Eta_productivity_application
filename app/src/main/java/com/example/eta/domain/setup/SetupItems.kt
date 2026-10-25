@@ -47,8 +47,25 @@ fun isOwnedBySettings(id: String): Boolean = SETTINGS_OWNED_KEYS.any { key ->
  * and live in `subtasks`; these are the rows they have to be on, all of them
  * alike, however many nights the week has.
  */
-fun isMorningRoutine(id: String): Boolean =
-    id == setupId("morning") || id.startsWith(setupId("morning-"))
+fun isMorningRoutine(id: String): Boolean = SetupRoutine.MORNING.owns(id)
+
+/**
+ * The two routines that hang off the night: the morning, and since step 52 the
+ * evening, which is the old "Bettfertig machen". Each is a task in Routine-Modus
+ * whose steps are the user's, written onto every definition it has — one, or
+ * one per night.
+ */
+enum class SetupRoutine(val key: String, val label: String) {
+    MORNING("morning", SetupLabels.MORNING),
+    EVENING("bedprep", SetupLabels.BED_PREP),
+    ;
+
+    fun owns(id: String): Boolean = id == setupId(key) || id.startsWith(setupId("$key-"))
+
+    companion object {
+        fun of(id: String): SetupRoutine? = entries.firstOrNull { it.owns(id) }
+    }
+}
 
 /**
  * The recurring definitions that follow from the answers.
@@ -229,6 +246,6 @@ fun UserSetup.recurringItems(now: Instant): List<Item> {
         }
     }
 
-    // The morning is a routine: its steps are ticked off one after the other.
-    return items.map { if (isMorningRoutine(it.id)) it.copy(routineMode = true) else it }
+    // Morning and evening are routines: their steps are ticked off one after the other.
+    return items.map { if (SetupRoutine.of(it.id) != null) it.copy(routineMode = true) else it }
 }

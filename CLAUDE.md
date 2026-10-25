@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (734 tests
-as of step 51), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (746 tests
+as of step 52), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -418,6 +418,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-49-routine-step-goals.md` | *Step 49*: a routine's steps as Timer-Tasks with "Zielzeit" and with a Mengen-Inkrement (`StepExtras`, `asItem` / `withItemFields`, `withStepExtras`, `StepFamily`, `SubtaskTimer` and `asBlock`, `StepTimerActions`, `stepTimerEntries`), and "Subtask von …" in the "Ziele" tab |
 | `step-50-app-update.md` | *Step 50*: the build stamp (`-PetaStamp`, `versionCodeOf`, `tools/build-apk.ps1`), releases on GitHub (`tools/publish-release.ps1`), and the "App-Update" page (`UpdateService`, `UpdateViewModel`, `isNewer`) — the browser downloads, never Eta: Play Protect flags an app that does |
 | `step-51-sounds-red.md` | *Step 51*: a sound per moment (`SoundEvent`, `SoundChoice`, `EtaSoundFile`, `EtaSound.play(SoundEvent)` / `uriOf` / `preview`, the fallback to the default, `SoundChoicesBox` on the Audio page, the wake alarm's own), and a negative balance in red by night (`EtaColors.alertRed`) |
+| `step-52-evening-once-sound-groups.md` | *Step 52*: Alarme and Benachrichtigungen (`SoundGroup`, `GroupAudio`, `mayPlay`, `playbackVolume`, `AlarmStreamVolume`, `SoundGroupFields`, the "Benachrichtigungen" page), the Abendroutine (`SetupRoutine`, `saveRoutineSteps`), a routine ticked in "Heute anstehend" (`RoutineTickDialog`), one-off rewards (`Reward.once`, `achievedAt` / `expiredAt`, `RewardDueDialog`), unplanned hours in the planner (`unplannedMinutes`, `weekendPlanning`), the Termin (`BlockOrigin.APPOINTMENT`), "Ausnahmen, Sonderfälle" |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -433,7 +434,9 @@ These came out of discussion with the user and are not all derivable from `Eta_d
   steps through the three. Legacy is the same thing in indigo. See *Step 30*.
 - **Eta may play through "Nicht stören"**, off by default — see *Sounds, and the
   alarms that announce a task*. **A phone on silent or vibrate silences it**
-  (step 44), the wake alarm excepted.
+  (step 44), the wake alarm excepted. Since step 52 both are switches of
+  their own for each of two groups, Alarme and Benachrichtigungen, each with
+  a volume bound to the phone or constant — see *Step 52*.
 - **An accent of the user's own, and icons in the tab bar**, both beside the
   design in `DesignStore` (step 44). See *Step 44*.
 - **The strict rules are the default, and loosening one is a setting**
@@ -506,7 +509,9 @@ occurrence · 46. The setup rebuilt, every other week, a task's own colour, and
 audio modes · 47. Rewards that are not changed, and a Statistiken page easier
 to read · 48. Streaks, a tolerance for "on time", a breach that costs, and a
 menu of one's own order · 49. A routine's steps as Timer-Tasks and with a count · 50. Updates from
-GitHub releases · 51. Every sound chosen, and a negative balance in red.
+GitHub releases · 51. Every sound chosen, and a negative balance in red ·
+52. Alarms and notifications apart, an evening routine, one-off rewards,
+unplanned hours in sight, and the Termin.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

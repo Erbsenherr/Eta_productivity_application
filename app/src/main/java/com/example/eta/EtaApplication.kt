@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.example.eta.alarm.AlarmStreamVolume
 
 class EtaApplication : Application() {
 
@@ -42,6 +43,8 @@ class EtaApplication : Application() {
         TaskNudgeNotifications.ensureChannels(this)
         ReminderCoordinator.ensureChannel(this)
         WakeAlarmNotifications.ensureChannel(this)
+        // A sound cut off by a dying process may have left the alarm slider moved.
+        AlarmStreamVolume.restoreLeftover(this)
         registerActivityLifecycleCallbacks(ForegroundCounter())
 
         // Alarms do not survive an uninstall-reinstall or a cleared app, and a

@@ -310,7 +310,7 @@ fun WeekTabScreen(
             NightEditDialog(
                 title = "Nacht auf ${wakeDay.formatLong()}",
                 scope = "Gilt ab jetzt für jede Nacht auf ${wakeDay.formatLong()} — und nur für " +
-                    "diesen Wochentag. Morgenroutine und »Bettfertig machen« ziehen mit; " +
+                    "diesen Wochentag. Morgen- und Abendroutine ziehen mit; " +
                     "heute, und morgen, wenn die Planung schon bestätigt ist, bleiben wie geplant.",
                 night = setup.nightEndingOn(wakeDay),
                 wakeDay = wakeDay,

@@ -344,14 +344,14 @@ val CONTRACT_STEPS: List<TutorialStep> = listOf(
         "Mehr als drei Verträge laufen nie gleichzeitig. Wird einer gebrochen, " +
             "kostet das 10 Punkte, und sein Slot bleibt einen Monat ab Vertragsschluss " +
             "gesperrt. Deshalb steht " +
-            "vor jedem Vertrag, was als Bruch gilt — und deine Unterschrift.",
+            "vor jedem Vertrag, was er verlangt und welche Ausnahmen gelten — und deine Unterschrift.",
     ),
     TutorialStep(
         stage = TutorialStage.CONTRACTS,
         title = "Einen schließen",
         text = {
             "Tippe in einem freien Slot auf »Vertrag schließen«. Fülle Kurzname, " +
-                "Konditionen und Vertragsbruch aus, setze den Haken bei der Garantie, " +
+                "Konditionen und Ausnahmen aus, setze den Haken bei der Garantie, " +
                 "unterschreibe mit dem Finger und tippe auf »Unterschreiben«. Das " +
                 "Fenster verdeckt diese Leiste; danach geht es hier weiter."
         },
@@ -386,7 +386,8 @@ val REWARD_STEPS: List<TutorialStep> = listOf(
         stage = TutorialStage.REWARDS,
         title = "Eine anlegen",
         text = {
-            "Tippe auf »Belohnung erstellen«, gib ihr einen Namen und einen Preis und " +
+            "Tippe auf »Belohnung erstellen«, wähle »Über die Tagesabrechnung«, gib ihr " +
+                "einen Namen und einen Preis und " +
                 "tippe auf »Erstellen«. Das Fenster verdeckt diese Leiste; danach " +
                 "geht es hier weiter."
         },

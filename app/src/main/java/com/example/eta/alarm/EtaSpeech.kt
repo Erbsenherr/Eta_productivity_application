@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
+import com.example.eta.domain.sound.SoundGroup
 
 /**
  * Eta's voice: a task's name read out where a sound would have played.
@@ -54,7 +55,7 @@ object EtaSpeech {
     /** Sentences still being read, each with the audio focus it holds. */
     private val speaking = ConcurrentHashMap<String, Utterance>()
 
-    private class Utterance(val done: CompletableDeferred<Unit>, val focus: Any?)
+    private class Utterance(val done: CompletableDeferred<Unit>, val focus: Any?, val holdsVolume: Boolean)
 
     /**
      * Reads [text] out. False when it could not — no speech engine, or one that
@@ -66,7 +67,10 @@ object EtaSpeech {
         // Vibration or silence was chosen: nothing is read out, and the caller
         // falls back to `EtaSound.play`, which buzzes or stays quiet as asked.
         if (EtaSound.mode(app) != AudioMode.SOUND) return false
-        if (text.isBlank() || EtaSound.isSilenced(app)) return true
+        // A sentence is a notification: its group's quiet and its volume (step 52).
+        if (text.isBlank() || EtaSound.isSilenced(app, SoundGroup.NOTIFICATION)) return true
+        val volume = EtaSound.volumeFor(app, SoundGroup.NOTIFICATION)
+        if (volume != null && volume <= 0f) return true
 
         val available = withTimeoutOrNull(BIND_TIMEOUT) { bind(app).await() } ?: false
         val tts = engine
@@ -74,8 +78,13 @@ object EtaSpeech {
 
         val audio: AudioManager? = app.getSystemService()
         val id = UUID.randomUUID().toString()
-        val utterance = Utterance(CompletableDeferred(), audio?.let { EtaSound.requestFocus(it) })
+        val utterance = Utterance(
+            done = CompletableDeferred(),
+            focus = audio?.let { EtaSound.requestFocus(it) },
+            holdsVolume = volume != null,
+        )
         speaking[id] = utterance
+        if (volume != null) AlarmStreamVolume.acquire(app, id.hashCode(), volume)
 
         val queued = runCatching { tts.speak(text, TextToSpeech.QUEUE_ADD, null, id) }.getOrNull()
         if (queued != TextToSpeech.SUCCESS) {
@@ -124,6 +133,7 @@ object EtaSpeech {
         val utterance = speaking.remove(id ?: return) ?: return
         val audio: AudioManager? = app.getSystemService()
         if (audio != null && utterance.focus != null) EtaSound.abandonFocus(audio, utterance.focus)
+        if (utterance.holdsVolume) AlarmStreamVolume.release(id.hashCode())
         utterance.done.complete(Unit)
     }
 }

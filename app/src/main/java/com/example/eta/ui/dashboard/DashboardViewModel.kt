@@ -355,7 +355,9 @@ class DashboardViewModel(
             tomorrowConfirmed = tomorrowPlan?.isConfirmed == true,
             // Only hand-placed blocks count as "already planned": the standing
             // schedule materializes itself and would otherwise always look done.
-            tomorrowHasBlocks = tomorrowBlocks.any { it.block.origin == BlockOrigin.DRAGGED },
+            tomorrowHasBlocks = tomorrowBlocks.any {
+                it.block.origin == BlockOrigin.DRAGGED || it.block.origin == BlockOrigin.APPOINTMENT
+            },
             dueAt = setup?.let {
                 nextPlanning(it, PlanningPhase.DAILY, clock.now().toLocalDateTime(timeZone))
             },
@@ -385,6 +387,23 @@ class DashboardViewModel(
             // Something ticked off ahead of its hour should not still announce
             // itself, and reopening one puts it back in the queue.
             taskStartCoordinator.reschedule()
+        }
+    }
+
+    /**
+     * A routine ticked off in "Heute anstehend" (step 52): with [allSteps], every
+     * step still open is ticked first, so the evening finds the whole routine
+     * done; without, only the block, and the evening asks about the steps.
+     */
+    fun completeRoutine(entry: BlockWithItem, allSteps: Boolean) {
+        viewModelScope.launch {
+            if (allSteps) {
+                val done = uiState.value.checked[entry.block.id].orEmpty()
+                uiState.value.subtasks[entry.item.id].orEmpty()
+                    .filter { it.id !in done }
+                    .forEach { subtaskRepository.setChecked(entry.block.id, it.id, true) }
+            }
+            toggleCompleted(entry)
         }
     }
 

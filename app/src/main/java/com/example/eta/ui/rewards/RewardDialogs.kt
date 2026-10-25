@@ -26,6 +26,15 @@ import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.lists.recurringSummary
 import com.example.eta.ui.theme.EtaTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.eta.ui.components.EtaDatePickerDialog
+import com.example.eta.ui.components.EtaTimePicker
+import com.example.eta.ui.format.formatWithYear
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 
 /** What a reward costs until someone says otherwise, and the most it may. */
 const val DEFAULT_REWARD_COST = 25
@@ -43,6 +52,180 @@ data class RewardDraft(
     val cost: Int = DEFAULT_REWARD_COST,
     val itemIds: Set<String> = emptySet(),
 )
+
+/**
+ * Step 52: the first question when a reward is made — how is it earned? Once,
+ * for reaching something ("Matheklausur am 12.10."), or through the evening's
+ * settlement as every reward was before.
+ */
+@Composable
+internal fun RewardKindDialog(
+    onOnce: () -> Unit,
+    onDaily: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    EtaDialog(title = "Wie soll die Belohnung verdient werden?", onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+            EtaButton(
+                text = "Einmalig",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOnce,
+            )
+            EtaText(
+                text = "Für ein Ziel, das einmal erreicht wird — zum Beispiel eine " +
+                    "bestandene Matheklausur. Es werden keine Punkte gesammelt.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+            EtaButton(
+                text = "Über die Tagesabrechnung",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onDaily,
+            )
+            EtaText(
+                text = "Jeden Abend fließen Punkte hinein, bis der Preis erreicht ist.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+        EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+    }
+}
+
+/** A one-off reward being made: a name, the goal, and optionally a date and an hour. */
+data class OnceRewardDraft(
+    val name: String = "",
+    val condition: String = "",
+    val date: LocalDate? = null,
+    val time: LocalTime = DEFAULT_DUE_TIME,
+)
+
+/** The hour a date is asked about unless the user picks another. */
+val DEFAULT_DUE_TIME = LocalTime(18, 0)
+
+/** Name, goal and the optional date of a one-off reward (step 52). */
+@Composable
+internal fun OnceRewardDialog(
+    draft: OnceRewardDraft,
+    today: LocalDate,
+    onChange: (OnceRewardDraft) -> Unit,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    var pickingDate by remember { mutableStateOf(false) }
+
+    EtaDialog(title = "Einmalige Belohnung", onDismiss = onBack) {
+        EtaText(
+            text = "Sammelt keine Punkte: Sie ist verdient, sobald du das Ziel erreichst. " +
+                "Danach lässt sie sich nur noch löschen.",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textMuted,
+        )
+        EtaField(label = "Name") {
+            EtaTextField(
+                value = draft.name,
+                onValueChange = { onChange(draft.copy(name = it)) },
+                placeholder = "Ein Abend im Kino",
+            )
+        }
+        EtaField(label = "Ziel", hint = "Was muss passieren, damit du sie dir verdient hast?") {
+            EtaTextField(
+                value = draft.condition,
+                onValueChange = { onChange(draft.copy(condition = it)) },
+                placeholder = "Matheklausur am 12.10. bestanden",
+                singleLine = false,
+            )
+        }
+        EtaField(
+            label = "Datum und Uhrzeit (freiwillig)",
+            hint = "Ist es so weit, fragt dich der Belohn-o-mat, ob du das Ziel erreicht hast.",
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                    EtaButton(
+                        text = draft.date?.formatWithYear() ?: "Datum wählen",
+                        style = EtaButtonStyle.Secondary,
+                        onClick = { pickingDate = true },
+                    )
+                    if (draft.date != null) {
+                        EtaButton(
+                            text = "Kein Datum",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { onChange(draft.copy(date = null)) },
+                        )
+                    }
+                }
+                if (draft.date != null) {
+                    EtaTimePicker(
+                        value = draft.time,
+                        onValueChange = { onChange(draft.copy(time = it)) },
+                    )
+                }
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = onBack)
+            Spacer(Modifier.weight(1f))
+            EtaButton(
+                text = "Erstellen",
+                enabled = draft.name.isNotBlank() && draft.condition.isNotBlank(),
+                onClick = onSave,
+            )
+        }
+    }
+
+    if (pickingDate) {
+        EtaDatePickerDialog(
+            title = "Bis wann?",
+            value = draft.date ?: today,
+            today = today,
+            onDismiss = { pickingDate = false },
+            onConfirm = {
+                onChange(draft.copy(date = it))
+                pickingDate = false
+            },
+        )
+    }
+}
+
+/**
+ * A one-off reward whose date has come (step 52): reached or not? "Ja" makes it
+ * ready to take, "Nein" lets it go into the history. Closed without an answer,
+ * it is asked again the next time the tab is opened.
+ */
+@Composable
+internal fun RewardDueDialog(
+    name: String,
+    condition: String?,
+    onReached: () -> Unit,
+    onMissed: () -> Unit,
+    onLater: () -> Unit,
+) {
+    EtaDialog(title = "Ziel erreicht?", onDismiss = onLater) {
+        EtaText(
+            text = buildString {
+                append("Der Tag für »$name« ist da.")
+                if (!condition.isNullOrBlank()) append(" Ziel: $condition.")
+                append(" Hast du es erreicht?")
+            },
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        EtaButton(text = "Ja, erreicht", modifier = Modifier.fillMaxWidth(), onClick = onReached)
+        EtaButton(
+            text = "Nein — Belohnung verfällt",
+            style = EtaButtonStyle.Secondary,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onMissed,
+        )
+        EtaButton(text = "Später", style = EtaButtonStyle.Secondary, onClick = onLater)
+    }
+}
 
 /** Name, price, and the way into the binding menu. */
 @Composable
@@ -100,7 +283,7 @@ internal fun RewardEditDialog(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = onDismiss)
             Spacer(Modifier.weight(1f))
             EtaButton(
                 text = "Erstellen",

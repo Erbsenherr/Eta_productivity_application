@@ -52,6 +52,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
+import com.example.eta.domain.setup.SetupRoutine
 
 /** A Sammelliste entry with how long it has left before the ban. */
 data class CollectionEntry(
@@ -172,13 +173,16 @@ class SmartListsViewModel(
     }
 
     /** The setup's answers, for the night the Wochenschema books. */
-    /** The morning routine's steps — see `SetupRepository.saveMorningSteps`. */
-    val morningSteps: StateFlow<List<SubtaskDraft>> = setupRepository.observeMorningSteps()
-        .map { it.drafts() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** The two routines' steps — see `SetupRepository.saveRoutineSteps`. */
+    val routineSteps: StateFlow<Map<SetupRoutine, List<SubtaskDraft>>> = combine(
+        setupRepository.observeRoutineSteps(SetupRoutine.MORNING),
+        setupRepository.observeRoutineSteps(SetupRoutine.EVENING),
+    ) { morning, evening ->
+        mapOf(SetupRoutine.MORNING to morning.drafts(), SetupRoutine.EVENING to evening.drafts())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    fun saveMorningSteps(steps: List<SubtaskDraft>) {
-        viewModelScope.launch { setupRepository.saveMorningSteps(steps) }
+    fun saveRoutineSteps(routine: SetupRoutine, steps: List<SubtaskDraft>) {
+        viewModelScope.launch { setupRepository.saveRoutineSteps(routine, steps) }
     }
 
     val setup: StateFlow<UserSetup?> = setupRepository.observe().stateIn(

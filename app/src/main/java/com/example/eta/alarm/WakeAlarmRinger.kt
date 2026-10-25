@@ -8,6 +8,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.content.getSystemService
+import com.example.eta.domain.sound.SoundGroup
 
 /**
  * The sound and the buzz, held outside any screen.
@@ -24,6 +25,8 @@ import androidx.core.content.getSystemService
 object WakeAlarmRinger {
 
     private var player: MediaPlayer? = null
+    private var holdsVolume = false
+    private const val VOLUME_HOLDER = -0x3a7e
 
     val isRinging: Boolean get() = player != null
 
@@ -34,6 +37,12 @@ object WakeAlarmRinger {
         // A chosen sound that will not play — gone with an update, or on storage
         // Eta may not read — must not leave the morning silent: the phone's own
         // alarm tone stands in.
+        // A constant volume for the alarms holds for the whole ringing (step 52);
+        // the quiet switches do not reach the wake alarm, which always rings.
+        EtaSound.groupAudio(context, SoundGroup.ALARM).constantVolume?.let { percent ->
+            AlarmStreamVolume.acquire(context, VOLUME_HOLDER, percent.coerceIn(1, 100) / 100f)
+            holdsVolume = true
+        }
         player = loop(context, uri) ?: EtaSound.phoneAlarmTone()?.takeIf { it != uri }?.let { loop(context, it) }
 
         vibrate(context)
@@ -55,6 +64,8 @@ object WakeAlarmRinger {
     fun stop(context: Context) {
         player?.let { runCatching { it.stop() }; runCatching { it.release() } }
         player = null
+        if (holdsVolume) AlarmStreamVolume.release(VOLUME_HOLDER)
+        holdsVolume = false
         runCatching { vibrator(context)?.cancel() }
     }
 

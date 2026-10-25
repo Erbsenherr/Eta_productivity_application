@@ -6,6 +6,7 @@ import com.example.eta.domain.model.extras
 import com.example.eta.domain.model.withExtras
 import com.example.eta.domain.setup.NightTimes
 import com.example.eta.domain.setup.SetupLabels
+import com.example.eta.domain.setup.SetupRoutine
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.isMorningRoutine
 import com.example.eta.domain.setup.isOwnedBySettings
@@ -108,7 +109,8 @@ class RoutineTest {
 
         assertEquals(7, mornings.size)
         assertTrue(mornings.all { it.routineMode && it.name == "Morgenroutine" })
-        assertTrue(items.filterNot { isMorningRoutine(it.id) }.none { it.routineMode })
+        // The evening is the other routine since step 52; nothing else is one.
+        assertTrue(items.filter { SetupRoutine.of(it.id) == null }.none { it.routineMode })
         assertFalse(isMorningRoutine("setup:bedprep-monday"))
     }
 

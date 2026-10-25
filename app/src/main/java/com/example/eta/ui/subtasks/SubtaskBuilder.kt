@@ -45,6 +45,7 @@ import com.example.eta.ui.theme.EtaTheme
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import java.util.UUID
+import com.example.eta.domain.setup.SetupRoutine
 
 /**
  * The group a form is describing: its name, and the steps inside it.
@@ -592,7 +593,8 @@ private fun SubtaskEditDialog(
 }
 
 /**
- * The morning routine's steps, and the way to change them.
+ * A routine's steps — the morning's, or since step 52 the evening's — and the
+ * way to change them.
  *
  * One composable for the two places the user asked for — the settings and the
  * standing task's own window — so the list reads the same in both and both save
@@ -600,18 +602,19 @@ private fun SubtaskEditDialog(
  * the app, and regenerated with the night it hangs off.
  */
 @Composable
-fun MorningRoutineSteps(
+fun SetupRoutineSteps(
     steps: List<SubtaskDraft>,
     onSave: (List<SubtaskDraft>) -> Unit,
     /** The routine's length, which timed steps are set against (step 49). */
     routineLength: Duration? = null,
+    routine: SetupRoutine = SetupRoutine.MORNING,
 ) {
     var editing by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
         if (steps.isEmpty()) {
             EtaText(
-                text = "Noch keine Schritte — die Morgenroutine ist dann einfach ein Block.",
+                text = "Noch keine Schritte — die ${routine.label} ist dann einfach ein Block.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
@@ -635,7 +638,7 @@ fun MorningRoutineSteps(
     if (editing) {
         SubtaskBuilderDialog(
             setting = SubtaskSetting(groupName = "", subtasks = steps),
-            title = "Morgenroutine",
+            title = routine.label,
             showName = false,
             stepExtras = true,
             routineLength = routineLength,

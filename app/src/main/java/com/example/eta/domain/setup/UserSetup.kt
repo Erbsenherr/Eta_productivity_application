@@ -460,6 +460,14 @@ data class UserSetup(
      */
     val allowPartialTimerGrowth: Boolean = false,
     /**
+     * Flexibilität, step 52: whether a weekend day ([weekendDays]) is held to the
+     * same planning as a weekday — the unplanned hours in the day planner red
+     * past the free two, rather than grey. Off: the weekend need not be planned
+     * full. It colours the number and nothing else; the evening's charge for
+     * unplanned time is unchanged.
+     */
+    val weekendPlanning: Boolean = false,
+    /**
      * The Statistiken tab, and which of its contents are **hidden** — the names
      * of `StatSection`s, comma-separated. Hidden rather than shown, so a section
      * added later is on for everyone without a migration.

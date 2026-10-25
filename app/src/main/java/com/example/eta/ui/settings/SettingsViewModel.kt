@@ -41,6 +41,7 @@ import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.eta.domain.setup.SetupRoutine
 
 /** What the screen has to say after a backup, a restore or a save. */
 sealed interface SettingsMessage {
@@ -105,16 +106,19 @@ class SettingsViewModel(
     }
 
     /**
-     * The morning routine's steps. Not part of the draft and not waiting for
-     * "Einrichtung sichern": they are rows of their own, and the builder's
-     * Sichern is their commit point, as it is on the Listen tab.
+     * The steps of the morning and the evening routine. Not part of the draft
+     * and not waiting for "Einrichtung sichern": they are rows of their own, and
+     * the builder's Sichern is their commit point, as it is on the Listen tab.
      */
-    val morningSteps: StateFlow<List<SubtaskDraft>> = setupRepository.observeMorningSteps()
-        .map { it.drafts() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val routineSteps: StateFlow<Map<SetupRoutine, List<SubtaskDraft>>> = combine(
+        setupRepository.observeRoutineSteps(SetupRoutine.MORNING),
+        setupRepository.observeRoutineSteps(SetupRoutine.EVENING),
+    ) { morning, evening ->
+        mapOf(SetupRoutine.MORNING to morning.drafts(), SetupRoutine.EVENING to evening.drafts())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    fun saveMorningSteps(steps: List<SubtaskDraft>) {
-        viewModelScope.launch { setupRepository.saveMorningSteps(steps) }
+    fun saveRoutineSteps(routine: SetupRoutine, steps: List<SubtaskDraft>) {
+        viewModelScope.launch { setupRepository.saveRoutineSteps(routine, steps) }
     }
 
     private val _message = MutableStateFlow<SettingsMessage?>(null)

@@ -96,7 +96,7 @@ fun SetupScreen(
     val saving by viewModel.saving.collectAsStateWithLifecycle()
     val skipped by viewModel.skipped.collectAsStateWithLifecycle()
     val custom by viewModel.custom.collectAsStateWithLifecycle()
-    val morningSteps by viewModel.morningSteps.collectAsStateWithLifecycle()
+    val routineSteps by viewModel.routineSteps.collectAsStateWithLifecycle()
     val pages = pagesFor(skipped, custom)
     val pagerState = rememberPagerState { pages.size }
     val scope = rememberCoroutineScope()
@@ -152,8 +152,8 @@ fun SetupScreen(
                         SetupPage.Sleep -> SleepStep(
                             draft = draft,
                             onChange = viewModel::update,
-                            morningSteps = morningSteps,
-                            onMorningSteps = viewModel::setMorningSteps,
+                            routineSteps = routineSteps,
+                            onRoutineSteps = viewModel::setRoutineSteps,
                         )
 
                         SetupPage.Planning -> PlanningStep(draft, viewModel::update)

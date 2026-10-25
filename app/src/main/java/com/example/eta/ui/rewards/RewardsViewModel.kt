@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.time.Instant
 
 /** One reward as the tab draws it. */
 data class RewardRow(
@@ -33,7 +34,7 @@ data class RewardRow(
 data class RewardsUiState(
     /** Everything not yet taken, in list order — full ones included. */
     val open: List<RewardRow> = emptyList(),
-    /** What has been taken, newest first. */
+    /** What has been taken — or, a one-off, let go at its date — newest first. */
     val redeemed: List<RewardRow> = emptyList(),
     /** The standing schedule, one entry per task: what a reward can be bound to. */
     val groups: List<RecurringGroup> = emptyList(),
@@ -69,9 +70,9 @@ class RewardsViewModel(
             )
         }
         RewardsUiState(
-            open = rows.filter { !it.reward.isRedeemed },
-            redeemed = rows.filter { it.reward.isRedeemed }
-                .sortedByDescending { it.reward.redeemedAt },
+            open = rows.filter { !it.reward.isPast },
+            redeemed = rows.filter { it.reward.isPast }
+                .sortedByDescending { it.reward.redeemedAt ?: it.reward.expiredAt },
             groups = groups,
             definitions = definitions,
         )
@@ -83,6 +84,18 @@ class RewardsViewModel(
 
     fun create(name: String, cost: Int, itemIds: Set<String>) {
         viewModelScope.launch { rewardRepository.create(name, cost.toDouble(), itemIds) }
+    }
+
+    fun createOnce(name: String, condition: String, dueAt: Instant?) {
+        viewModelScope.launch { rewardRepository.createOnce(name, condition, dueAt) }
+    }
+
+    fun achieve(id: String) {
+        viewModelScope.launch { rewardRepository.achieve(id) }
+    }
+
+    fun expire(id: String) {
+        viewModelScope.launch { rewardRepository.expire(id) }
     }
 
     fun reorder(ids: List<String>) {

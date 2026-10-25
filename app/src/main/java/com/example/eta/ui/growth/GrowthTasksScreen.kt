@@ -1,7 +1,7 @@
 package com.example.eta.ui.growth
 
 import com.example.eta.domain.growth.growthSetting
-import com.example.eta.domain.setup.isMorningRoutine
+import com.example.eta.domain.setup.SetupRoutine
 import com.example.eta.domain.subtask.asItem
 import com.example.eta.domain.subtask.quantityLabel
 import androidx.compose.foundation.clickable
@@ -398,7 +398,8 @@ private fun StepGoalRows(goals: List<StepGoal>, onOpen: (RecurringGroup) -> Unit
 private fun StepGoalRow(goal: StepGoal, onOpen: (RecurringGroup) -> Unit) {
     val step = goal.step
     val parent = goal.parent.representative
-    val morning = isMorningRoutine(parent.id)
+    // The morning's and the evening's steps are edited in the settings.
+    val morning = SetupRoutine.of(parent.id) != null
     val growth = step.asItem().growthSetting
     val interactionSource = remember { MutableInteractionSource() }
 

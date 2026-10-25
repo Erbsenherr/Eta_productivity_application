@@ -20,6 +20,13 @@ enum class BlockOrigin {
     RECURRING,
     DRAGGED,
     CALENDAR_IMPORT,
+
+    /**
+     * A "Termin" made in the day planner (step 52): a ToDo in every respect but
+     * one — once it is on the day, it stays where it was put. Not movable and
+     * not hand-placed, so it is drawn and called off like the standing schedule.
+     */
+    APPOINTMENT,
 }
 
 /**

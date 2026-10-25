@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.eta.domain.setup.SetupRoutine
 
 /** What the summary step reports back about the answers so far. */
 data class SetupOutlook(
@@ -78,11 +79,11 @@ class SetupViewModel(
     val custom: StateFlow<List<CustomTask>> = _custom.asStateFlow()
 
     /**
-     * The morning routine's steps, held until there is a task to put them on.
-     * The routine is laid down by `complete`; [finish] writes these onto it.
+     * The routines' steps, held until there is a task to put them on. The
+     * routines are laid down by `complete`; [finish] writes these onto them.
      */
-    private val _morningSteps = MutableStateFlow(emptyList<SubtaskDraft>())
-    val morningSteps: StateFlow<List<SubtaskDraft>> = _morningSteps.asStateFlow()
+    private val _routineSteps = MutableStateFlow(emptyMap<SetupRoutine, List<SubtaskDraft>>())
+    val routineSteps: StateFlow<Map<SetupRoutine, List<SubtaskDraft>>> = _routineSteps.asStateFlow()
 
     private val _saving = MutableStateFlow(false)
     val saving: StateFlow<Boolean> = _saving.asStateFlow()
@@ -131,8 +132,8 @@ class SetupViewModel(
 
     fun unskip(part: SetupPart) = _skipped.update { it - part }
 
-    fun setMorningSteps(steps: List<SubtaskDraft>) {
-        _morningSteps.value = steps
+    fun setRoutineSteps(routine: SetupRoutine, steps: List<SubtaskDraft>) {
+        _routineSteps.update { it + (routine to steps) }
     }
 
     /** A task of the user's own, by name; the rest is asked on its page. */
@@ -169,7 +170,9 @@ class SetupViewModel(
         _weekReview.value = true
         viewModelScope.launch {
             setupRepository.complete(_draft.value.skipping(_skipped.value))
-            _morningSteps.value.takeIf { it.isNotEmpty() }?.let { setupRepository.saveMorningSteps(it) }
+            _routineSteps.value.forEach { (routine, steps) ->
+                if (steps.isNotEmpty()) setupRepository.saveRoutineSteps(routine, steps)
+            }
             _custom.value
                 .filter { it.name.isNotBlank() && it.attributes.weekdays.isNotEmpty() }
                 .forEach { task ->

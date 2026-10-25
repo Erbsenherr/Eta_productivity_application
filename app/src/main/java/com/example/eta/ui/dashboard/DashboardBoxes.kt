@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.eta.data.local.BlockWithItem
+import com.example.eta.domain.model.BlockOrigin
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.PlannedBlock
 import com.example.eta.domain.model.Subtask
@@ -987,7 +988,8 @@ private fun TaskRow(
                     StartAndDuration(
                         start = entry.block.start,
                         duration = entry.block.effectiveDuration,
-                        editable = onStartChange != null,
+                        // A Termin stays where it was put (step 52).
+                        editable = onStartChange != null && entry.block.origin != BlockOrigin.APPOINTMENT,
                         onEditStart = { pickingStart = true },
                     )
                 }

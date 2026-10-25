@@ -49,6 +49,9 @@ here would overwrite every edit made on the Listen tab. The weekly social budget
 count, `UserSetup.conflicts()` having described answers that no longer describe the
 schedule.
 
+**Benachrichtigungen** (step 52) follows Alarme: the quiet and the volume of
+every sound that is not an alarm — see *Step 52*.
+
 **App-Update** (step 50) follows "Deine Daten" and is left out in the tutorial's
 sandbox — see *Step 50*.
 

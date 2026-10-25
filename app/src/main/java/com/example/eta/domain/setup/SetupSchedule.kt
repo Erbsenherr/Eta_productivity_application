@@ -72,7 +72,12 @@ private fun MutableList<SetupSpan>.addEveryDay(
 
 object SetupLabels {
     const val SLEEP = "Schlafen"
-    const val BED_PREP = "Bettfertig machen"
+    /**
+     * The evening, worked through step by step like the morning (step 52) — it
+     * was "Bettfertig machen" until then. The constant kept its name, the role
+     * is still `ItemRole.BED_PREP`.
+     */
+    const val BED_PREP = "Abendroutine"
     /** The morning, worked through step by step — see [isMorningRoutine]. */
     const val MORNING = "Morgenroutine"
 

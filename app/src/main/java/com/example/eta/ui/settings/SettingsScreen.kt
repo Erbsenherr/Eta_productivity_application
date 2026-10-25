@@ -101,7 +101,7 @@ import com.example.eta.ui.theme.AppDesign
 import com.example.eta.ui.theme.Brightness
 import com.example.eta.ui.theme.DesignChoice
 import com.example.eta.domain.subtask.SubtaskDraft
-import com.example.eta.ui.subtasks.MorningRoutineSteps
+import com.example.eta.ui.subtasks.SetupRoutineSteps
 import com.example.eta.ui.theme.EtaTheme
 import com.example.eta.domain.setup.NightMode
 import com.example.eta.domain.setup.nightMode
@@ -111,6 +111,9 @@ import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.example.eta.domain.setup.SetupRoutine
+import com.example.eta.domain.setup.bedPrepDuration
+import com.example.eta.domain.sound.SoundGroup
 
 /**
  * The Einstellungen tab: the standing configuration, away from planning a day.
@@ -162,7 +165,7 @@ fun SettingsScreen(
     val phrase by viewModel.phrase.collectAsStateWithLifecycle()
     val phraseAccepted by viewModel.phraseAccepted.collectAsStateWithLifecycle()
     val alarms by viewModel.alarms.collectAsStateWithLifecycle()
-    val morningSteps by viewModel.morningSteps.collectAsStateWithLifecycle()
+    val routineSteps by viewModel.routineSteps.collectAsStateWithLifecycle()
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip"),
@@ -247,6 +250,7 @@ fun SettingsScreen(
                     }
                     SettingsPage.NAVIGATION -> NavigationBox(design.tabStyle, onTabStyleChange, tabs)
                     SettingsPage.ALARMS -> AlarmBox(alarms)
+                    SettingsPage.NOTIFICATIONS -> NotificationSoundBox()
                     SettingsPage.CALENDAR -> CalendarSettingsBox(calendarViewModel)
                     SettingsPage.DATA -> DataBox(
                         onExport = { exportLauncher.launch(BACKUP_FILE_NAME) },
@@ -287,7 +291,19 @@ fun SettingsScreen(
                                 )
                                 SleepStep(setup, viewModel::update)
                                 PunctualToleranceBox(setup, viewModel::update)
-                                MorningRoutineBox(morningSteps, viewModel::saveMorningSteps, setup.morningDuration)
+                                RoutineBox(
+                                    routine = SetupRoutine.MORNING,
+                                    steps = routineSteps[SetupRoutine.MORNING].orEmpty(),
+                                    onSave = viewModel::saveRoutineSteps,
+                                    routineLength = setup.morningDuration,
+                                )
+                                RoutineBox(
+                                    routine = SetupRoutine.EVENING,
+                                    steps = routineSteps[SetupRoutine.EVENING].orEmpty(),
+                                    onSave = viewModel::saveRoutineSteps,
+                                    routineLength = setup.bedPrepDuration()
+                                        .takeIf { setup.nightMode != NightMode.PER_DAY },
+                                )
                             }
 
                             SettingsPage.WAKE -> {
@@ -352,6 +368,7 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     DESIGN("Design", SettingsSection.APP),
     NAVIGATION("Navigation", SettingsSection.APP),
     ALARMS("Alarme", SettingsSection.APP),
+    NOTIFICATIONS("Benachrichtigungen", SettingsSection.APP),
     CALENDAR("Google Kalender", SettingsSection.APP),
     DATA("Deine Daten", SettingsSection.APP),
     UPDATE("App-Update", SettingsSection.APP),
@@ -1086,6 +1103,14 @@ private fun FlexibilityBox(setup: UserSetup, onChange: OnSetupChange) {
                     "nächste Inkrement, wenn der Timer nicht voll abgearbeitet wurde. " +
                     "Ausgeschaltet wächst die Zeit nur nach vollständigen Terminen.",
             )
+            CheckRow(
+                checked = setup.weekendPlanning,
+                onCheckedChange = { on -> onChange { it.copy(weekendPlanning = on) } },
+                label = "Auch das Wochenende verplanen",
+                hint = "Im Tagesplaner werden die unverplanten Stunden am Wochenende " +
+                    "rot, sobald es mehr als zwei sind — wie unter der Woche. " +
+                    "Ausgeschaltet bleiben sie dort grau.",
+            )
         }
     }
 }
@@ -1519,7 +1544,7 @@ private fun MessageBox(message: SettingsMessage, onDismiss: () -> Unit) {
                 val detail = when (message) {
                     // The rule every edit to a standing task follows.
                     SettingsMessage.Saved ->
-                        "Bettfertig und Morgenroutine gelten ab dem ersten noch nicht " +
+                        "Abend- und Morgenroutine gelten ab dem ersten noch nicht " +
                             "bestätigten Tag."
 
                     is SettingsMessage.Exported -> "${message.bytes / 1024} KB geschrieben."
@@ -1545,31 +1570,43 @@ private fun MessageBox(message: SettingsMessage, onDismiss: () -> Unit) {
 }
 
 /**
- * The steps of the morning routine.
+ * The steps of the morning routine, or of the evening routine (step 52).
  *
- * Under the sleep card, because that is where the morning's hour and length are
- * set. Saved at once, unlike the answers around it: the steps are not part of
- * the draft, and a list edited in a dialog with its own "Sichern" that then
+ * Under the sleep card, because that is where each routine's hour and length
+ * are set. Saved at once, unlike the answers around it: the steps are not part
+ * of the draft, and a list edited in a dialog with its own "Sichern" that then
  * waited for a second one further down would lose edits.
  */
 @Composable
-private fun MorningRoutineBox(
+private fun RoutineBox(
+    routine: SetupRoutine,
     steps: List<SubtaskDraft>,
-    onSave: (List<SubtaskDraft>) -> Unit,
+    onSave: (SetupRoutine, List<SubtaskDraft>) -> Unit,
     routineLength: Duration? = null,
 ) {
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
-            EtaText(text = "Morgenroutine", style = EtaTheme.typography.heading)
+            EtaText(text = routine.label, style = EtaTheme.typography.heading)
             EtaText(
-                text = "Beginnt mit dem Aufstehen und dauert so lange, wie oben unter " +
-                    "„Morgenroutine“ steht. Die Schritte laufen im Routine-Modus: " +
-                    "„Gerade“ zeigt immer nur den nächsten, Abhaken hält die Uhrzeit " +
-                    "fest. Änderungen an den Schritten gelten sofort.",
+                text = when (routine) {
+                    SetupRoutine.MORNING ->
+                        "Beginnt mit dem Aufstehen und dauert so lange, wie oben unter " +
+                            "„Morgenroutine“ steht."
+                    SetupRoutine.EVENING ->
+                        "Beginnt zur Uhrzeit, die oben unter „Abendroutine ab“ steht, und " +
+                            "dauert bis zum Schlafengehen. Schritte sind freiwillig."
+                } + " Die Schritte laufen im Routine-Modus: „Gerade“ zeigt immer nur den " +
+                    "nächsten, Abhaken hält die Uhrzeit fest. Änderungen an den Schritten " +
+                    "gelten sofort.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
-            MorningRoutineSteps(steps = steps, onSave = onSave, routineLength = routineLength)
+            SetupRoutineSteps(
+                steps = steps,
+                onSave = { onSave(routine, it) },
+                routineLength = routineLength,
+                routine = routine,
+            )
         }
     }
 }
@@ -1752,48 +1789,17 @@ private fun AlarmBox(alarms: AlarmSchedule) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Alarme", style = EtaTheme.typography.heading)
-            var ignoreDnd by remember { mutableStateOf(EtaSound.ignoresDoNotDisturb(context)) }
             val dndOn = remember(probe) { EtaSound.isDoNotDisturbOn(context) }
             val muted = remember(probe) { EtaSound.isRingerMuted(context) }
             EtaText(
-                text = when {
-                    !dndOn && muted ->
-                        "Das Handy ist gerade stumm oder auf Vibration — solange bleiben " +
-                            "Etas Töne still. Benachrichtigungen erscheinen trotzdem."
-                    dndOn && ignoreDnd ->
-                        "„Nicht stören“ ist gerade an — Etas Töne spielen trotzdem, " +
-                            "solange das Handy Wecker durchlässt."
-                    dndOn ->
-                        "„Nicht stören“ ist gerade an — solange bleiben Etas Töne still. " +
-                            "Benachrichtigungen erscheinen trotzdem."
-                    ignoreDnd ->
-                        "Etas Töne laufen über die Wecker-Lautstärke, unabhängig von der " +
-                            "Lautstärke für Benachrichtigungen, auch bei „Nicht stören“. Steht " +
-                            "das Handy stumm oder auf Vibration, bleiben sie still."
-                    else ->
-                        "Etas Töne laufen über die Wecker-Lautstärke, unabhängig von der " +
-                            "Lautstärke für Benachrichtigungen. Still sind sie bei „Nicht stören“ " +
-                            "und wenn das Handy stumm oder auf Vibration steht."
-                },
+                text = "Alarme sind der Weckruf und die Planungsphasen. Alle anderen Töne " +
+                    "stellst du unter „Benachrichtigungen“ ein. Gilt sofort. Der Weckruf " +
+                    "klingelt immer, auch bei „Nicht stören“ und lautlos — die Lautstärke " +
+                    "gilt aber auch für ihn.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
-
-            EtaField(
-                label = "Bei „Nicht stören“",
-                hint = "Gilt sofort, für Töne und Ansagen. Bei „Lautlos komplett“ " +
-                    "schaltet das Handy auch Wecker stumm — daran kann Eta nichts ändern. " +
-                    "Der Weckalarm klingelt ohnehin immer.",
-            ) {
-                EtaChoice(
-                    options = listOf(false to "Still bleiben", true to "Trotzdem spielen"),
-                    selected = ignoreDnd,
-                    onSelect = { chosen ->
-                        EtaSound.setIgnoresDoNotDisturb(context, chosen)
-                        ignoreDnd = chosen
-                    },
-                )
-            }
+            SoundGroupFields(group = SoundGroup.ALARM, dndOn = dndOn, muted = muted)
 
             ReadinessRow(
                 label = "Benachrichtigungen",
@@ -1827,6 +1833,37 @@ private fun AlarmBox(alarms: AlarmSchedule) {
             DueRow("Aufgaben-Töne", alarms.task, offHint = "nichts geplant")
             DueRow("Erinnerung", alarms.reminder, offHint = "keine")
 
+            EtaButton(
+                text = "Neu prüfen",
+                style = EtaButtonStyle.Secondary,
+                onClick = { probe++ },
+            )
+        }
+    }
+}
+
+/**
+ * The "Benachrichtigungen" page (step 52): the quiet and the volume of every
+ * sound that is not an alarm — the twin of the fields in the Alarme card.
+ */
+@Composable
+private fun NotificationSoundBox() {
+    val context = LocalContext.current
+    var probe by remember { mutableIntStateOf(0) }
+    val dndOn = remember(probe) { EtaSound.isDoNotDisturbOn(context) }
+    val muted = remember(probe) { EtaSound.isRingerMuted(context) }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(text = "Benachrichtigungen", style = EtaTheme.typography.heading)
+            EtaText(
+                text = "Alle Töne außer Weckruf und Planungsphasen: Beginn und Ende von " +
+                    "Aufgaben, Pomodoro, Timer, Erinnerungen, Belohn-o-mat, Streaks und die " +
+                    "Ansagen. Gilt sofort.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            SoundGroupFields(group = SoundGroup.NOTIFICATION, dndOn = dndOn, muted = muted)
             EtaButton(
                 text = "Neu prüfen",
                 style = EtaButtonStyle.Secondary,

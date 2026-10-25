@@ -90,7 +90,7 @@ fun EditContractDialog(
                         singleLine = false,
                     )
                 }
-                EtaField(label = "Vertragsbruch", hint = "Was gilt als Bruch?") {
+                EtaField(label = "Ausnahmen, Sonderfälle", hint = "Wann gilt der Vertrag nicht?") {
                     EtaTextField(
                         value = breach,
                         onValueChange = { breach = it },

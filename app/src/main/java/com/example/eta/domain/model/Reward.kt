@@ -34,23 +34,53 @@ data class Reward(
     val position: Int,
     /** When the user took it. A redeemed reward is history and fills no more. */
     val redeemedAt: Instant? = null,
+    /**
+     * Step 52: "Einmalig" — earned by reaching [condition] once, not through the
+     * evening's settlement. It collects no points ([cost] is 0) and is passed
+     * over by every rule that pours them; [achievedAt] is what makes it full.
+     */
+    val once: Boolean = false,
+    /** What has to happen for a one-off reward, in the user's words. */
+    val condition: String? = null,
+    /** By when, if the user gave a date — once it passes, the tab asks. */
+    val dueAt: Instant? = null,
+    /** When the user said the goal was reached. */
+    val achievedAt: Instant? = null,
+    /** When the user said, at its date, that it was not: then it is history. */
+    val expiredAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
     /** Earned in full and waiting to be taken — it no longer counts as position 1. */
     @get:Ignore
-    val isFull: Boolean get() = progress >= cost - REWARD_EPSILON
+    val isFull: Boolean
+        get() = if (once) achievedAt != null else progress >= cost - REWARD_EPSILON
+
+    @get:Ignore
+    val isExpired: Boolean get() = expiredAt != null
+
+    /** Off the list: taken, or a one-off whose date went by without it. */
+    @get:Ignore
+    val isPast: Boolean get() = redeemedAt != null || expiredAt != null
+
+    /** A one-off whose date has come and that still waits for an answer. */
+    fun isDue(now: Instant): Boolean =
+        once && !isPast && achievedAt == null && dueAt != null && dueAt <= now
 
     @get:Ignore
     val isRedeemed: Boolean get() = redeemedAt != null
 
-    /** Still being filled: what the evening's points can go to. */
+    /** Still being filled: what the evening's points can go to. Never a one-off. */
     @get:Ignore
-    val isFilling: Boolean get() = !isRedeemed && !isFull
+    val isFilling: Boolean get() = !once && !isPast && !isFull
 
     @get:Ignore
     val fraction: Float
-        get() = if (cost <= 0.0) 1f else (progress / cost).toFloat().coerceIn(0f, 1f)
+        get() = when {
+            once -> if (achievedAt != null) 1f else 0f
+            cost <= 0.0 -> 1f
+            else -> (progress / cost).toFloat().coerceIn(0f, 1f)
+        }
 }
 
 /** Rounding slack, so 24.999999 of 25 counts as earned. */

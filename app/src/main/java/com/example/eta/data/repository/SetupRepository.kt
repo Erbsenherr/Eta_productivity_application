@@ -5,7 +5,7 @@ import com.example.eta.data.local.ResetDao
 import com.example.eta.data.local.SetupDao
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
-import com.example.eta.domain.setup.isMorningRoutine
+import com.example.eta.domain.setup.SetupRoutine
 import com.example.eta.domain.subtask.SubtaskDraft
 import com.example.eta.domain.subtask.drafts
 import com.example.eta.domain.setup.isOwnedBySettings
@@ -114,12 +114,14 @@ class SetupRepository(
         // Read before the rows are swapped: switching the weekend night on or
         // off replaces `setup:morning` by one row per night, or the reverse, and
         // the steps have to follow the routine onto whichever rows it now has.
-        val steps = morningDefinitions().firstNotNullOfOrNull { definition ->
-            subtaskRepository.forItem(definition.id).takeIf { it.isNotEmpty() }
+        val steps = SetupRoutine.entries.associateWith { routine ->
+            routineDefinitions(routine).firstNotNullOfOrNull { definition ->
+                subtaskRepository.forItem(definition.id).takeIf { it.isNotEmpty() }
+            }
         }
 
         itemDao.upsertAll(generated + obsolete)
-        if (steps != null) saveMorningSteps(steps.drafts())
+        steps.forEach { (routine, list) -> if (list != null) saveRoutineSteps(routine, list.drafts()) }
         recurringTaskService.relayOccurrences((generated + obsolete).map { it.id })
     }
 
@@ -138,23 +140,23 @@ class SetupRepository(
         setupDao.upsert(transform(stored).copy(id = SETUP_ID, updatedAt = clock.now()))
     }
 
-    private suspend fun morningDefinitions(): List<Item> =
+    private suspend fun routineDefinitions(routine: SetupRoutine): List<Item> =
         itemDao.findByIdPrefix(SETUP_ITEM_ID_PREFIX)
-            .filter { isMorningRoutine(it.id) && it.completedAt == null }
+            .filter { routine.owns(it.id) && it.completedAt == null }
             .sortedBy { it.id }
 
     /**
-     * The steps of the morning routine, as they stand.
+     * The steps of a routine — the morning's or the evening's — as they stand.
      *
-     * Every morning definition carries the same list, so the first one speaks
+     * Every definition of it carries the same list, so the first one speaks
      * for all of them.
      */
-    fun observeMorningSteps(): Flow<List<Subtask>> = combine(
+    fun observeRoutineSteps(routine: SetupRoutine): Flow<List<Subtask>> = combine(
         itemDao.observeRecurringDefinitions(),
         subtaskRepository.observeByItem(),
     ) { definitions, byItem ->
         definitions
-            .filter { isMorningRoutine(it.id) }
+            .filter { routine.owns(it.id) }
             .sortedBy { it.id }
             .firstNotNullOfOrNull { byItem[it.id]?.takeIf { steps -> steps.isNotEmpty() } }
             .orEmpty()
@@ -162,7 +164,7 @@ class SetupRepository(
     }
 
     /**
-     * Writes the morning routine's steps — onto **every** morning definition.
+     * Writes a routine's steps — onto **every** definition of it.
      *
      * With a weekend night there is one per night, and on the Listen tab the
      * weekdays and the weekend are two rows of the list; it is still one routine,
@@ -170,8 +172,8 @@ class SetupRepository(
      * nobody could find. Both places the steps are edited — the settings and the
      * standing task's own window — come through here.
      */
-    suspend fun saveMorningSteps(drafts: List<SubtaskDraft>) {
-        morningDefinitions().forEach { subtaskRepository.save(it.id, drafts) }
+    suspend fun saveRoutineSteps(routine: SetupRoutine, drafts: List<SubtaskDraft>) {
+        routineDefinitions(routine).forEach { subtaskRepository.save(it.id, drafts) }
     }
 
     /**
