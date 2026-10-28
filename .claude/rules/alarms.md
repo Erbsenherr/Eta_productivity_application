@@ -100,7 +100,9 @@ filter other than "all" counts as on. Music ducks for the length of a sound
 (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`). The coordinators play **one sound per kind
 per ring**, so two tasks starting on the same minute are not twice as loud.
 `postNotification` replaced every `runCatching { notify(...) }` with an explicit
-permission check, which is also what turned `lint` green.
+permission check, which is also what turned `lint` green. Since step 53 it also
+takes Eta's earlier notifications away first, the wake alarm and the same
+moment's spared — see *Step 53*.
 
 **A channel's sound is fixed when the channel is created** — `setSound` on an
 existing `NotificationChannel` is ignored — so every change to one needs a **new

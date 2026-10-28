@@ -292,6 +292,21 @@ data class Item(
         updatedAt = now,
     )
 
+    /**
+     * A note turned into the other kind of card — "Einmalig" or "Wiederkehrend"
+     * (step 53). Quick-Add makes every note a ToDo; the switch in the form is
+     * how one becomes a standing task, and back.
+     *
+     * Only what the other kind cannot carry goes: a standing task has no
+     * priority and no unlock day, a ToDo no rule and no hour. Everything else —
+     * name, note, its place on the one-month clock — stays.
+     */
+    fun asKind(kind: ItemType, now: Instant): Item = when {
+        kind == type -> this
+        kind == ItemType.RECURRING -> copy(type = kind, priority = null, targetDate = null, updatedAt = now)
+        else -> copy(type = kind, recurrenceRule = null, startTime = null, repeatUntil = null, updatedAt = now)
+    }
+
     companion object {
         /** Quick-Add from the dashboard: name only, attributes filled in during daily planning. */
         fun newQuickTodo(

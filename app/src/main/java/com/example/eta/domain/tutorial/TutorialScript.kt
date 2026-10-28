@@ -77,6 +77,9 @@ object TutorialGate {
     const val CONCRETIZE_TODO = "concretize.todo"
     const val CONCRETIZE_RECURRING = "concretize.recurring"
 
+    /** The switch "Einmalig · Wiederkehrend" on a note's card (step 53). */
+    const val CONCRETIZE_KIND = "concretize.kind"
+
     /** "Löschen" on a note. No step opens it. */
     const val CONCRETIZE_DELETE = "concretize.delete"
 
@@ -117,9 +120,6 @@ object TutorialSpot {
     const val LIST_APPOINTMENTS = LIST_PREFIX + "TERMINE"
     const val LIST_LOCKED = LIST_PREFIX + "SPERRLISTE"
     const val QUICK_ADD = "dashboard.quickAdd"
-
-    /** The two dots of the Quick-Add box: the way to its second page. */
-    const val QUICK_ADD_PAGES = "dashboard.quickAdd.pages"
     const val TODO_SAVE = "todo.save"
     const val RECURRING_SAVE = "recurring.save"
     const val TODAY_TASKS = "dashboard.tasks"
@@ -145,6 +145,12 @@ data class TutorialFacts(
     /** A ToDo and a recurring note of the user's own were made at some point. */
     val todoNoted: Boolean = false,
     val recurringNoted: Boolean = false,
+    /**
+     * How many notes of the user's own have been made, of either kind. Since
+     * step 53 Quick-Add makes ToDos only, so the two notes are told apart by
+     * count until the evening turns one of them into a standing task.
+     */
+    val notesTaken: Int = 0,
     /** What the user called them, for the texts; null until there is one. */
     val todoName: String? = null,
     val recurringName: String? = null,
@@ -282,29 +288,22 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
         stage = TutorialStage.DASHBOARD,
         title = "Aus dem Kopf, in die App",
         text = { facts ->
-            if (facts.todoNoted && !facts.recurringNoted) {
-                "Die erste Notiz steht. »Regelmäßig Sport« soll sich wiederholen und " +
-                    "gehört auf die zweite Seite der Box: Wische sie zur Seite oder " +
-                    "tippe auf den zweiten Punkt oben rechts. Dort notierst du es."
+            if (facts.notesTaken == 1) {
+                "Die erste Notiz steht. Jetzt »Regelmäßig Sport« — ebenfalls nur der " +
+                    "Name. Dass es sich wiederholen soll, sagst du später."
             } else {
-                "Schreib beides in die Quick-Add-Box — ein Name genügt. Beginne mit " +
-                    "»Katzenstreu kaufen«. Danach darfst du es vergessen: Eta erinnert " +
-                    "sich für dich. (Nur zur Übung — nichts davon landet in deinen " +
-                    "eigenen Listen.)"
+                "Schreib beides in die Quick-Add-Box — ein Name genügt, eins nach dem " +
+                    "anderen. Beginne mit »Katzenstreu kaufen«. Danach darfst du es " +
+                    "vergessen: Eta erinnert sich für dich. (Nur zur Übung — nichts " +
+                    "davon landet in deinen eigenen Listen.)"
             }
         },
         kind = StepKind.TASK,
         spot = TutorialSpot.QUICK_ADD,
-        // Once the ToDo is noted the frame leaves the box for its two dots:
-        // what is missing now is not typing, it is finding the second page.
-        spotFor = { facts ->
-            if (facts.todoNoted && !facts.recurringNoted) TutorialSpot.QUICK_ADD_PAGES else null
-        },
-        swipeHint = { it.todoNoted && !it.recurringNoted },
         checks = {
             listOf(
-                TutorialCheck("»Katzenstreu kaufen« notieren", it.todoNoted),
-                TutorialCheck("»Regelmäßig Sport« als Wiederholung notieren", it.recurringNoted),
+                TutorialCheck("»Katzenstreu kaufen« notieren", it.notesTaken >= 1),
+                TutorialCheck("»Regelmäßig Sport« notieren", it.notesTaken >= 2),
             )
         },
     ),
@@ -463,6 +462,19 @@ val QUICKSTART_STEPS: List<TutorialStep> = listOf(
     ),
 
     // --- The notes get their answers ----------------------------------------
+    TutorialStep(
+        stage = TutorialStage.CONCRETIZE,
+        title = "Einmalig oder wiederkehrend",
+        text = {
+            "Quick-Add legt jede Notiz als einmaliges ToDo an. »Regelmäßig Sport« soll " +
+                "sich aber wiederholen: Stell auf seiner Karte den Schalter oben auf " +
+                "»Wiederkehrend«. Die Karte fragt dann nach Wochentagen statt nach einer " +
+                "Priorität."
+        },
+        kind = StepKind.TASK,
+        checks = { listOf(TutorialCheck("»Regelmäßig Sport« auf »Wiederkehrend« stellen", it.recurringNoted)) },
+        allow = setOf(TutorialGate.CONCRETIZE_KIND),
+    ),
     TutorialStep(
         stage = TutorialStage.CONCRETIZE,
         title = "Notizen ausfüllen",
@@ -715,6 +727,7 @@ fun tutorialFacts(
     val mail = today.firstOrNull { it.item.id == TUTORIAL_MAIL_ID }?.block
 
     return TutorialFacts(
+        notesTaken = ownTodos.size + notes.size,
         todoNoted = ownTodos.isNotEmpty(),
         recurringNoted = notes.isNotEmpty(),
         todoName = ownTodos.firstOrNull()?.name,
@@ -744,6 +757,7 @@ fun tutorialFacts(
  * false again because of it, nor its name be forgotten.
  */
 fun TutorialFacts.remembering(earlier: TutorialFacts): TutorialFacts = copy(
+    notesTaken = maxOf(notesTaken, earlier.notesTaken),
     todoNoted = todoNoted || earlier.todoNoted,
     recurringNoted = recurringNoted || earlier.recurringNoted,
     todoName = todoName ?: earlier.todoName,

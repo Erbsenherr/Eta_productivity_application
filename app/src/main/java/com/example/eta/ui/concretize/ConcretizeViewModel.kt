@@ -9,6 +9,7 @@ import com.example.eta.domain.setup.UserSetup
 import com.example.eta.data.repository.SubtaskRepository
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
+import com.example.eta.domain.model.ItemType
 import com.example.eta.domain.model.Priority
 import com.example.eta.domain.model.Stage
 import com.example.eta.domain.model.Subtask
@@ -152,6 +153,18 @@ class ConcretizeViewModel(
      * Deleting rather than banning: the Sperrliste is for ToDos that were carried
      * around for a month, not for ones dismissed the same evening they were noted.
      */
+    /**
+     * The switch on a card (step 53): the note becomes the other kind, and the
+     * card the other form. Written at once — a card here has no "Abbrechen",
+     * and the kind is what decides which questions it is asked.
+     */
+    fun switchKind(item: Item, recurring: Boolean) {
+        viewModelScope.launch {
+            val kind = item.asKind(if (recurring) ItemType.RECURRING else ItemType.TODO, clock.now())
+            if (kind != item) itemRepository.update(kind)
+        }
+    }
+
     fun discard(item: Item) {
         viewModelScope.launch { itemRepository.delete(item) }
     }

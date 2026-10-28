@@ -21,9 +21,11 @@ snapping, and where a block can actually go.
 - **A drop onto another movable block asks.** "Tasks gruppieren?" — with "Nur
   verschieben" as one of the answers, because the slide below is a gesture a dense
   day needs. See *Step 23*.
-- **A block moved onto occupied time slides.** `firstFreeStart` finds the next
-  place it fits. Something **new** put on occupied time is asked about instead,
-  since step 41 — see *Step 41*.
+- **A block moved onto occupied time asks** since step 53 — next free place,
+  overwrite, or back to the week list (`MoveDialog`, see *Step 53*). It used to
+  slide to `firstFreeStart`. Something **new** put on occupied time is asked
+  about since step 41 — see *Step 41*.
+- **"Rückgängig"** takes the day back one change at a time — see *Step 53*.
 - **Turn versus pull.** Both gestures live on the centre chamber, so the *first*
   direction the finger takes decides which one it is, and that decision is held
   until the finger lifts. Anything else and a hesitant drag does both. `onPullStart`

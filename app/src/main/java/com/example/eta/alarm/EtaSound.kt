@@ -394,10 +394,35 @@ internal fun postNotification(context: Context, tag: String?, id: Int, notificat
         return
     }
     try {
+        clearEarlierNotifications(context)
         NotificationManagerCompat.from(context).notify(tag, id, notification)
     } catch (revoked: SecurityException) {
         // Revoked between the check and the call; the same outcome as refused.
     }
+}
+
+/**
+ * How long ago a notification may have been posted and still stand beside a new
+ * one: two tasks starting on the same minute are posted one after the other, and
+ * the second must not take the first away.
+ */
+private const val SAME_MOMENT_MILLIS = 10_000L
+
+/**
+ * Takes Eta's earlier notifications off the lock screen before a new one is
+ * posted (step 53), so only the latest stands there instead of a day's worth.
+ *
+ * Spared: an **ongoing** one — the wake alarm, which is answered rather than
+ * read — and what was posted in the same moment. Only Eta's own: the system
+ * hands an app nothing but its own notifications.
+ */
+private fun clearEarlierNotifications(context: Context) {
+    val manager: NotificationManager = context.getSystemService() ?: return
+    val now = System.currentTimeMillis()
+    runCatching { manager.activeNotifications }.getOrNull().orEmpty()
+        .filter { it.notification.flags and Notification.FLAG_ONGOING_EVENT == 0 }
+        .filter { now - it.postTime > SAME_MOMENT_MILLIS }
+        .forEach { manager.cancel(it.tag, it.id) }
 }
 
 /**

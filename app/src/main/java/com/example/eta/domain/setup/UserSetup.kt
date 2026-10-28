@@ -483,6 +483,11 @@ data class UserSetup(
      */
     val streaks: Boolean = false,
     /**
+     * Step 53: the Regelwerk tab — questions and the answers the user gave
+     * them. An Advanced Feature, off for everyone.
+     */
+    val rulebook: Boolean = false,
+    /**
      * Step 48: how many minutes after the hour still count as on time, for
      * getting up and for going to bed alike. Five unless the user says
      * otherwise; past [RECOMMENDED_MAX_PUNCTUAL_TOLERANCE] the settings say

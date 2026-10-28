@@ -9,6 +9,11 @@ paths:
 
 ### Quick-Add, and what a bare note becomes
 
+**Since step 53 Quick-Add is one page and every note a ToDo**; whether it is
+meant to repeat is a switch in the form it is finished in (`KindSwitch`,
+`Item.asKind`) — see *Step 53*. What follows about the second page, the swipe
+and the dots is how it stood; the rest still holds.
+
 **Quick-Add asks for a name and nothing else**, on both of its pages, because that is
 what a quick-add *is*: the thought is caught now and the questions are answered in
 the evening. `ui/quickadd/` owns the panel — the pager, the two forms and their view

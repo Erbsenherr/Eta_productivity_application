@@ -146,6 +146,13 @@ class ReevaluationViewModel(
     private val _journal = MutableStateFlow<Map<String, String>>(emptyMap())
     val journal: StateFlow<Map<String, String>> = _journal.asStateFlow()
 
+    /**
+     * Remainders answered with "Lassen" or "Verfallen", by block id. Above
+     * `init`, which reads it: the offers are derived afresh on every refresh,
+     * and one waved away must not come back with the next tick.
+     */
+    private val dismissedRemainders = mutableSetOf<String>()
+
     init {
         refresh()
     }
@@ -162,6 +169,7 @@ class ReevaluationViewModel(
             val remainders = blocks.mapNotNull { entry ->
                 val all = steps[entry.item.id].orEmpty()
                 if (all.isEmpty() || entry.block.isOpen) return@mapNotNull null
+                if (entry.block.id in dismissedRemainders) return@mapNotNull null
                 val open = all.stillOpen(ticks[entry.block.id].orEmpty())
                 if (open.isEmpty()) return@mapNotNull null
                 RemainderOffer(
@@ -327,7 +335,20 @@ class ReevaluationViewModel(
         }
     }
 
+    /**
+     * "Erledigt" on a routine's rest (step 53): the open steps were done and
+     * not ticked in time, so they are ticked now, on this day.
+     */
+    fun completeRemainder(offer: RemainderOffer) {
+        viewModelScope.launch {
+            offer.open.forEach { subtaskRepository.setChecked(offer.entry.block.id, it.id, true) }
+            refresh()
+        }
+    }
+
+    /** "Lassen", and a routine's "Verfallen": the steps stay unticked. */
     fun dismissRemainder(offer: RemainderOffer) {
+        dismissedRemainders += offer.entry.block.id
         _state.update { state ->
             state.copy(
                 remainders = state.remainders

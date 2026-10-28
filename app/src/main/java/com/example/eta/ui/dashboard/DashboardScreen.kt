@@ -273,6 +273,26 @@ private fun TodayPage(
         var confirming by remember { mutableStateOf<BlockWithItem?>(null) }
         // A routine ticked in "Heute anstehend" with steps still open, by block id.
         var routineTickId by remember { mutableStateOf<String?>(null) }
+        // A routine opened by a tap on its name (step 53), by block id.
+        var routineShownId by remember { mutableStateOf<String?>(null) }
+        val routineIds = state.todayBlocks
+            .filter { it.item.routineMode && state.subtasks[it.item.id].orEmpty().isNotEmpty() }
+            .mapTo(mutableSetOf()) { it.block.id }
+        routineShownId?.let { id ->
+            val entry = state.todayBlocks.firstOrNull { it.block.id == id }
+            if (entry == null) {
+                routineShownId = null
+            } else {
+                RoutineDetailDialog(
+                    entry = entry,
+                    steps = state.subtasks[entry.item.id].orEmpty(),
+                    checkedIds = state.checked[id].orEmpty(),
+                    checkTimes = state.checkTimes[id].orEmpty(),
+                    onCheck = { subtaskId, on -> viewModel.setSubtaskChecked(id, subtaskId, on) },
+                    onDismiss = { routineShownId = null },
+                )
+            }
+        }
         val followUp by viewModel.followUp.collectAsStateWithLifecycle()
 
         // Timer-Tasks: the buttons under them, and the three things they can
@@ -324,6 +344,7 @@ private fun TodayPage(
             checkTimes = state.checkTimes,
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
+            onOpenRoutine = { routineShownId = it },
             timer = timerActions,
             stepTimers = state.stepTimers,
             stepTimer = StepTimerActions(
@@ -514,6 +535,8 @@ private fun TodayPage(
             onStartChange = viewModel::setStart,
             onUncancel = viewModel::uncancel,
             onEdit = plannerViewModel?.let { { id: String -> editingId = id } },
+            routineIds = routineIds,
+            onOpenRoutine = { routineShownId = it },
         )
 
         // Small corrections happen in the list above. This is the way to the

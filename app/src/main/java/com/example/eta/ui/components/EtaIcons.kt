@@ -50,6 +50,9 @@ enum class EtaIcon {
     /** Streaks: a flame. */
     FLAME,
 
+    /** Regelwerk: a bound book. */
+    RULEBOOK,
+
     /** Einstellungen: three sliders. */
     SLIDERS,
 }
@@ -160,6 +163,13 @@ private fun DrawScope.drawIcon(icon: EtaIcon, color: Color) {
             outline(14.5f, 3f, 14.5f, 7.5f, 19f, 7.5f)
             line(8f, 12f, 16f, 12f)
             line(8f, 16f, 13.5f, 16f)
+        }
+
+        EtaIcon.RULEBOOK -> {
+            outline(5f, 3f, 19f, 3f, 19f, 21f, 5f, 21f, closed = true)
+            line(8.5f, 3f, 8.5f, 21f)
+            line(11.5f, 8f, 16f, 8f)
+            line(11.5f, 11.5f, 16f, 11.5f)
         }
 
         EtaIcon.FLAME -> {

@@ -113,6 +113,8 @@ fun DayPlannerScreen(
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
     val overlapPrompt by viewModel.overlapPrompt.collectAsStateWithLifecycle()
     val mergeRequest by viewModel.mergeRequest.collectAsStateWithLifecycle()
+    val movePrompt by viewModel.movePrompt.collectAsStateWithLifecycle()
+    val canUndo by viewModel.canUndo.collectAsStateWithLifecycle()
     val canSpend by viewModel.canSpend.collectAsStateWithLifecycle()
     // Whether the full builder is open, rather than the short question. Keyed by
     // the pair, so a second drop starts over instead of reopening the last one.
@@ -434,6 +436,7 @@ fun DayPlannerScreen(
                 } else PlannerFooter(
                     confirmed = state.isConfirmed,
                     isToday = state.isToday,
+                    onUndo = viewModel::undo.takeIf { canUndo },
                     onConfirm = viewModel::confirm,
                     onReopen = viewModel::reopen,
                     onClose = onClose,
@@ -610,6 +613,24 @@ fun DayPlannerScreen(
                 viewModel.cancelWholeDay()
                 clearingDay = false
             },
+        )
+    }
+
+    // Held as an id: a block that has gone while the question stood leaves
+    // nothing to move, and the dialog closes itself.
+    movePrompt?.let { prompt ->
+        if (state.blocks.none { it.block.id == prompt.blockId }) {
+            viewModel.dismissMove()
+            return@let
+        }
+        MoveDialog(
+            prompt = prompt,
+            blocks = state.blocks,
+            costs = state.isToday,
+            onDismiss = viewModel::dismissMove,
+            onNextFree = viewModel::moveToNextFree,
+            onOverwrite = viewModel::moveOverwriting,
+            onCancel = viewModel::cancelMove,
         )
     }
 
@@ -950,6 +971,8 @@ private fun UnplannedLine(state: PlannerUiState) {
 private fun PlannerFooter(
     confirmed: Boolean,
     isToday: Boolean,
+    /** "Rückgängig" (step 53); null while there is nothing to take back. */
+    onUndo: (() -> Unit)?,
     onConfirm: () -> Unit,
     onReopen: () -> Unit,
     onClose: () -> Unit,
@@ -963,13 +986,21 @@ private fun PlannerFooter(
         // A day being lived is never confirmed again. It was planned last night,
         // and writing `confirmedAt` a second time would misdate that. Changes are
         // saved as they are made, so leaving is all this needs to offer.
+        // Two buttons at most: with something to take back, "Rückgängig" takes
+        // the place of the caption.
+        if (!confirmed && onUndo != null) {
+            EtaButton(text = "↶ Rückgängig", style = EtaButtonStyle.Secondary, onClick = onUndo)
+            Spacer(Modifier.weight(1f))
+        }
         if (isToday) {
-            EtaText(
-                text = "Änderungen gelten sofort.",
-                style = EtaTheme.typography.caption,
-                color = EtaTheme.colors.textMuted,
-                modifier = Modifier.weight(1f),
-            )
+            if (onUndo == null) {
+                EtaText(
+                    text = "Änderungen gelten sofort.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             EtaButton(text = "Fertig", onClick = onClose)
         } else if (confirmed) {
             EtaText(
@@ -985,12 +1016,14 @@ private fun PlannerFooter(
             // What a break or a points entry used to be reached by — a button
             // through three revolvers — is a long press on the day now, so the
             // footer says where it went.
-            EtaText(
-                text = "Freie Stelle gedrückt halten für ToDo, Pause oder Custom.",
-                style = EtaTheme.typography.caption,
-                color = EtaTheme.colors.textMuted,
-                modifier = Modifier.weight(1f),
-            )
+            if (onUndo == null) {
+                EtaText(
+                    text = "Freie Stelle gedrückt halten für ToDo, Pause oder Custom.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             EtaButton(
                 text = "Bestätigen",
                 // Confirming puts the revolver away; in the tutorial that waits
@@ -1019,7 +1052,8 @@ private fun BoxScope.PlacementBanner(
             feedback is PlacementFeedback.CopiedToWeek ||
             feedback is PlacementFeedback.ReturnedToWeek ||
             feedback is PlacementFeedback.Removed ||
-            feedback is PlacementFeedback.DayCleared
+            feedback is PlacementFeedback.DayCleared ||
+            feedback is PlacementFeedback.Undone
         ) {
             EtaTheme.colors.success
         } else {
@@ -1050,6 +1084,9 @@ private fun BoxScope.PlacementBanner(
                     is PlacementFeedback.Overlapping ->
                         "»${feedback.name}« ist gruppiert, passt aber nirgends ganz hin — " +
                             "der Block überschneidet sich jetzt."
+
+                    is PlacementFeedback.Undone ->
+                        "Rückgängig gemacht — der Tag steht wieder wie vor der letzten Änderung."
 
                     is PlacementFeedback.DayCleared -> when (feedback.count) {
                         0 -> "Es stand nichts mehr offen."

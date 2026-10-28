@@ -32,6 +32,8 @@ data class Features(
     val notes: Boolean = true,
     /** Step 48: the Streaks tab and the evening's streak page. */
     val streaks: Boolean = true,
+    /** Step 53: the Regelwerk tab. */
+    val rulebook: Boolean = true,
 )
 
 val LocalFeatures = staticCompositionLocalOf { Features() }

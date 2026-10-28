@@ -68,6 +68,7 @@ import com.example.eta.domain.tutorial.TutorialSignal
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.components.EtaTimePickerDialog
 import com.example.eta.ui.components.ConfirmDialog
+import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatCountdown
 import com.example.eta.ui.format.formatLong
@@ -192,6 +193,11 @@ fun NowBox(
      */
     greeting: String? = null,
     greetingContent: (@Composable () -> Unit)? = null,
+    /**
+     * A tap on the name of a routine with steps (step 53): what the routine is
+     * made of, every step tickable. Handed the block's id.
+     */
+    onOpenRoutine: ((blockId: String) -> Unit)? = null,
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
 
@@ -288,6 +294,7 @@ fun NowBox(
                             timer = timer,
                             stepTimers = stepTimers[entry.entry.block.id].orEmpty(),
                             stepTimer = stepTimer,
+                            onOpenRoutine = onOpenRoutine?.let { open -> { open(entry.entry.block.id) } },
                         )
                     }
                 }
@@ -324,6 +331,7 @@ private fun NowLine(
     timer: TimerActions? = null,
     stepTimers: Map<String, SubtaskTimer> = emptyMap(),
     stepTimer: StepTimerActions? = null,
+    onOpenRoutine: (() -> Unit)? = null,
 ) {
     val entry = now.entry
     val block = entry.block
@@ -345,6 +353,17 @@ private fun NowLine(
             EtaText(
                 text = entry.item.name + (phaseLabel(now.phase)?.let { " · $it" } ?: ""),
                 style = EtaTheme.typography.title,
+                // A routine's name opens what it is made of: the box shows one
+                // step at a time, and a step ticked too late is ticked there.
+                modifier = if (routine && onOpenRoutine != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onOpenRoutine,
+                    )
+                } else {
+                    Modifier
+                },
             )
         }
         EtaText(
@@ -844,6 +863,13 @@ fun TasksBox(
      * so a folded list is not a hidden one.
      */
     foldKey: String? = null,
+    /**
+     * The blocks whose name opens their routine on a tap (step 53), and what
+     * opens it. A routine's row has steps to show; every other row unfolds
+     * its name as before.
+     */
+    routineIds: Set<String> = emptySet(),
+    onOpenRoutine: ((blockId: String) -> Unit)? = null,
 ) {
     val fold = foldKey?.let { rememberFold(it, initiallyOpen = true) }
     val open = fold?.open ?: true
@@ -896,6 +922,7 @@ fun TasksBox(
                         onUncancel = onUncancel,
                         onEdit = onEdit,
                         timer = timer,
+                        onOpenRoutine = onOpenRoutine?.takeIf { entry.block.id in routineIds },
                     )
                 }
             }
@@ -912,6 +939,7 @@ private fun TaskRow(
     onUncancel: ((BlockWithItem) -> Unit)? = null,
     onEdit: ((blockId: String) -> Unit)? = null,
     timer: TimerActions? = null,
+    onOpenRoutine: ((blockId: String) -> Unit)? = null,
 ) {
     var pickingStart by remember(entry.block.id) { mutableStateOf(false) }
     var offeringUncancel by remember(entry.block.id) { mutableStateOf(false) }
@@ -926,15 +954,20 @@ private fun TaskRow(
     // planner does not offer it either.
     val canEdit = entry.block.isOpen && onEdit != null
     val latestOnEdit by rememberUpdatedState(onEdit)
+    val latestOnOpenRoutine by rememberUpdatedState(onOpenRoutine)
+    val isRoutine = onOpenRoutine != null
     val blockId = entry.block.id
 
     Column(
         // Keyed by what the lambdas depend on, so nothing in them can go stale.
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(blockId, canUncancel, canEdit) {
+            .pointerInput(blockId, canUncancel, canEdit, isRoutine) {
                 detectTapGestures(
-                    onTap = { showFullName = !showFullName },
+                    // A routine's row opens what it is made of (step 53).
+                    onTap = {
+                        if (isRoutine) latestOnOpenRoutine?.invoke(blockId) else showFullName = !showFullName
+                    },
                     onLongPress = when {
                         canUncancel -> { _ -> offeringUncancel = true }
                         canEdit -> { _ -> latestOnEdit?.invoke(blockId) }
@@ -1169,5 +1202,76 @@ fun DeadlinesBox(
                 }
             }
         }
+    }
+}
+
+/**
+ * What a routine is made of, every step with its checkbox (step 53).
+ *
+ * The "Gerade" box shows one step at a time, which is the point of a routine
+ * and the trouble with ticking afterwards: a step done and not ticked in time
+ * has left the screen. Here all of them stand in order, the time of each tick
+ * beside it, and a tick can be set or taken back — Timer-Task steps included,
+ * whose timer is otherwise the only way to end them.
+ */
+@Composable
+fun RoutineDetailDialog(
+    entry: BlockWithItem,
+    steps: List<Subtask>,
+    checkedIds: Set<String>,
+    checkTimes: Map<String, Instant>,
+    onCheck: (subtaskId: String, checked: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val zone = TimeZone.currentSystemDefault()
+    val ordered = steps.sortedBy { it.position }
+    val done = ordered.count { it.id in checkedIds }
+    EtaDialog(title = entry.item.name, onDismiss = onDismiss) {
+        EtaText(
+            text = "${entry.block.start.formatClock()} · ${entry.block.effectiveDuration.formatShort()} · " +
+                "$done von ${ordered.size} Schritten erledigt",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textSecondary,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            ordered.forEach { step ->
+                val ticked = step.id in checkedIds
+                key(step.id) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EtaCheckbox(checked = ticked, onCheckedChange = { onCheck(step.id, it) })
+                        Spacer(Modifier.width(EtaTheme.spacing.sm))
+                        Column(Modifier.weight(1f)) {
+                            EtaText(
+                                text = step.name,
+                                style = EtaTheme.typography.body,
+                                color = if (ticked) EtaTheme.colors.textMuted else EtaTheme.colors.textPrimary,
+                                textDecoration = if (ticked) TextDecoration.LineThrough else null,
+                            )
+                            val details = listOfNotNull(
+                                step.duration?.takeIf { step.isTimerStep }?.formatShort(),
+                                step.quantityLabel(),
+                                checkTimes[step.id]?.takeIf { ticked }
+                                    ?.toLocalDateTime(zone)?.time?.formatClock()?.let { "abgehakt $it" },
+                            )
+                            if (details.isNotEmpty()) {
+                                EtaText(
+                                    text = details.joinToString(" · "),
+                                    style = EtaTheme.typography.caption,
+                                    color = EtaTheme.colors.textMuted,
+                                )
+                            }
+                            step.note?.takeIf { it.isNotBlank() }?.let { note ->
+                                EtaText(
+                                    text = note,
+                                    style = EtaTheme.typography.caption,
+                                    color = EtaTheme.colors.textMuted,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EtaButton(text = "Schließen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
     }
 }

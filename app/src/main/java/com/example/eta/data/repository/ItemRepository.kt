@@ -92,23 +92,6 @@ class ItemRepository(
         return AddItemResult.Added(item)
     }
 
-    /**
-     * The recurring Quick-Add: also name only, and refused by the same lock.
-     *
-     * It lands in the Sammelliste rather than the schedule, because it has no
-     * rule yet — asking for weekdays and a duration at the moment of the thought
-     * is what a Quick-Add is supposed to spare the user.
-     */
-    suspend fun addQuickRecurring(name: String): AddItemResult {
-        val now = clock.now()
-        itemDao.findActiveLock(normalizeName(name), now)?.let { locked ->
-            return AddItemResult.BlockedByLock(locked.lockedUntil ?: now)
-        }
-        val item = Item.newQuickRecurring(name, now)
-        itemDao.upsert(item)
-        return AddItemResult.Added(item)
-    }
-
     suspend fun add(
         item: Item,
         subtasks: List<SubtaskDraft> = emptyList(),

@@ -149,6 +149,7 @@ private fun RunningTutorial(tutorial: TutorialViewModel, session: TutorialSessio
                         statistics = false,
                         notes = false,
                         streaks = on,
+                        rulebook = false,
                     )
                 },
             ) {

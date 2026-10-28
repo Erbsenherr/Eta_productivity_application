@@ -19,8 +19,7 @@ import com.example.eta.ui.theme.DesignChoice
  * It is a **launcher, not a text field**: `RemoteViews` has no editable view, so
  * a widget cannot take typing itself. What it can do is look like the field it
  * opens and get out of the way in one tap — which lands in [QuickAddActivity],
- * holding the very same panel the dashboard shows, swipe to the recurring form
- * included.
+ * holding the very same panel the dashboard shows.
  *
  * There is no `updatePeriodMillis`: the widget shows nothing that changes, so
  * waking it on a timer would spend battery redrawing the same picture.

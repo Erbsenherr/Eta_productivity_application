@@ -20,7 +20,9 @@ import androidx.compose.ui.window.Dialog
 import com.example.eta.domain.model.Category
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.ItemType
+import com.example.eta.domain.model.Stage
 import com.example.eta.domain.model.Subtask
+import com.example.eta.ui.attributes.KindSwitch
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.domain.recurrence.RecurringOverlap
 import com.example.eta.domain.reward.yieldOf
@@ -344,9 +346,17 @@ fun ItemEditDialog(
     var note by remember(item.id) { mutableStateOf(item.note.orEmpty()) }
     var todo by remember(item.id) { mutableStateOf(TodoAttributes.of(item, today, subtasks)) }
     var recurring by remember(item.id) { mutableStateOf(RecurringAttributes.of(item, subtasks)) }
-    val isRecurring = item.type == ItemType.RECURRING
+    // A note in the Sammelliste can still become the other kind of card (step
+    // 53) — Quick-Add makes every note a ToDo. Changed in the form, written
+    // with "Sichern": "Abbrechen" leaves the card what it was.
+    val canSwitchKind = item.stage == Stage.COLLECTION &&
+        (item.type == ItemType.TODO || item.type == ItemType.RECURRING)
+    var isRecurring by remember(item.id) { mutableStateOf(item.type == ItemType.RECURRING) }
 
     ListDialog(title = "Bearbeiten", onDismiss = onDismiss) {
+        if (canSwitchKind) {
+            KindSwitch(recurring = isRecurring, onChange = { isRecurring = it })
+        }
         if (isRecurring) {
             EtaText(
                 text = "Wiederkehrend — mit dem Sichern zieht diese Aufgabe aus der " +

@@ -29,6 +29,7 @@ import com.example.eta.domain.model.SubtaskTimer
 import com.example.eta.domain.model.Vacation
 import com.example.eta.domain.model.VacationRule
 import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.model.Rule
 
 @Database(
     entities = [
@@ -55,8 +56,9 @@ import com.example.eta.domain.setup.UserSetup
         Note::class,
         HabitStreak::class,
         SubtaskTimer::class,
+        Rule::class,
     ],
-    version = 35,
+    version = 36,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -77,6 +79,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun plannerExtrasDao(): PlannerExtrasDao
     abstract fun trackingDao(): TrackingDao
     abstract fun streakDao(): StreakDao
+    abstract fun ruleDao(): RuleDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -1093,5 +1096,21 @@ val MIGRATION_34_35 = object : Migration(34, 35) {
               AND `name` = 'Bettfertig machen'
             """.trimIndent(),
         )
+    }
+}
+
+/**
+ * Step 53: the Regelwerk — the table `rules`, and its switch
+ * **`user_setup.rulebook`** (`NOT NULL DEFAULT 0`: an Advanced Feature, off for
+ * everyone who upgrades, as it is for a new setup).
+ */
+val MIGRATION_35_36 = object : Migration(35, 36) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `rules` (`id` TEXT NOT NULL, `question` TEXT NOT NULL, " +
+                "`answer` TEXT NOT NULL, `position` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `rulebook` INTEGER NOT NULL DEFAULT 0")
     }
 }

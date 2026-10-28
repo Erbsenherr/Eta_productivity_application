@@ -995,6 +995,13 @@ private fun AdvancedFeaturesBox(setup: UserSetup, onChange: OnSetupChange) {
                 hint = "Ein Reiter für Notizen mit Titel und Text, die sich per »Taskify« " +
                     "in ToDos verwandeln lassen. Ausgeschaltet bleiben die Notizen erhalten.",
             )
+            CheckRow(
+                checked = setup.rulebook,
+                onCheckedChange = { on -> onChange { it.copy(rulebook = on) } },
+                label = "Regelwerk",
+                hint = "Ein Reiter für eigene Regeln als Frage und Antwort — »Was passiert, " +
+                    "wenn …?«. Ausgeschaltet bleiben die Regeln erhalten.",
+            )
         }
     }
 }

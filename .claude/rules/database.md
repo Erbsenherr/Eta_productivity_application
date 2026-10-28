@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 35.** When changing an entity, diff the hand-written SQL against the
+**Version 36.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -47,6 +47,7 @@ Room stores enums by name in a TEXT column.
 | 32→33 | the table `streaks`; `user_setup.streaks` (`INTEGER NOT NULL DEFAULT 0`) and `punctualTolerance` (`INTEGER NOT NULL DEFAULT 5`); `sleep_logs.tolerance` (`INTEGER`, nullable) — see *Step 48* |
 | 33→34 | the item's timer, growth and quantity columns of the same names on `subtasks` (`timerTask`, `growthEvery`, `growthProgress`, `quantityEvery`, `quantityProgress` `NOT NULL` with the item's defaults, the rest nullable) and the table `subtask_timers` — see *Step 49* |
 | 34→35 | `rewards.once` (`INTEGER NOT NULL DEFAULT 0`), `condition`, `dueAt`, `achievedAt`, `expiredAt` (nullable); `user_setup.weekendPlanning` (0); every `setup:bedprep` row gets `routineMode` on, and those still named "Bettfertig machen" become "Abendroutine" — see *Step 52* |
+| 35→36 | the table `rules` (the Regelwerk); `user_setup.rulebook` (`INTEGER NOT NULL DEFAULT 0`) — see *Step 53* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

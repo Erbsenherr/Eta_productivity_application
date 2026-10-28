@@ -20,18 +20,16 @@ import kotlinx.datetime.toLocalDateTime
 /** What a quick-add has to say back. */
 sealed interface QuickAddFeedback {
     data class Added(val name: String) : QuickAddFeedback
-    data class AddedRecurring(val name: String) : QuickAddFeedback
     data class Blocked(val name: String, val until: LocalDate) : QuickAddFeedback
 }
 
 /**
- * The two quick-adds: a note for the Sammelliste, and a note that is meant to
- * repeat.
+ * The quick-add: a note for the Sammelliste.
  *
- * Both take **a name and nothing else**. That is the whole point of a quick-add —
+ * It takes **a name and nothing else**. That is the whole point of a quick-add —
  * the thought is caught now, the questions are answered in the evening, in the
- * concretizing step that already exists for exactly this. The only difference
- * between the two is which kind of card the evening will then ask about.
+ * concretizing step that already exists for exactly this. Every note is a ToDo
+ * since step 53; whether it is meant to repeat is one of those questions.
  *
  * Its own view model rather than a corner of the dashboard's, because the
  * home-screen widget shows exactly the same panel. Two copies of this would
@@ -52,25 +50,6 @@ class QuickAddViewModel(
         viewModelScope.launch {
             _feedback.value = when (val result = itemRepository.addQuickTodo(trimmed)) {
                 is AddItemResult.Added -> QuickAddFeedback.Added(trimmed)
-                is AddItemResult.BlockedByLock -> blocked(trimmed, result)
-            }
-        }
-    }
-
-    /**
-     * The recurring half. Also name only.
-     *
-     * It occupies no day until it is concretized — `expandRecurring` skips a
-     * definition without a rule, a start time or a duration rather than guessing
-     * at one — so a bare recurring note sits in the Sammelliste harmlessly, next
-     * to the bare ToDos, and the evening asks all three at once.
-     */
-    fun addRecurring(name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            _feedback.value = when (val result = itemRepository.addQuickRecurring(trimmed)) {
-                is AddItemResult.Added -> QuickAddFeedback.AddedRecurring(trimmed)
                 is AddItemResult.BlockedByLock -> blocked(trimmed, result)
             }
         }

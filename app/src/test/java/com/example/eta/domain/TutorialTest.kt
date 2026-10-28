@@ -432,6 +432,7 @@ class TutorialTest {
         )
         val played = tutorialFacts(emptyList(), listOf(todo), day, listOf(dragged), true)
             .copy(
+                notesTaken = 2,
                 todoNoted = true,
                 recurringNoted = true,
                 seen = setOf("${TutorialSignal.NOW_PAGE}=1"),
@@ -584,20 +585,36 @@ class TutorialTest {
     }
 
     @Test
-    fun `once the ToDo is noted the frame moves from the box to its two dots`() {
+    fun `both notes go into the one Quick-Add box and are counted, not told apart`() {
         val step = QUICKSTART_STEPS.first { it.spot == TutorialSpot.QUICK_ADD }
 
-        assertEquals(TutorialSpot.QUICK_ADD, step.spotAt(TutorialFacts()))
-        assertFalse(step.swipeHint(TutorialFacts()))
+        assertEquals(TutorialSpot.QUICK_ADD, step.spotAt(TutorialFacts(notesTaken = 1)))
+        assertFalse(step.swipeHint(TutorialFacts(notesTaken = 1)))
+        assertTrue(step.text(TutorialFacts(notesTaken = 1)).contains("Regelmäßig Sport"))
+        assertFalse(step.checks(TutorialFacts(notesTaken = 1)).all { it.done })
+        assertTrue(step.checks(TutorialFacts(notesTaken = 2)).all { it.done })
 
-        val half = TutorialFacts(todoNoted = true)
-        assertEquals(TutorialSpot.QUICK_ADD_PAGES, step.spotAt(half))
-        assertTrue(step.swipeHint(half))
-        assertTrue(step.text(half).contains("zweite"))
+        // Two ToDo notes: neither is a recurring one until the evening's switch.
+        val facts = tutorialFacts(
+            listOf(Item.newQuickTodo("Katzenstreu kaufen", now), Item.newQuickTodo("Regelmäßig Sport", now)),
+            emptyList(),
+            exampleDay(),
+            emptyList(),
+            false,
+        )
+        assertEquals(2, facts.notesTaken)
+        assertFalse(facts.recurringNoted)
+    }
 
-        val both = TutorialFacts(todoNoted = true, recurringNoted = true)
-        assertEquals(TutorialSpot.QUICK_ADD, step.spotAt(both))
-        assertFalse(step.swipeHint(both))
+    @Test
+    fun `the evening's first step turns a note into a standing task and opens only the switch`() {
+        val step = QUICKSTART_STEPS.first { TutorialGate.CONCRETIZE_KIND in it.allow }
+
+        assertEquals(TutorialStage.CONCRETIZE, step.stage)
+        assertEquals(StepKind.TASK, step.kind)
+        assertEquals(step, QUICKSTART_STEPS.first { it.stage == TutorialStage.CONCRETIZE })
+        assertFalse(step.checks(TutorialFacts(notesTaken = 2)).all { it.done })
+        assertTrue(step.checks(TutorialFacts(notesTaken = 2, recurringNoted = true)).all { it.done })
     }
 
     @Test

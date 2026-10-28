@@ -39,9 +39,13 @@ abstract class ResetDao {
         clearPlannerDismissals()
         clearSleepLogs()
         clearNotes()
+        clearRules()
         clearStreaks()
         clearSetup()
     }
+
+    @Query("DELETE FROM rules")
+    abstract suspend fun clearRules()
 
     @Query("DELETE FROM streaks")
     abstract suspend fun clearStreaks()

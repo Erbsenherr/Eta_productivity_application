@@ -48,7 +48,8 @@ Where the `PlacementSpan` runs into nothing it is written at once; where it does
   says, `NoRoom` what a moved block says.
 - **Not changed, deliberately: moving a block already on the day.**
   `moveAnyway` still slides, and a drop on another hand-placed block still asks
-  "Gruppieren?". The note asked about *new* cards.
+  "Gruppieren?". The note asked about *new* cards. **Since step 53 a move asks
+  too** — see *Step 53*.
 - `fitsSomewhere` — the priority gate's and `canCreateTodo`'s test — is
   unchanged: "fits" still means without overlap.
 

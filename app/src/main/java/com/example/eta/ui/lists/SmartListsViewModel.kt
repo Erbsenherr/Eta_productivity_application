@@ -304,7 +304,9 @@ class SmartListsViewModel(
     fun saveTodo(item: Item, name: String, note: String?, attributes: TodoAttributes) {
         viewModelScope.launch {
             val now = clock.now()
-            val renamed = if (name != item.name) item.renamed(name, now) else item
+            // A recurring note switched to "Einmalig" in the form (step 53).
+            val kind = item.asKind(ItemType.TODO, now)
+            val renamed = if (name != kind.name) kind.renamed(name, now) else kind
             // The evening step's own call, so a card finished here is finished by
             // the same rules — and comes out `isConcretized` either way.
             itemRepository.concretize(
@@ -340,7 +342,9 @@ class SmartListsViewModel(
         if (attributes.weekdays.isEmpty()) return
         viewModelScope.launch {
             val now = clock.now()
-            val renamed = if (name != item.name) item.renamed(name, now) else item
+            // A ToDo note switched to "Wiederkehrend" in the form (step 53).
+            val kind = item.asKind(ItemType.RECURRING, now)
+            val renamed = if (name != kind.name) kind.renamed(name, now) else kind
             itemRepository.concretizeRecurring(
                 item = renamed.copy(note = note),
                 category = attributes.category,

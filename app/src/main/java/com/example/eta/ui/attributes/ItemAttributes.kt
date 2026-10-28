@@ -92,6 +92,12 @@ import com.example.eta.ui.format.formatLong
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.format.formatWeekdays
 import com.example.eta.ui.theme.EtaTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.alpha
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -1870,5 +1876,49 @@ fun StepExtrasFields(value: StepExtras, onChange: (StepExtras) -> Unit) {
             PomodoroRow(extras = asItemExtras, onExtras = { onChange(fromItemExtras(it)) })
         }
         QuantityRow(extras = asItemExtras, onExtras = { onChange(fromItemExtras(it)) })
+    }
+}
+
+/**
+ * "Einmalig" or "Wiederkehrend": two halves of one pill, the chosen one filled
+ * (step 53) — the shape of the week timetable's "Aktuell · Generell".
+ *
+ * Quick-Add makes every note a ToDo; the form a note is finished in is where it
+ * becomes a standing task instead, and the fields below follow the choice.
+ */
+@Composable
+fun KindSwitch(
+    recurring: Boolean,
+    onChange: (recurring: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = modifier
+            .alpha(if (enabled) 1f else 0.5f)
+            .background(EtaTheme.colors.surface, EtaTheme.shapes.pill)
+            .border(1.dp, EtaTheme.colors.border, EtaTheme.shapes.pill)
+            .padding(2.dp),
+    ) {
+        listOf(false to "Einmalig", true to "Wiederkehrend").forEach { (option, label) ->
+            val chosen = option == recurring
+            EtaText(
+                text = label,
+                style = EtaTheme.typography.label,
+                color = if (chosen) EtaTheme.colors.onAccent else EtaTheme.colors.textSecondary,
+                modifier = Modifier
+                    .background(
+                        color = if (chosen) EtaTheme.colors.accent else EtaTheme.colors.surface,
+                        shape = EtaTheme.shapes.pill,
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = enabled && !chosen,
+                        onClick = { onChange(option) },
+                    )
+                    .padding(horizontal = EtaTheme.spacing.md, vertical = EtaTheme.spacing.sm),
+            )
+        }
     }
 }

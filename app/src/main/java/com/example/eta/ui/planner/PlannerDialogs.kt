@@ -680,44 +680,140 @@ fun OverlapDialog(
                 enabled = adjustable,
                 onClick = onAdjustPlan,
             )
-            entries.forEach { (relief, entry) ->
-                val other = entry.item.name
-                EtaText(
-                    text = "· " + when (relief) {
-                        is PlanRelief.EndsEarlier ->
-                            "»$other« endet schon um ${clockAt(relief.result.endMinute())}."
-
-                        is PlanRelief.StartsLater ->
-                            "»$other« beginnt erst um ${clockAt(relief.result.startMinute())}."
-
-                        is PlanRelief.Removed -> when (entry.removalFate()) {
-                            RemovalFate.DELETED -> "»$other« entfällt."
-                            RemovalFate.BACK_TO_WEEK -> "»$other« geht zurück in die Wochenliste."
-                            RemovalFate.CALLED_OFF -> "»$other« wird abgesagt."
-                        }
-
-                        is PlanRelief.Kept ->
-                            "»$other« ist ein Kalendertermin und bleibt stehen — die " +
-                                "Überschneidung mit ihm auch."
-                    },
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.textSecondary,
-                )
-            }
-            val callsOff = entries.any { (relief, entry) ->
-                relief is PlanRelief.Removed && entry.removalFate() == RemovalFate.CALLED_OFF
-            }
-            if (callsOff && costs && pointsVisible) {
-                EtaText(
-                    text = "Der Tag läuft bereits: Absagen kostet die abgesagten Stunden an Punkten.",
-                    style = EtaTheme.typography.caption,
-                    color = EtaTheme.colors.warning,
-                )
-            }
+            ReliefLines(entries = entries, costs = costs && pointsVisible)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+        }
+    }
+}
+
+/**
+ * What "Plan anpassen" or "Überschreiben" would do to each block in the way,
+ * one line each, and the price where calling something off costs.
+ */
+@Composable
+private fun ReliefLines(entries: List<Pair<PlanRelief, BlockWithItem>>, costs: Boolean) {
+    entries.forEach { (relief, entry) ->
+        val other = entry.item.name
+        EtaText(
+            text = "· " + when (relief) {
+                is PlanRelief.EndsEarlier ->
+                    "»$other« endet schon um ${clockAt(relief.result.endMinute())}."
+
+                is PlanRelief.StartsLater ->
+                    "»$other« beginnt erst um ${clockAt(relief.result.startMinute())}."
+
+                is PlanRelief.Removed -> when (entry.removalFate()) {
+                    RemovalFate.DELETED -> "»$other« entfällt."
+                    RemovalFate.BACK_TO_WEEK -> "»$other« geht zurück in die Wochenliste."
+                    RemovalFate.CALLED_OFF -> "»$other« wird abgesagt."
+                }
+
+                is PlanRelief.Kept ->
+                    "»$other« ist ein Kalendertermin und bleibt stehen — die " +
+                        "Überschneidung mit ihm auch."
+            },
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textSecondary,
+        )
+    }
+    val callsOff = entries.any { (relief, entry) ->
+        relief is PlanRelief.Removed && entry.removalFate() == RemovalFate.CALLED_OFF
+    }
+    if (callsOff && costs) {
+        EtaText(
+            text = "Der Tag läuft bereits: Absagen kostet die abgesagten Stunden an Punkten.",
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.warning,
+        )
+    }
+}
+
+/**
+ * A block already on the day was dropped on occupied time (step 53), and the
+ * three ways out of it: the next free stretch, the place it was dropped on with
+ * the plan giving way, or not at all.
+ *
+ * Each answer says what it would do before it is given, as [OverlapDialog]'s do.
+ * Tapping beside the window leaves the block where it stood.
+ */
+@Composable
+fun MoveDialog(
+    prompt: MovePrompt,
+    blocks: List<BlockWithItem>,
+    /** Whether calling something off costs here — today yes, tomorrow no. */
+    costs: Boolean,
+    onDismiss: () -> Unit,
+    onNextFree: () -> Unit,
+    onOverwrite: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val name = prompt.name
+    val wanted = prompt.wanted
+    val entries = prompt.relief.mapNotNull { relief ->
+        blocks.firstOrNull { it.block.id == relief.block.id }?.let { relief to it }
+    }
+    val pointsVisible = LocalPointsVisible.current
+
+    PlannerDialog(title = "Platz belegt", onDismiss = onDismiss) {
+        EtaText(
+            text = "Von ${clockAt(wanted.startMinute)} bis ${clockAt(wanted.endMinute)} liegt bereits " +
+                entries.joinToString(separator = ", ", postfix = ".") { "»${it.second.item.name}«" },
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+
+        val nextFree = prompt.nextFree
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Nächster freier Platz",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = nextFree != null,
+                onClick = onNextFree,
+            )
+            EtaText(
+                text = if (nextFree == null) {
+                    "An diesem Tag ist keine Lücke mehr frei, in die »$name« passt."
+                } else {
+                    "»$name« beginnt dann um ${clockAt(nextFree)}. Der Plan bleibt, wie er ist."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+
+        // Only a calendar import in the way: nothing in the plan to overwrite.
+        val adjustable = entries.any { it.first !is PlanRelief.Kept }
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Überschreiben",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = adjustable,
+                onClick = onOverwrite,
+            )
+            ReliefLines(entries = entries, costs = costs && pointsVisible)
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = if (prompt.canReturn) "Zurück in die Wochenliste" else "Abbrechen",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onCancel,
+            )
+            EtaText(
+                text = if (prompt.canReturn) {
+                    "»$name« verlässt den Tag und kann neu eingeplant werden."
+                } else {
+                    "»$name« bleibt, wo es stand."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
         }
     }
 }

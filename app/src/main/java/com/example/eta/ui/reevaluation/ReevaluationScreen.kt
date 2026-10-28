@@ -335,7 +335,27 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                         color = EtaTheme.colors.textSecondary,
                     )
                 }
-                if (offer.createdItem != null) {
+                if (offer.entry.item.routineMode) {
+                    // A routine's rest is not carried over (step 53): what was
+                    // left of a morning is not a task for another day. Either
+                    // it was done and not ticked, or it is gone.
+                    EtaText(
+                        text = "Wurden die offenen Schritte doch erledigt, oder verfallen sie?",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textSecondary,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                        EtaButton(
+                            text = "Erledigt",
+                            onClick = { viewModel.completeRemainder(offer) },
+                        )
+                        EtaButton(
+                            text = "Verfallen",
+                            style = EtaButtonStyle.Secondary,
+                            onClick = { viewModel.dismissRemainder(offer) },
+                        )
+                    }
+                } else if (offer.createdItem != null) {
                     EtaText(
                         text = "»${offer.createdItem.name}« liegt in der Wochenliste, " +
                             "${offer.createdItem.estimatedDuration?.formatShort() ?: ""} lang.",

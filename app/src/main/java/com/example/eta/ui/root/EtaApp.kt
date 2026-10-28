@@ -15,6 +15,8 @@ import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.theme.orderTabs
 import com.example.eta.ui.streaks.StreaksScreen
+import com.example.eta.ui.rules.RulesScreen
+import com.example.eta.ui.rules.RulesViewModel
 import com.example.eta.ui.streaks.StreaksViewModel
 import com.example.eta.ui.theme.reorderVisible
 import com.example.eta.ui.theme.EtaTheme
@@ -191,6 +193,7 @@ fun EtaApp(
                         statistics = stored.statistics,
                         notes = stored.notes,
                         streaks = stored.streaks,
+                        rulebook = stored.rulebook,
                     ),
                 ) {
                     MainScaffold(
@@ -476,6 +479,10 @@ private fun MainScaffold(
                     ),
                 )
 
+                EtaTab.Rules -> RulesScreen(
+                    viewModel = viewModel(key = "rules", factory = rulesViewModelFactory(container)),
+                )
+
                 EtaTab.Settings -> SettingsScreen(
                     viewModel = viewModel(factory = settingsViewModelFactory(container)),
                     calendarViewModel = viewModel(
@@ -571,6 +578,9 @@ private enum class EtaTab(val label: String, val icon: EtaIcon) {
     /** Step 48: streaks bound to standing tasks, beside the contracts they resemble. */
     Streaks("Streaks", EtaIcon.FLAME),
 
+    /** Step 53: the user's own rules, questions and what holds for them. */
+    Rules("Regelwerk", EtaIcon.RULEBOOK),
+
     /** Far right, as the user asked: it is the tab opened least. */
     Settings("Einstellungen", EtaIcon.SLIDERS),
 }
@@ -583,6 +593,7 @@ private fun EtaTab.isShown(features: Features): Boolean = when (this) {
     EtaTab.Statistics -> features.statistics
     EtaTab.Notes -> features.notes
     EtaTab.Streaks -> features.streaks
+    EtaTab.Rules -> features.rulebook
     else -> true
 }
 
@@ -921,6 +932,11 @@ internal fun statisticsViewModelFactory(container: AppContainer): ViewModelProvi
                 clock = container.clock,
             )
         }
+    }
+
+internal fun rulesViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
+    viewModelFactory {
+        initializer { RulesViewModel(ruleRepository = container.ruleRepository) }
     }
 
 internal fun notesViewModelFactory(container: AppContainer): ViewModelProvider.Factory =

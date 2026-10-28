@@ -29,6 +29,7 @@ import com.example.eta.ui.attributes.RecurringAttributes
 import com.example.eta.ui.attributes.growthIssuesFor
 import com.example.eta.ui.attributes.TodoAttributeFields
 import com.example.eta.ui.attributes.TodoAttributes
+import com.example.eta.ui.attributes.KindSwitch
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaField
@@ -121,6 +122,7 @@ fun ConcretizeScreen(
                                 viewModel.concretizeRecurring(item, name, attributes)
                             },
                             onDiscard = { viewModel.discard(item) },
+                            onSwitchKind = { viewModel.switchKind(item, recurring = it) },
                         )
                     } else {
                         ConcretizeCard(
@@ -132,6 +134,7 @@ fun ConcretizeScreen(
                                 viewModel.concretize(item, name, attributes)
                             },
                             onDiscard = { viewModel.discard(item) },
+                            onSwitchKind = { viewModel.switchKind(item, recurring = it) },
                         )
                     }
                 }
@@ -166,12 +169,14 @@ private fun ConcretizeCard(
     foldCandidates: List<FoldCandidate>,
     onSave: (String, TodoAttributes) -> Unit,
     onDiscard: () -> Unit,
+    onSwitchKind: (recurring: Boolean) -> Unit,
 ) {
     var name by remember(item.id) { mutableStateOf(item.name) }
     var attributes by remember(item.id) { mutableStateOf(TodoAttributes.of(item, today, subtasks)) }
 
     CardFrame(
-        label = null,
+        recurring = false,
+        onSwitchKind = onSwitchKind,
         name = name,
         onNameChange = { name = it },
         onDiscard = onDiscard,
@@ -207,12 +212,14 @@ private fun ConcretizeRecurringCard(
     foldCandidates: List<FoldCandidate>,
     onSave: (String, RecurringAttributes) -> Unit,
     onDiscard: () -> Unit,
+    onSwitchKind: (recurring: Boolean) -> Unit,
 ) {
     var name by remember(item.id) { mutableStateOf(item.name) }
     var attributes by remember(item.id) { mutableStateOf(RecurringAttributes.of(item, subtasks)) }
 
     CardFrame(
-        label = "Wiederkehrend",
+        recurring = true,
+        onSwitchKind = onSwitchKind,
         name = name,
         onNameChange = { name = it },
         onDiscard = onDiscard,
@@ -259,10 +266,14 @@ private fun ConcretizeRecurringCard(
     }
 }
 
-/** The surface, the name field and the two buttons — identical for both cards. */
+/**
+ * The surface, the kind switch, the name field and the two buttons — identical
+ * for both cards.
+ */
 @Composable
 private fun CardFrame(
-    label: String?,
+    recurring: Boolean,
+    onSwitchKind: (Boolean) -> Unit,
     name: String,
     onNameChange: (String) -> Unit,
     onDiscard: () -> Unit,
@@ -278,13 +289,13 @@ private fun CardFrame(
 
     EtaSurface(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg)) {
-            if (label != null) {
-                EtaText(
-                    text = label,
-                    style = EtaTheme.typography.label,
-                    color = EtaTheme.colors.accent,
-                )
-            }
+            // Quick-Add makes every note a ToDo; this is where one that is meant
+            // to repeat becomes a standing task (step 53).
+            KindSwitch(
+                recurring = recurring,
+                onChange = onSwitchKind,
+                enabled = tutorialAllows(TutorialGate.CONCRETIZE_KIND),
+            )
             EtaField(label = "Name") {
                 EtaTextField(value = name, onValueChange = onNameChange)
             }

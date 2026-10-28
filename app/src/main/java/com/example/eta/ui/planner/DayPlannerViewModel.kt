@@ -31,6 +31,9 @@ import com.example.eta.domain.model.withExtras
 import com.example.eta.domain.planning.BreakFindings
 import com.example.eta.domain.planning.PlacementSpan
 import com.example.eta.domain.planning.PlanRelief
+import com.example.eta.domain.planning.PLAN_UNDO_DEPTH
+import com.example.eta.domain.planning.PlanSnapshot
+import com.example.eta.domain.planning.planRestore
 import com.example.eta.domain.planning.collisions
 import com.example.eta.domain.planning.fittedSpan
 import com.example.eta.domain.planning.planRelief
@@ -69,7 +72,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -187,6 +193,9 @@ sealed interface PlacementFeedback {
     /** A break was dropped back on the revolver, and is simply gone. */
     data class Removed(val name: String) : PlacementFeedback
 
+    /** "Rückgängig" put the day back as it stood before the last change. */
+    data object Undone : PlacementFeedback
+
     /** The whole day was called off at once; [count] cards were dealt with. */
     data class DayCleared(val count: Int) : PlacementFeedback
 
@@ -272,6 +281,29 @@ data class OverlapPrompt(
     val relief: List<PlanRelief>,
 )
 
+/**
+ * A block already on the day was moved onto time something else holds (step 53).
+ *
+ * Asked rather than slid: the planner used to put it at the next free stretch,
+ * or leave it where it was when the day had none — a time the user did not
+ * choose, or nothing at all. Three answers: the next free stretch ([nextFree],
+ * null when the day has none), the place it was dropped on with what stands
+ * there cut or cleared ([relief], as "Plan anpassen" does for a new card), or
+ * neither — back to the week list where it came from one ([canReturn]),
+ * otherwise where it stood.
+ *
+ * Held by the block's **id**; the row and both answers are worked out again
+ * when one is given.
+ */
+data class MovePrompt(
+    val blockId: String,
+    val name: String,
+    val wanted: PlacementSpan,
+    val nextFree: Int?,
+    val relief: List<PlanRelief>,
+    val canReturn: Boolean,
+)
+
 /** What becomes of a block "Plan anpassen" or "Ganzen Tag absagen" clears away. */
 enum class RemovalFate { DELETED, BACK_TO_WEEK, CALLED_OFF }
 
@@ -337,6 +369,22 @@ class DayPlannerViewModel(
 
     private val _mergeRequest = MutableStateFlow<MergeRequest?>(null)
     val mergeRequest: StateFlow<MergeRequest?> = _mergeRequest.asStateFlow()
+
+    private val _movePrompt = MutableStateFlow<MovePrompt?>(null)
+    val movePrompt: StateFlow<MovePrompt?> = _movePrompt.asStateFlow()
+
+    /**
+     * The day as it stood before each change, newest last — "Rückgängig"
+     * (step 53). In memory: leaving the planner and coming back is a new
+     * sitting, and a change from yesterday is not one to take back by a tap.
+     */
+    private val undoStack = MutableStateFlow<List<PlanSnapshot>>(emptyList())
+    val canUndo: StateFlow<Boolean> = undoStack
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** One change at a time, so a snapshot is never taken in the middle of another. */
+    private val writes = Mutex()
 
     init {
         // The phase materializes what it is about to plan. Idempotent, so opening
@@ -489,7 +537,7 @@ class DayPlannerViewModel(
     private fun request(pending: PendingPlacement, wanted: PlacementSpan) {
         val existing = uiState.value.blocks.standing()
         if (wanted.collisions(existing).isEmpty()) {
-            viewModelScope.launch { commit(pending, wanted) }
+            undoable { commit(pending, wanted) }
             return
         }
         _overlapPrompt.value = OverlapPrompt(
@@ -504,7 +552,7 @@ class DayPlannerViewModel(
     fun placeAnyway() {
         val prompt = _overlapPrompt.value ?: return
         _overlapPrompt.value = null
-        viewModelScope.launch { commit(prompt.pending, prompt.wanted) }
+        undoable { commit(prompt.pending, prompt.wanted) }
     }
 
     /**
@@ -521,14 +569,78 @@ class DayPlannerViewModel(
             _feedback.value = PlacementFeedback.NoRoom(prompt.pending.name)
             return
         }
-        viewModelScope.launch { commit(prompt.pending, fitted) }
+        undoable { commit(prompt.pending, fitted) }
     }
 
     /** "Plan anpassen": the card stands, and what is in its way is cut or cleared. */
     fun placeAdjustingPlan() {
         val prompt = _overlapPrompt.value ?: return
         _overlapPrompt.value = null
-        viewModelScope.launch { commit(prompt.pending, prompt.wanted, adjustPlan = true) }
+        undoable { commit(prompt.pending, prompt.wanted, adjustPlan = true) }
+    }
+
+    // --- Rückgängig (step 53) -----------------------------------------------
+
+    /**
+     * Runs a change to the day and remembers how the day stood before it.
+     *
+     * The snapshot is pushed only when the change changed something: a card the
+     * Sperrliste refused, or a move that found no room, leaves nothing to undo.
+     */
+    private fun undoable(change: suspend () -> Unit) {
+        viewModelScope.launch {
+            writes.withLock {
+                val before = snapshot()
+                change()
+                if (!snapshot().sameRowsAs(before)) {
+                    undoStack.update { (it + before).takeLast(PLAN_UNDO_DEPTH) }
+                }
+            }
+        }
+    }
+
+    /** The day's blocks, and every card a change on it can reach. */
+    private suspend fun snapshot(): PlanSnapshot {
+        val takenAt = clock.now()
+        val day = planRepository.findDay(date)
+        val loose = itemRepository.observeStage(Stage.WEEK).first() +
+            itemRepository.observeStage(Stage.COLLECTION).first()
+        return PlanSnapshot(
+            blocks = day.map { it.block },
+            items = (day.map { it.item } + loose).distinctBy { it.id },
+            takenAt = takenAt,
+        )
+    }
+
+    /**
+     * "Rückgängig": the day goes back to how it stood before the last change.
+     *
+     * Rows are written back as they were — the blocks the change laid down
+     * first, so the old ones find their slot free under the one-a-day index,
+     * and every card before its blocks.
+     */
+    fun undo() {
+        viewModelScope.launch {
+            writes.withLock {
+                val before = undoStack.value.lastOrNull() ?: return@withLock
+                undoStack.update { it.dropLast(1) }
+                val now = clock.now()
+                val restore = planRestore(before, snapshot())
+                restore.removeBlocks.forEach { planRepository.removeBlock(it) }
+                restore.restoreItems.forEach { itemRepository.update(it) }
+                restore.restoreBlocks.forEach { planRepository.addBlock(it.copy(updatedAt = now)) }
+                restore.deleteItems.forEach { itemRepository.delete(it) }
+                _feedback.value = PlacementFeedback.Undone
+            }
+        }
+    }
+
+    /**
+     * A change the undo cannot reach — steps, a group, a night — ends what can
+     * be undone: an older snapshot written back over it would undo half of it.
+     */
+    private fun forgetUndo() {
+        undoStack.value = emptyList()
     }
 
     fun dismissOverlap() {
@@ -638,8 +750,8 @@ class DayPlannerViewModel(
     }
 
     /** Cuts or clears what stands in [span]'s way — "Plan anpassen". */
-    private suspend fun makeRoomFor(span: PlacementSpan, now: Instant) {
-        val standing = uiState.value.blocks.filter { it.claimsItsSlot() }
+    private suspend fun makeRoomFor(span: PlacementSpan, now: Instant, ignoreId: String? = null) {
+        val standing = uiState.value.blocks.filter { it.claimsItsSlot() && it.block.id != ignoreId }
         planRelief(standing.map { it.block }, span).forEach { relief ->
             when (relief) {
                 is PlanRelief.EndsEarlier -> planRepository.addBlock(relief.result.copy(updatedAt = now))
@@ -710,35 +822,97 @@ class DayPlannerViewModel(
         moveAnyway(blockId, toMinute)
     }
 
-    /** The slide the planner has always done, and the "nur verschieben" answer. */
+    /**
+     * A move, and the "nur verschieben" answer: written where it was dropped if
+     * that is free, asked about if it is not — see [MovePrompt].
+     */
     fun moveAnyway(blockId: String, toMinute: Int) {
         _mergeRequest.value = null
-        val block = uiState.value.blocks.firstOrNull { it.block.id == blockId }?.block ?: return
+        val entry = uiState.value.blocks.firstOrNull { it.block.id == blockId } ?: return
+        val block = entry.block
         if (!block.isMovable) return
-        viewModelScope.launch {
-            val existing = uiState.value.blocks.standing()
-            val wanted = snapToGrid(toMinute).coerceIn(0, MINUTES_PER_DAY - 1)
-            val moved = block.copy(start = minuteToLocalTime(wanted), updatedAt = clock.now())
+        val existing = uiState.value.blocks.standing()
+        val wanted = snapToGrid(toMinute).coerceIn(0, MINUTES_PER_DAY - 1)
+        val moved = block.copy(start = minuteToLocalTime(wanted), updatedAt = clock.now())
 
-            if (canPlace(existing, moved)) {
-                planRepository.addBlock(moved)
-                return@launch
-            }
-            val start = firstFreeStart(
-                existing,
-                block.effectiveDuration,
-                wanted,
-                ignoreId = block.id,
-                leadIn = block.travelBefore,
-                tailOut = block.returnAfter,
-                tailOutExtra = block.breakAfter,
-            )
-            if (start == null) {
-                _feedback.value = PlacementFeedback.NoRoom("Der Block")
-                return@launch
-            }
-            planRepository.addBlock(moved.copy(start = minuteToLocalTime(start)))
+        if (canPlace(existing, moved)) {
+            undoable { planRepository.addBlock(moved) }
+            return
         }
+        val span = spanOf(moved)
+        _movePrompt.value = MovePrompt(
+            blockId = blockId,
+            name = entry.item.name,
+            wanted = span,
+            nextFree = nextFreeFor(block, wanted),
+            relief = planRelief(existing.filterNot { it.id == blockId }, span),
+            canReturn = block.isHandPlaced,
+        )
+    }
+
+    /** The span a block takes at its start, margins and all. */
+    private fun spanOf(block: PlannedBlock) = PlacementSpan(
+        startMinute = block.startMinute(),
+        duration = block.effectiveDuration,
+        travelBefore = block.travelBefore,
+        returnAfter = block.returnAfter,
+        breakAfter = block.breakAfter,
+    )
+
+    /** The next stretch the block fits, from where it was dropped on. */
+    private fun nextFreeFor(block: PlannedBlock, wanted: Int): Int? = firstFreeStart(
+        uiState.value.blocks.standing(),
+        block.effectiveDuration,
+        wanted,
+        ignoreId = block.id,
+        leadIn = block.travelBefore,
+        tailOut = block.returnAfter,
+        tailOutExtra = block.breakAfter,
+    )
+
+    /** "Nächster freier Platz": the slide the planner always did, now chosen. */
+    fun moveToNextFree() {
+        val prompt = _movePrompt.value ?: return
+        _movePrompt.value = null
+        val block = uiState.value.blocks.firstOrNull { it.block.id == prompt.blockId }?.block ?: return
+        val start = nextFreeFor(block, prompt.wanted.startMinute)
+        if (start == null) {
+            _feedback.value = PlacementFeedback.NoRoom(prompt.name)
+            return
+        }
+        undoable {
+            planRepository.addBlock(block.copy(start = minuteToLocalTime(start), updatedAt = clock.now()))
+        }
+    }
+
+    /**
+     * "Überschreiben": the block stands where it was dropped, and what is in
+     * its way is cut or cleared — "Plan anpassen" for a block that is moved.
+     */
+    fun moveOverwriting() {
+        val prompt = _movePrompt.value ?: return
+        _movePrompt.value = null
+        val block = uiState.value.blocks.firstOrNull { it.block.id == prompt.blockId }?.block ?: return
+        undoable {
+            val now = clock.now()
+            makeRoomFor(prompt.wanted, now, ignoreId = block.id)
+            planRepository.addBlock(block.copy(start = minuteToLocalTime(prompt.wanted.startMinute), updatedAt = now))
+        }
+    }
+
+    /**
+     * "Abbrechen": a card from the week list goes back to it; anything else —
+     * a flexible standing occurrence — stays where it stood.
+     */
+    fun cancelMove() {
+        val prompt = _movePrompt.value ?: return
+        _movePrompt.value = null
+        if (prompt.canReturn) returnToWeek(prompt.blockId)
+    }
+
+    /** The dialog closed beside its buttons: nothing moves. */
+    fun dismissMove() {
+        _movePrompt.value = null
     }
 
     /**
@@ -758,6 +932,7 @@ class DayPlannerViewModel(
      *   make-up is not: it follows from work already under way.
      */
     fun saveSubtasks(blockId: String, setting: SubtaskSetting) {
+        forgetUndo()
         viewModelScope.launch {
             val block = planRepository.findBlock(blockId) ?: return@launch
             val item = itemRepository.findById(block.itemId) ?: return@launch
@@ -815,6 +990,7 @@ class DayPlannerViewModel(
         val anchorId = request?.targetId ?: survivorId
         val wanted = state.blocks.firstOrNull { it.block.id == anchorId }?.block?.startMinute()
             ?: return
+        forgetUndo()
 
         viewModelScope.launch {
             val obstacles = state.blocks
@@ -860,7 +1036,7 @@ class DayPlannerViewModel(
      * decision, not the evening's admission that it did not happen.
      */
     fun cancel(entry: BlockWithItem, forceMajeure: Boolean = false) {
-        viewModelScope.launch {
+        undoable {
             // Held down rather than tapped: called off, and excused in the same
             // breath. The evening then has no charge to book for it.
             planRepository.discard(
@@ -892,14 +1068,14 @@ class DayPlannerViewModel(
     fun returnToWeek(blockId: String) {
         val entry = uiState.value.blocks.firstOrNull { it.block.id == blockId } ?: return
         if (!entry.block.isHandPlaced) return
-        viewModelScope.launch {
+        undoable {
             planRepository.removeBlock(entry.block)
             // A break has no week list to go back to: it was made for this
             // day, so taking it off the day takes it away.
             if (entry.item.isOneOffBreak) {
                 itemRepository.delete(entry.item)
                 _feedback.value = PlacementFeedback.Removed(entry.item.name)
-                return@launch
+                return@undoable
             }
             if (entry.item.stage == Stage.DAY) itemRepository.moveTo(entry.item, Stage.WEEK)
             _feedback.value = PlacementFeedback.ReturnedToWeek(entry.item.name)
@@ -921,7 +1097,7 @@ class DayPlannerViewModel(
      * rewrite the day's record.
      */
     fun cancelWholeDay() {
-        viewModelScope.launch {
+        undoable {
             val entries = uiState.value.blocks.filter { it.block.isOpen }
             entries.forEach { clearFromDay(it) }
             _feedback.value = PlacementFeedback.DayCleared(entries.size)
@@ -940,7 +1116,7 @@ class DayPlannerViewModel(
      * hoarded. It has no target date, so it can be planned at once.
      */
     fun copyToWeek(entry: BlockWithItem) {
-        viewModelScope.launch {
+        undoable {
             val now = clock.now()
             val copy = Item(
                 type = ItemType.TODO,
@@ -994,7 +1170,7 @@ class DayPlannerViewModel(
         pointsPerHour: Double?,
         flexible: Boolean = entry.block.flexible,
     ) {
-        viewModelScope.launch {
+        undoable {
             val now = clock.now()
             val newItemNote = itemNote.ifBlank { null }
             if (name != entry.item.name ||
@@ -1084,6 +1260,7 @@ class DayPlannerViewModel(
      * no other. See [NightService.overrideNight] for what moves with it.
      */
     fun changeNight(wakeDate: LocalDate, sleep: LocalTime, wake: LocalTime) {
+        forgetUndo()
         viewModelScope.launch {
             nightService.overrideNight(wakeDate, sleep, wake)
             wakeAlarmCoordinator.reschedule()
@@ -1091,6 +1268,7 @@ class DayPlannerViewModel(
     }
 
     fun resetNight(wakeDate: LocalDate) {
+        forgetUndo()
         viewModelScope.launch {
             nightService.clearOverride(wakeDate)
             wakeAlarmCoordinator.reschedule()
