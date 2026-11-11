@@ -49,6 +49,7 @@ Room stores enums by name in a TEXT column.
 | 34→35 | `rewards.once` (`INTEGER NOT NULL DEFAULT 0`), `condition`, `dueAt`, `achievedAt`, `expiredAt` (nullable); `user_setup.weekendPlanning` (0); every `setup:bedprep` row gets `routineMode` on, and those still named "Bettfertig machen" become "Abendroutine" — see *Step 52* |
 | 35→36 | the table `rules` (the Regelwerk); `user_setup.rulebook` (`INTEGER NOT NULL DEFAULT 0`) — see *Step 53* |
 | 36→37 | `items.ultraHigh` (`INTEGER NOT NULL DEFAULT 0`) — see *Step 54* |
+| 37→38 | `planned_blocks.endedEarly` (`INTEGER NOT NULL DEFAULT 0`), `items.timerMalusBase` (`INTEGER`, nullable seconds) — see *Step 55* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

@@ -83,6 +83,9 @@ and four callbacks taking a block **id**).
   begun before or after its hour is not in the box at all.
 - "Start · 2 h" → the countdown. With a rhythm the large figure is the phase,
   the small one the total. "Pause" / "Weiter".
+- **Since step 55 a task's second button is "Vorzeitig beenden"**, asked
+  about and costing 10 % of its time — see *Step 55*. What follows is how it
+  stood, and how a routine's step still has it.
 - **"Ende" is behind a long press** (`EtaButton(onLongClick = …)`,
   `combinedClickable`) until the goal is counted down or the block's frame has
   run out; then it stands beside the button.

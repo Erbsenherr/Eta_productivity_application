@@ -58,7 +58,7 @@ import com.example.eta.domain.model.Rule
         SubtaskTimer::class,
         Rule::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1119,5 +1119,13 @@ val MIGRATION_35_36 = object : Migration(35, 36) {
 val MIGRATION_36_37 = object : Migration(36, 37) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `items` ADD COLUMN `ultraHigh` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** Step 55: a sitting ended early, and the time a task returns to after it. */
+val MIGRATION_37_38 = object : Migration(37, 38) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `endedEarly` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `timerMalusBase` INTEGER")
     }
 }

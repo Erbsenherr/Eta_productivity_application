@@ -144,6 +144,12 @@ data class PlannedBlock(
     val timerWorked: Duration? = null,
     val timerRunningSince: Instant? = null,
     /**
+     * "Vorzeitig beenden" was confirmed for this sitting (step 55): the evening
+     * takes 10 % off the task's time — see `withEarlyEndMalus`. Cleared when
+     * the tick is taken back.
+     */
+    val endedEarly: Boolean = false,
+    /**
      * By how much a late start lengthened this block, so the timer does not run
      * into time nobody planned. Part of [plannedDuration], and **not** part of
      * what the timer counts or the evening bills — see `fullTimerGoal`.

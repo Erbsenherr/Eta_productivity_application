@@ -316,8 +316,9 @@ val GROWTH_STEPS: List<TutorialStep> = listOf(
         "So wächst sie",
         "Die Aufgabe steht jetzt in deinem Wochenplan wie jede wiederkehrende. " +
             "Läuft ihr Timer bis zum Ende und schließt du den Tag ab, wächst sie um " +
-            "ihr Inkrement — »Pause« von Hand zählt dabei nicht mit, ein vorzeitiges " +
-            "»Ende« (Knopf gedrückt halten) bringt kein Inkrement. Mit »dynamischer " +
+            "ihr Inkrement — »Pause« von Hand zählt dabei nicht mit. »Vorzeitig " +
+            "beenden« bringt kein Inkrement und kürzt ihre Zeit um 10 %; volle " +
+            "Sitzungen holen sie Stück für Stück zurück. Mit »dynamischer " +
             "Zeitsetzung« sucht sie sich ab ihrer frühesten Uhrzeit selbst den " +
             "nächsten freien Platz.",
     ),

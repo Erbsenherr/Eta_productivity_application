@@ -12,7 +12,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.eta.data.local.BlockWithItem
+import com.example.eta.domain.growth.MALUS_RECOVERY
+import com.example.eta.domain.growth.hasQuantity
+import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.growth.timerBufferOrZero
+import com.example.eta.domain.growth.timerDuration
+import com.example.eta.domain.growth.withEarlyEndMalus
 import com.example.eta.domain.planning.PomodoroPhaseKind
 import com.example.eta.domain.planning.TimerState
 import com.example.eta.domain.planning.endsAt
@@ -49,6 +54,12 @@ class TimerActions(
     val onPause: (blockId: String) -> Unit,
     val onResume: (blockId: String) -> Unit,
     val onEnd: (blockId: String) -> Unit,
+    /**
+     * "Vorzeitig beenden" (step 55): the screen asks first ([EarlyEndDialog]).
+     * Null keeps the older shape — "Ende" behind a long press — which a
+     * routine's step still has: a step carries no malus.
+     */
+    val onEndEarly: ((blockId: String) -> Unit)? = null,
 )
 
 /**
@@ -70,10 +81,10 @@ class StepTimerActions(
  * without one the large figure is the whole of it. The button is "Pause" while
  * it runs and "Weiter" while it does not.
  *
- * **"Ende" is behind a long press** until there is a reason for it to be the
- * obvious thing to press: the time is counted down, or the block's frame —
- * buffer included — has run out. Ending early is allowed and deliberate, which
- * is what holding a button down says.
+ * Before the time is counted down the second button is **"Vorzeitig beenden"**
+ * (step 55), which the screen asks about — it costs the task 10 % of its time.
+ * Once the time is up it is "Ende". Without [TimerActions.onEndEarly] — a
+ * routine's step — "Ende" is behind a long press as it always was.
  */
 @Composable
 fun TimerControls(
@@ -146,6 +157,40 @@ fun TimerControls(
             )
         }
 
+        val endEarly = actions.onEndEarly
+        if (endEarly != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                if (!done) {
+                    EtaButton(
+                        text = if (running) "Pause" else "Weiter",
+                        style = EtaButtonStyle.Secondary,
+                        modifier = Modifier.weight(1f),
+                        onClick = { if (running) actions.onPause(id) else actions.onResume(id) },
+                    )
+                    EtaButton(
+                        text = "Vorzeitig beenden",
+                        style = EtaButtonStyle.Secondary,
+                        modifier = Modifier.weight(1f),
+                        onClick = { endEarly(id) },
+                    )
+                } else {
+                    EtaButton(
+                        text = "Ende",
+                        modifier = Modifier.weight(1f),
+                        onClick = { actions.onEnd(id) },
+                    )
+                }
+            }
+            if (frameOver && !done) {
+                EtaText(
+                    text = "Der geplante Zeitrahmen ist abgelaufen.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.warning,
+                )
+            }
+            return@Column
+        }
+
         val offerEnd = done || frameOver || endRevealed
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             if (!done) {
@@ -182,40 +227,116 @@ fun TimerControls(
 }
 
 /**
- * A Timer-Task ticked off without its timer.
+ * "Vorzeitig beenden" asked about (step 55): what it costs, said before.
  *
- * It cannot simply be ticked: what it is about is time put in, and a tick says
- * nothing about how much. So the tick is asked about — and may say how much it
- * was. Without a figure it counts as the whole time.
+ * The figures are the task's — 10 % of the time as it stands, and 2 % of the
+ * time before the first malus back with every full sitting — so the user sees
+ * the minutes, not the rule.
+ */
+@Composable
+fun EarlyEndDialog(
+    entry: BlockWithItem,
+    /** What the timer has counted so far. */
+    counted: Duration,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
+    EtaDialog(title = "Vorzeitig beenden?", onDismiss = onDismiss) {
+        EtaText(
+            text = "»${entry.item.name}«: ${counted.formatShort()} von ${goal.formatShort()} gezählt.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textSecondary,
+        )
+        MalusNote(entry)
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(text = "Weitermachen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+            Spacer(Modifier.weight(1f))
+            EtaButton(text = "Vorzeitig beenden", onClick = onConfirm)
+        }
+    }
+}
+
+/** What an early end does to the task, in its own minutes. */
+@Composable
+private fun MalusNote(entry: BlockWithItem) {
+    val item = entry.item
+    val current = item.timerDuration ?: return
+    val reduced = item.withEarlyEndMalus().timerDuration ?: return
+    val base = item.timerMalusBase ?: current
+    val growthNote = if (item.isGrowthTask) " Bis dahin wächst die Zielzeit nicht." else ""
+    EtaText(
+        text = "Beim Abendabschluss sinkt die Zeit der Task um 10 %: von " +
+            "${current.formatShort()} auf ${reduced.formatShort()}. Jede danach vollständig " +
+            "absolvierte Sitzung holt ${(base * MALUS_RECOVERY).formatShort()} zurück, bis wieder " +
+            "${base.formatShort()} erreicht sind." + growthNote,
+        style = EtaTheme.typography.caption,
+        color = EtaTheme.colors.warning,
+    )
+}
+
+/**
+ * A Timer-Task ticked off without its timer having counted it all.
+ *
+ * Three answers (step 55): the whole time was put in — it counts in full,
+ * towards the next increment as well, which is how a workout tracked
+ * elsewhere still grows — or it was ended early, with the time that was put
+ * in and the malus that brings, or nothing.
  */
 @Composable
 fun TimerTickDialog(
     entry: BlockWithItem,
     onDismiss: () -> Unit,
-    /** Null is "the whole time"; otherwise the time that was really put in. */
-    onConfirm: (worked: Duration?) -> Unit,
+    /** [worked] is null for the whole time; [early] is "Vorzeitig beendet". */
+    onConfirm: (worked: Duration?, early: Boolean) -> Unit,
+    /** What the timer counted, where it was started and never ended. */
+    counted: Duration? = null,
 ) {
     val goal = entry.block.fullTimerGoal(entry.item.timerBufferOrZero)
-    var custom by remember(entry.block.id) { mutableStateOf(false) }
-    var worked by remember(entry.block.id) { mutableStateOf(goal) }
+    var early by remember(entry.block.id) { mutableStateOf(false) }
+    var worked by remember(entry.block.id) {
+        mutableStateOf((counted ?: goal).coerceIn(1.minutes, maxOf(goal, 1.minutes)))
+    }
+    val grows = entry.item.isGrowthTask || entry.item.hasQuantity
+    val timerLine = if (counted != null) {
+        "Der Timer hat ${counted.formatShort()} gezählt und wurde nicht beendet."
+    } else {
+        "Der Timer wurde nie gestartet."
+    }
 
-    EtaDialog(title = "Wirklich abhaken?", onDismiss = onDismiss) {
+    EtaDialog(title = "Timer-Task abhaken", onDismiss = onDismiss) {
         EtaText(
-            text = "»${entry.item.name}« ist eine Timer-Task: Sie zählt die Zeit, die du " +
-                "investierst — ${goal.formatShort()} sind vorgesehen. Der Timer wurde nie " +
-                "gestartet. Soll sie trotzdem als voll gewertet werden?",
+            text = "»${entry.item.name}« ist eine Timer-Task — ${goal.formatShort()} sind " +
+                "vorgesehen. " + timerLine,
             style = EtaTheme.typography.body,
             color = EtaTheme.colors.textSecondary,
         )
-        if (custom) {
-            EtaField(
-                label = "Investierte Zeit",
-                hint = if (worked < goal) {
-                    "Weniger als vorgesehen: zählt nicht für das nächste Inkrement."
-                } else {
-                    null
-                },
-            ) {
+        if (!early) {
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                EtaButton(
+                    text = "Volle Zeit gemacht",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onConfirm(null, false) },
+                )
+                EtaText(
+                    text = if (grows) {
+                        "Zählt als vollständig absolviert — auch für das nächste Inkrement."
+                    } else {
+                        "Zählt als vollständig absolviert."
+                    },
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+                EtaButton(
+                    text = "Vorzeitig beendet",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { early = true },
+                )
+            }
+            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
+        } else {
+            EtaField(label = "Investierte Zeit") {
                 EtaDurationPicker(
                     value = worked,
                     onValueChange = { worked = it.coerceAtMost(goal) },
@@ -224,21 +345,12 @@ fun TimerTickDialog(
                     precise = true,
                 )
             }
-        } else {
-            EtaButton(
-                text = "Eigene Zeit angeben",
-                style = EtaButtonStyle.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { custom = true },
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-            EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
-            Spacer(Modifier.weight(1f))
-            EtaButton(
-                text = if (custom) "Abhaken" else "Ja, volle Zeit",
-                onClick = { onConfirm(if (custom) worked else null) },
-            )
+            MalusNote(entry)
+            Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+                EtaButton(text = "Zurück", style = EtaButtonStyle.Secondary, onClick = { early = false })
+                Spacer(Modifier.weight(1f))
+                EtaButton(text = "Abhaken", onClick = { onConfirm(worked, true) })
+            }
         }
     }
 }

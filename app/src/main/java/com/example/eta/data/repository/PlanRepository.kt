@@ -137,7 +137,8 @@ class PlanRepository(
     }
 
     suspend fun reopen(block: PlannedBlock) {
-        blockDao.upsert(block.copy(completedAt = null, updatedAt = clock.now()))
+        // An early end belongs to the tick being taken back (step 55).
+        blockDao.upsert(block.copy(completedAt = null, endedEarly = false, updatedAt = clock.now()))
     }
 
     /**

@@ -43,6 +43,7 @@ import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
 import androidx.compose.runtime.key
 import com.example.eta.domain.growth.growthCurrent
+import com.example.eta.domain.growth.hasTimerMalus
 import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.format.formatShort
@@ -356,6 +357,14 @@ private fun GrowthRow(
                             (if (it.every > 1) " alle ${it.every} Abschlüsse)" else ")"),
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.accent,
+                    )
+                }
+                // Step 55: an early end weighs on it, and growing waits.
+                item.timerMalusBase?.takeIf { item.hasTimerMalus }?.let { base ->
+                    EtaText(
+                        text = "Zeit-Malus: zurück auf ${base.formatShort()} mit vollen Sitzungen",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.warning,
                     )
                 }
             }

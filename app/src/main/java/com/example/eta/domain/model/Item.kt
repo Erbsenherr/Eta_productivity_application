@@ -163,6 +163,11 @@ data class Item(
     val timerTask: Boolean = false,
     val timerBuffer: Duration? = null,
     /**
+     * The time on the timer a Timer-Task was at before its first "Vorzeitig
+     * beenden" (step 55) — what full sittings bring it back to. Null: no malus.
+     */
+    val timerMalusBase: Duration? = null,
+    /**
      * A colour of the task's own, as ARGB, in place of its category's — null is
      * the category's. Read through `colorOf(item)`, the one place a card's
      * colour is decided, so the planner, the lists and the Wochenschema agree.

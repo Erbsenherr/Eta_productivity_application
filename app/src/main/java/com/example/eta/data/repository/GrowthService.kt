@@ -3,7 +3,8 @@ package com.example.eta.data.repository
 import com.example.eta.data.local.ItemDao
 import com.example.eta.domain.growth.GrowthFamily
 import com.example.eta.domain.growth.QuantityFamily
-import com.example.eta.domain.growth.advancedByCompletion
+import com.example.eta.domain.growth.advancedBySitting
+import com.example.eta.domain.growth.isTimerTask
 import com.example.eta.domain.growth.growthFamily
 import com.example.eta.domain.growth.growthOrdering
 import com.example.eta.domain.growth.hasQuantity
@@ -126,17 +127,23 @@ class GrowthService(
                 .filter { it.item.hasQuantity && it.block.quantityDone == null }
                 .map { it.block.copy(quantityDone = it.item.quantity) },
         )
+        // Step 55: every Timer-Task takes part, growing or not — an early end
+        // shortens it, and full sittings bring the time back. See
+        // `advancedBySitting`.
         val advanced = completed
-            .filter { it.item.isGrowthTask || it.item.hasQuantity }
+            .filter { it.item.isGrowthTask || it.item.hasQuantity || it.item.isTimerTask }
             .distinctBy { it.item.familyKey }
             .associate { entry ->
-                entry.item.familyKey to
-                    entry.item.advancedByCompletion(timeCounts = lenient || entry.block.workedInFull)
+                entry.item.familyKey to entry.item.advancedBySitting(
+                    endedEarly = entry.item.isTimerTask && entry.block.endedEarly,
+                    workedInFull = entry.block.workedInFull,
+                    lenient = lenient,
+                )
             }
         if (advanced.isEmpty()) return emptyList()
 
         val rows = itemDao.findRecurringDefinitions()
-            .filter { it.isGrowthTask || it.hasQuantity }
+            .filter { it.isGrowthTask || it.hasQuantity || it.isTimerTask }
         val changed = rows.mapNotNull { row ->
             val next = advanced[row.familyKey] ?: return@mapNotNull null
             val updated = row.copy(
@@ -144,6 +151,7 @@ class GrowthService(
                 growthProgress = next.growthProgress,
                 quantity = next.quantity,
                 quantityProgress = next.quantityProgress,
+                timerMalusBase = next.timerMalusBase,
             )
             if (updated == row) null else row to updated.copy(updatedAt = now)
         }

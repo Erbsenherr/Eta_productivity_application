@@ -254,9 +254,9 @@ class ReevaluationViewModel(
      * null for all of it — stored as the dashboard stores it, so the increment
      * and the yield are decided by the one rule.
      */
-    fun completeTimerByHand(entry: BlockWithItem, worked: Duration?) {
+    fun completeTimerByHand(entry: BlockWithItem, worked: Duration?, early: Boolean = false) {
         viewModelScope.launch {
-            val block = entry.block
+            val block = entry.block.timerPaused(clock.now()).copy(endedEarly = early)
             val buffer = entry.item.timerBufferOrZero
             val billed = worked
                 ?.takeIf { it < block.fullTimerGoal(buffer) }

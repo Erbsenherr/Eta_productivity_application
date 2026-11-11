@@ -850,7 +850,7 @@ class DashboardViewModel(
      * does not count towards the next increment — and the screen says so, with
      * the advice about the buffer if the frame had run out.
      */
-    fun endTimer(blockId: String) {
+    fun endTimer(blockId: String, early: Boolean = false) {
         viewModelScope.launch {
             val entry = timerEntry(blockId) ?: return@launch
             val block = entry.block
@@ -862,7 +862,9 @@ class DashboardViewModel(
             val counted = block.timerElapsed(now)
             val full = counted >= goal
             planRepository.complete(
-                block.timerPaused(now).copy(actualDuration = null),
+                // "Vorzeitig beenden" confirmed (step 55) — unless the time ran
+                // out while the question stood, which makes it a full sitting.
+                block.timerPaused(now).copy(actualDuration = null, endedEarly = early && !full),
                 // Null is "as planned" — which a block lengthened by a late
                 // start is not billed at, worked in full or not.
                 actualDuration = block.timerBilled(now, buffer).takeIf { it < block.plannedDuration },
@@ -895,7 +897,7 @@ class DashboardViewModel(
      * is stored the way the timer stores its own count — plus the buffer — so
      * the evening bills it and decides about the increment by the one rule.
      */
-    fun completeTimerByHand(blockId: String, worked: Duration?) {
+    fun completeTimerByHand(blockId: String, worked: Duration?, early: Boolean = false) {
         viewModelScope.launch {
             val entry = timerEntry(blockId) ?: return@launch
             val block = entry.block
@@ -904,7 +906,10 @@ class DashboardViewModel(
             val billed = worked
                 ?.takeIf { it < block.fullTimerGoal(buffer) }
                 ?.let { (it + buffer).coerceAtMost(block.plannedDuration) }
-            planRepository.complete(block.copy(actualDuration = null), actualDuration = billed)
+            planRepository.complete(
+                block.timerPaused(clock.now()).copy(actualDuration = null, endedEarly = early),
+                actualDuration = billed,
+            )
             taskStartCoordinator.reschedule()
             askFollowUp(entry, billing = null)
         }

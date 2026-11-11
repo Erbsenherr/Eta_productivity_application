@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (763 tests
-as of step 54), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (770 tests
+as of step 55), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -421,6 +421,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-52-evening-once-sound-groups.md` | *Step 52*: Alarme and Benachrichtigungen (`SoundGroup`, `GroupAudio`, `mayPlay`, `playbackVolume`, `AlarmStreamVolume`, `SoundGroupFields`, the "Benachrichtigungen" page), the Abendroutine (`SetupRoutine`, `saveRoutineSteps`), a routine ticked in "Heute anstehend" (`RoutineTickDialog`), one-off rewards (`Reward.once`, `achievedAt` / `expiredAt`, `RewardDueDialog`), unplanned hours in the planner (`unplannedMinutes`, `weekendPlanning`), the Termin (`BlockOrigin.APPOINTMENT`), "Ausnahmen, Sonderfälle" |
 | `step-53-undo-kinds-rulebook.md` | *Step 53*: "Rückgängig" in the day planner (`PlanSnapshot`, `planRestore`, `undoable`, `forgetUndo`), a move onto occupied time asks (`MovePrompt`, `MoveDialog`), a routine's steps on a tap (`RoutineDetailDialog`), a routine's rest "Erledigt" / "Verfallen", one Quick-Add and the switch "Einmalig · Wiederkehrend" (`KindSwitch`, `Item.asKind`), notifications that replace one another (`clearEarlierNotifications`), the Regelwerk (`Rule`, `EtaTab.Rules`) |
 | `step-54-fixes-ultra-high.md` | *Step 54*: the planning alarm past midnight (`planningWindowOpen`), "Anfahr-/Vorbereitungszeit", reordering steps (`key`), a start time in "Heute anstehend" always written (`BlockEditFeedback.Overlapping`), help for a block in a conflict (`blockConflict`, `ConflictHelp`), pulling forward from an empty "Gerade" (`offerPullForward`), Ultra-High (`Item.ultraHigh`) |
+| `step-55-timer-malus.md` | *Step 55*: "Vorzeitig beenden" (`EarlyEndDialog`, `TimerActions.onEndEarly`, `PlannedBlock.endedEarly`), the malus and its recovery (`withEarlyEndMalus`, `recoveredFromMalus`, `advancedBySitting`, `Item.timerMalusBase`), the three-answer `TimerTickDialog` |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -448,7 +449,8 @@ These came out of discussion with the user and are not all derivable from `Eta_d
 - **A Timer-Task is worked, not ticked** (step 42): standing tasks only, billed
   at what its timer counted — pomodoro pauses and the buffer included, pauses by
   hand not — and a "Zielzeit" grows only after a sitting worked in full, unless
-  Flexibilität says otherwise. See *Step 42*.
+  Flexibilität says otherwise. See *Step 42*. **Ending one early costs 10 % of
+  its time**, won back 2 % at a time by full sittings (step 55).
 - **Getting up and going to bed on time pay half a point each, on the user's
   word**, booked with the evening's settlement — the bedtime's with the
   settlement of the day after (step 43). See *Step 43*.
@@ -515,7 +517,8 @@ GitHub releases · 51. Every sound chosen, and a negative balance in red ·
 52. Alarms and notifications apart, an evening routine, one-off rewards,
 unplanned hours in sight, and the Termin · 53. Rückgängig, a move onto
 occupied time asked about, a routine shown on a tap, one Quick-Add, and the
-Regelwerk · 54. Four bugfixes, help for a conflict, and Ultra-High.
+Regelwerk · 54. Four bugfixes, help for a conflict, and Ultra-High ·
+55. "Vorzeitig beenden", and the time it costs.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

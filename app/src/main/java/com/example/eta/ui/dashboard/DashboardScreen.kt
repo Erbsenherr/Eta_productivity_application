@@ -34,6 +34,8 @@ import com.example.eta.domain.planning.nowAndNext
 import com.example.eta.domain.planning.sleepPrompts
 import com.example.eta.domain.model.ItemRole
 import com.example.eta.domain.planning.timerWasUsed
+import com.example.eta.domain.planning.timerDone
+import com.example.eta.domain.planning.timerElapsed
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.LocalEtaClock
@@ -298,12 +300,31 @@ private fun TodayPage(
 
         // Timer-Tasks: the buttons under them, and the three things they can
         // lead to. The tick is held as an id, like every dialog about a row.
+        // "Vorzeitig beenden" (step 55), from the button or from a tick.
+        var earlyEndingId by remember { mutableStateOf<String?>(null) }
+        earlyEndingId?.let { id ->
+            val entry = state.todayBlocks.firstOrNull { it.block.id == id && it.block.isOpen }
+            if (entry == null) {
+                earlyEndingId = null
+            } else {
+                EarlyEndDialog(
+                    entry = entry,
+                    counted = entry.block.timerElapsed(now),
+                    onDismiss = { earlyEndingId = null },
+                    onConfirm = {
+                        viewModel.endTimer(id, early = true)
+                        earlyEndingId = null
+                    },
+                )
+            }
+        }
         val timerActions = TimerActions(
             now = now,
             onStart = viewModel::startTimer,
             onPause = viewModel::pauseTimer,
             onResume = viewModel::resumeTimer,
-            onEnd = viewModel::endTimer,
+            onEnd = { viewModel.endTimer(it) },
+            onEndEarly = { earlyEndingId = it },
         )
         var tickingTimerId by remember { mutableStateOf<String?>(null) }
         val timerOverflow by viewModel.timerOverflow.collectAsStateWithLifecycle()
@@ -317,8 +338,8 @@ private fun TodayPage(
                 TimerTickDialog(
                     entry = entry,
                     onDismiss = { tickingTimerId = null },
-                    onConfirm = { worked ->
-                        viewModel.completeTimerByHand(id, worked)
+                    onConfirm = { worked, early ->
+                        viewModel.completeTimerByHand(id, worked, early)
                         tickingTimerId = null
                     },
                 )
@@ -526,6 +547,9 @@ private fun TodayPage(
                     entry.item.routineMode && entry.block.isOpen && openSteps ->
                         routineTickId = entry.block.id
                     !entry.item.timerTask || !entry.block.isOpen -> viewModel.toggleCompleted(entry)
+                    // Short of its time, ticking it is ending it early — asked.
+                    entry.block.timerWasUsed && !entry.block.timerDone(now) ->
+                        earlyEndingId = entry.block.id
                     entry.block.timerWasUsed -> viewModel.endTimer(entry.block.id)
                     else -> tickingTimerId = entry.block.id
                 }

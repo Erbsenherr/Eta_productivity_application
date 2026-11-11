@@ -51,6 +51,9 @@ import kotlinx.coroutines.delay
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.planning.cancellationCharged
 import com.example.eta.domain.planning.timerWasUsed
+import com.example.eta.domain.planning.timerDone
+import com.example.eta.domain.planning.timerElapsed
+import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.dashboard.TimerTickDialog
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.reevaluation.DailySettlement
@@ -257,16 +260,20 @@ fun ReevaluationScreen(
 private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewModel) {
     // Held as an id and resolved against the list as it is now.
     var tickingTimerId by remember { mutableStateOf<String?>(null) }
+    val clock = LocalEtaClock.current
     tickingTimerId?.let { id ->
         val entry = state.blocks.firstOrNull { it.block.id == id && it.block.isOpen }
         if (entry == null) {
             tickingTimerId = null
         } else {
+            // Started and never ended, it says what the timer counted (step 55).
+            val counted = entry.block.takeIf { it.timerWasUsed }?.timerElapsed(clock.now())
             TimerTickDialog(
                 entry = entry,
+                counted = counted,
                 onDismiss = { tickingTimerId = null },
-                onConfirm = { worked ->
-                    viewModel.completeTimerByHand(entry, worked)
+                onConfirm = { worked, early ->
+                    viewModel.completeTimerByHand(entry, worked, early)
                     tickingTimerId = null
                 },
             )
@@ -298,7 +305,12 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                     onToggle = {
                         // A Timer-Task that was never started is asked about
                         // before it counts as worked in full.
-                        if (entry.item.timerTask && entry.block.isOpen && !entry.block.timerWasUsed) {
+                        // Step 55: one started and ended short of its time too.
+                        val short = entry.block.timerWasUsed &&
+                            !entry.block.timerDone(clock.now())
+                        if (entry.item.timerTask && entry.block.isOpen &&
+                            (!entry.block.timerWasUsed || short)
+                        ) {
                             tickingTimerId = entry.block.id
                         } else {
                             viewModel.toggleCompleted(entry)
