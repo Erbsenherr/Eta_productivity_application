@@ -6,7 +6,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 
 /** The share of savings the weekly devaluation takes off. */
-const val WEEKLY_INFLATION_RATE = 0.30
+val WEEKLY_INFLATION_RATE: Double get() = Balancing[BalanceKey.WEEKLY_INFLATION]
 
 /**
  * What the weekly devaluation costs at a given balance.

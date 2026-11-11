@@ -1,5 +1,7 @@
 package com.example.eta.domain.streak
 
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.BalanceKey
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.HabitStreak
 import com.example.eta.domain.model.ItemType
@@ -11,16 +13,16 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 
 /** What one evening of a streak pays, per day of its length (step 48). */
-const val STREAK_POINTS_PER_DAY = 0.001
+val STREAK_POINTS_PER_DAY: Double get() = Balancing[BalanceKey.STREAK_PER_DAY]
 
 /** The most one streak pays in an evening. */
-const val STREAK_MAX_PER_STREAK = 1.0
+val STREAK_MAX_PER_STREAK: Double get() = Balancing[BalanceKey.STREAK_MAX_PER]
 
 /** The most all streaks together pay in an evening. */
-const val STREAK_MAX_TOTAL = 3.0
+val STREAK_MAX_TOTAL: Double get() = Balancing[BalanceKey.STREAK_MAX_TOTAL]
 
 /** What a streak that breaks costs the account. */
-const val STREAK_BREAK_PENALTY = 10.0
+val STREAK_BREAK_PENALTY: Double get() = Balancing[BalanceKey.STREAK_BREAK]
 
 /** What the evening found for one streak. */
 enum class StreakVerdict {

@@ -1,5 +1,7 @@
 package com.example.eta.domain.growth
 
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.BalanceKey
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.PlannedBlock
 import kotlin.time.Duration
@@ -79,10 +81,10 @@ val PlannedBlock.workedInFull: Boolean
     get() = actualDuration?.let { it >= plannedDuration - (timerExtension ?: Duration.ZERO) } ?: true
 
 /** What "Vorzeitig beenden" takes off the time on the timer: of the time as it stands. */
-const val EARLY_END_MALUS = 0.10
+val EARLY_END_MALUS: Double get() = Balancing[BalanceKey.EARLY_END_MALUS]
 
 /** What every full sitting under a malus gives back: of the time before it. */
-const val MALUS_RECOVERY = 0.02
+val MALUS_RECOVERY: Double get() = Balancing[BalanceKey.MALUS_RECOVERY]
 
 /** A share of a duration, to the whole second — growth already counts in seconds. */
 private fun Duration.share(fraction: Double): Duration =

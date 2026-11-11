@@ -11,7 +11,7 @@ import kotlin.time.Duration
 import kotlin.time.DurationUnit
 
 /** Points an imported Google Calendar event earns per *full* hour. */
-const val CALENDAR_POINTS_PER_FULL_HOUR = 0.5
+val CALENDAR_POINTS_PER_FULL_HOUR: Double get() = Balancing[BalanceKey.CALENDAR]
 
 /** Default rates for the second revolver, in points per hour. */
 const val CUSTOM_EARN_POINTS_PER_HOUR = 1.5

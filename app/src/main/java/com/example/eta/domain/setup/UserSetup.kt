@@ -488,6 +488,11 @@ data class UserSetup(
      */
     val rulebook: Boolean = false,
     /**
+     * Step 58: the Punkte-Balancing, as `encodeBalancing` writes it — only the
+     * values that differ from their defaults. Empty: the rules as they were.
+     */
+    val balancing: String = "",
+    /**
      * Step 48: how many minutes after the hour still count as on time, for
      * getting up and for going to bed alike. Five unless the user says
      * otherwise; past [RECOMMENDED_MAX_PUNCTUAL_TOLERANCE] the settings say

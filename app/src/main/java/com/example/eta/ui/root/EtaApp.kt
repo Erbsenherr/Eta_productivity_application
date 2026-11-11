@@ -103,6 +103,7 @@ import com.example.eta.ui.week.WeekTabScreen
 import com.example.eta.ui.week.WeekTabViewModel
 import com.example.eta.ui.weekplanner.WeekPlannerScreen
 import com.example.eta.ui.weekplanner.WeekPlannerViewModel
+import com.example.eta.ui.weekplanner.ReviewSources
 import com.example.eta.widget.QuickAddWidgetProvider
 import kotlinx.datetime.todayIn
 
@@ -788,6 +789,13 @@ internal fun weekPlannerViewModelFactory(
                 setupRepository = container.setupRepository,
                 scheduleMaintenance = container.scheduleMaintenance,
                 clock = container.clock,
+                // Step 58: not in the practice week, which has no past to look back on.
+                reviewSources = ReviewSources(
+                    setup = { container.setupRepository.find() },
+                    overrides = { container.nightService.overrides() },
+                    blocks = { from, to -> container.planRepository.findRange(from, to) },
+                    logs = { from, to -> container.sleepLogRepository.findRange(from, to) },
+                ).takeIf { !container.sandbox },
             )
         }
     }

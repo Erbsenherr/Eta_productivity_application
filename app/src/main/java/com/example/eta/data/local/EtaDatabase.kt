@@ -62,7 +62,7 @@ import com.example.eta.domain.model.StopwatchTime
         StopwatchTime::class,
         RuleBreach::class,
     ],
-    version = 40,
+    version = 41,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1158,5 +1158,12 @@ val MIGRATION_39_40 = object : Migration(39, 40) {
                 "`date` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
                 "PRIMARY KEY(`id`))",
         )
+    }
+}
+
+/** Step 58: the Punkte-Balancing, on the setup row. */
+val MIGRATION_40_41 = object : Migration(40, 41) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `balancing` TEXT NOT NULL DEFAULT ''")
     }
 }

@@ -1,5 +1,6 @@
 package com.example.eta.ui.dashboard
 
+import com.example.eta.domain.growth.EARLY_END_MALUS
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -266,7 +267,7 @@ private fun MalusNote(entry: BlockWithItem) {
     val base = item.timerMalusBase ?: current
     val growthNote = if (item.isGrowthTask) " Bis dahin wächst die Zielzeit nicht." else ""
     EtaText(
-        text = "Beim Abendabschluss sinkt die Zeit der Task um 10 %: von " +
+        text = "Beim Abendabschluss sinkt die Zeit der Task um ${percentOf(EARLY_END_MALUS)}: von " +
             "${current.formatShort()} auf ${reduced.formatShort()}. Jede danach vollständig " +
             "absolvierte Sitzung holt ${(base * MALUS_RECOVERY).formatShort()} zurück, bis wieder " +
             "${base.formatShort()} erreicht sind." + growthNote,
@@ -460,4 +461,11 @@ fun TimerResultDialog(result: TimerResult, onDismiss: () -> Unit) {
             EtaButton(text = "OK", onClick = onDismiss)
         }
     }
+}
+
+/** A share as the screen says it: 0.1 is "10 %", 0.025 is "2,5 %". */
+internal fun percentOf(share: Double): String {
+    val percent = share * 100
+    val rounded = Math.round(percent * 10) / 10.0
+    return (if (rounded % 1.0 == 0.0) rounded.toLong().toString() else rounded.toString().replace('.', ',')) + " %"
 }

@@ -1,7 +1,19 @@
 package com.example.eta.domain.model
 
-enum class Category(val yieldMultiplier: Double) {
-    FOKUS(1.0),
-    NEBENBEI(0.5),
-    ACHTSAM(1.0),
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.BalanceKey
+
+/** The three kinds of task; what an hour of each pays is tuned under Balancing (step 58). */
+enum class Category {
+    FOKUS,
+    NEBENBEI,
+    ACHTSAM,
+    ;
+
+    val yieldMultiplier: Double
+        get() = when (this) {
+            FOKUS -> Balancing[BalanceKey.FOCUS]
+            NEBENBEI -> Balancing[BalanceKey.SIDELINE]
+            ACHTSAM -> Balancing[BalanceKey.MINDFUL]
+        }
 }

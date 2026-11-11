@@ -1,5 +1,7 @@
 package com.example.eta
 
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.decodeBalancing
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
@@ -54,6 +56,14 @@ class EtaApplication : Application() {
             container.taskStartCoordinator.reschedule()
             container.wakeAlarmCoordinator.reschedule()
             container.reminderCoordinator.reschedule()
+        }
+        // Step 58: the Punkte-Balancing in force, wherever the arithmetic runs —
+        // followed for as long as the process lives, so a change on the debug
+        // page counts from the next figure on.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.setupRepository.observe().collect { setup ->
+                Balancing.values = decodeBalancing(setup?.balancing.orEmpty())
+            }
         }
     }
 

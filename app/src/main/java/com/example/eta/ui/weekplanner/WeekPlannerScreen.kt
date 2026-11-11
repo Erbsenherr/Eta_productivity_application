@@ -1,5 +1,7 @@
 package com.example.eta.ui.weekplanner
 
+import com.example.eta.domain.reward.WEEKLY_INFLATION_RATE
+import com.example.eta.ui.dashboard.percentOf
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,10 +57,13 @@ import com.example.eta.ui.format.formatPoints
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.domain.stats.ReviewFigure
+import com.example.eta.domain.stats.Trend
+import com.example.eta.domain.stats.WeekReview
 import com.example.eta.ui.theme.colorOf
 import kotlinx.coroutines.launch
 
-private enum class Step { INFLATION, EVALUATION, CALENDAR, PLAN }
+private enum class Step { REVIEW, INFLATION, EVALUATION, CALENDAR, PLAN }
 
 /**
  * Which steps a visit runs through.
@@ -71,14 +77,22 @@ private enum class Step { INFLATION, EVALUATION, CALENDAR, PLAN }
  * first and every appointment is a conflict; fill after and most of them are
  * simply part of the week.
  */
-private fun stepsFor(midWeek: Boolean, pointsVisible: Boolean, calendar: Boolean): List<Step> =
+private fun stepsFor(
+    midWeek: Boolean,
+    pointsVisible: Boolean,
+    calendar: Boolean,
+    review: Boolean,
+): List<Step> =
     when {
         midWeek -> listOf(Step.CALENDAR, Step.PLAN)
         // The devaluation is booked on its weekday either way; its page is only the
         // account being shown, and goes out of sight with it.
         !pointsVisible -> Step.entries - Step.INFLATION
         else -> Step.entries
-    }.filter { calendar || it != Step.CALENDAR }
+    }
+        .filter { calendar || it != Step.CALENDAR }
+        // The Wochenrückblick (step 58): the scheduled phase only, first.
+        .filter { review || it != Step.REVIEW }
 
 /**
  * The weekly planning phase, in the three parts `Planungsphase.md` names:
@@ -106,7 +120,13 @@ fun WeekPlannerScreen(
     val inflation by viewModel.inflation.collectAsStateWithLifecycle()
     val evaluation by viewModel.evaluation.collectAsStateWithLifecycle()
     val banned by viewModel.banned.collectAsStateWithLifecycle()
-    val steps = stepsFor(viewModel.isMidWeek, LocalPointsVisible.current, calendarViewModel != null)
+    val review by viewModel.review.collectAsStateWithLifecycle()
+    val steps = stepsFor(
+        viewModel.isMidWeek,
+        LocalPointsVisible.current,
+        calendarViewModel != null,
+        viewModel.hasReview,
+    )
     val pagerState = rememberPagerState { steps.size }
     ReportToTutorial(
         TutorialSignal.WEEK_STEP,
@@ -173,6 +193,7 @@ fun WeekPlannerScreen(
                     verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
                 ) {
                     when (steps[page]) {
+                        Step.REVIEW -> ReviewStep(review)
                         Step.INFLATION -> InflationStep(inflation, banned)
                         Step.EVALUATION -> EvaluationStep(evaluation, viewModel::setEvaluation)
                         Step.CALENDAR -> calendarViewModel?.let { CalendarEventsSection(it) }
@@ -255,7 +276,7 @@ private fun InflationStep(preview: InflationPreview?, banned: Int?) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Inflation", style = EtaTheme.typography.heading)
             EtaText(
-                text = "Jede Woche verlieren 30 % der angesparten Punkte ihren Wert. " +
+                text = "Jede Woche verlieren ${percentOf(WEEKLY_INFLATION_RATE)} der angesparten Punkte ihren Wert. " +
                     "Punkte sind zum Ausgeben da.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
@@ -531,5 +552,86 @@ private fun ItemCard(item: Item, onClick: () -> Unit) {
             style = EtaTheme.typography.caption,
             color = EtaTheme.colors.textMuted,
         )
+    }
+}
+
+/**
+ * The Wochenrückblick (step 58): the week that is ending, figure by figure,
+ * beside the user's own usual — every day before it — and whether it was
+ * better, worse or as ever.
+ */
+@Composable
+private fun ReviewStep(review: WeekReview?) {
+    EtaText(text = "Wochenrückblick", style = EtaTheme.typography.heading)
+    if (review == null) {
+        EtaText(text = "Wird berechnet …", style = EtaTheme.typography.body, color = EtaTheme.colors.textMuted)
+        return
+    }
+    EtaText(
+        text = "${review.from.formatLong()} bis ${review.to.formatLong()}",
+        style = EtaTheme.typography.caption,
+        color = EtaTheme.colors.textSecondary,
+    )
+    if (review.isEmpty) {
+        EtaText(
+            text = "In der letzten Woche stand nichts im Plan — es gibt noch nichts zurückzublicken.",
+            style = EtaTheme.typography.body,
+            color = EtaTheme.colors.textMuted,
+        )
+        return
+    }
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+            EtaText(
+                text = if (review.tasksDone == 1) "1 Aufgabe erledigt" else "${review.tasksDone} Aufgaben erledigt",
+                style = EtaTheme.typography.title,
+                color = EtaTheme.colors.accent,
+            )
+            EtaText(
+                text = if (review.hasHistory) {
+                    "Verglichen mit allem davor: deinem eigenen Durchschnitt."
+                } else {
+                    "Deine erste Woche — noch nichts, womit sie sich vergleichen ließe."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+        }
+    }
+    review.figures.forEach { figure ->
+        key(figure.label) { ReviewLine(figure) }
+    }
+}
+
+@Composable
+private fun ReviewLine(figure: ReviewFigure) {
+    val (verdict, tint) = when (figure.trend) {
+        Trend.BETTER -> "besser als sonst" to EtaTheme.colors.success
+        Trend.WORSE -> "schlechter als sonst" to EtaTheme.colors.danger
+        Trend.USUAL -> "wie sonst" to EtaTheme.colors.textSecondary
+        Trend.UNKNOWN -> "" to EtaTheme.colors.textMuted
+    }
+    EtaSurface(modifier = Modifier.fillMaxWidth(), contentPadding = EtaTheme.spacing.md) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EtaText(text = figure.label, style = EtaTheme.typography.body, modifier = Modifier.weight(1f))
+                EtaText(
+                    text = figure.week.percent?.let { "$it %" } ?: "—",
+                    style = EtaTheme.typography.bodyStrong,
+                    color = if (figure.week.of == 0) EtaTheme.colors.textMuted else tint,
+                )
+            }
+            val usual = figure.before.percent?.let { "sonst $it %" }
+            val line = listOfNotNull(usual, verdict.ifBlank { null }).joinToString(" · ")
+            if (line.isNotBlank()) {
+                EtaText(text = line, style = EtaTheme.typography.caption, color = tint)
+            } else if (figure.week.of == 0) {
+                EtaText(
+                    text = "Nichts zu zählen in dieser Woche.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+        }
     }
 }

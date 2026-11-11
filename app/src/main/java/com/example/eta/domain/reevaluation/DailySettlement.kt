@@ -4,7 +4,10 @@ import com.example.eta.data.local.BlockWithItem
 import com.example.eta.domain.model.Contract
 import com.example.eta.domain.model.ContractState
 import com.example.eta.domain.model.ItemRole
-import com.example.eta.domain.model.PUNCTUAL_SLEEP_POINTS
+import com.example.eta.domain.model.PUNCTUAL_BED_POINTS
+import com.example.eta.domain.model.PUNCTUAL_WAKE_POINTS
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.BalanceKey
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.planning.containerEndMinute
 import com.example.eta.domain.planning.containerStartMinute
@@ -17,23 +20,23 @@ import com.example.eta.domain.streak.StreakVerdict
 import kotlinx.datetime.TimeZone
 
 /** Hours a day may go unplanned before it starts costing. */
-const val FREE_UNPLANNED_HOURS = 2.0
+val FREE_UNPLANNED_HOURS: Double get() = Balancing[BalanceKey.FREE_UNPLANNED_HOURS]
 
 /** What every unplanned hour past [FREE_UNPLANNED_HOURS] costs, unless the setup says otherwise. */
 const val UNPLANNED_PENALTY_PER_HOUR = 1.5
 
 /** Giving up the day's free time pays this per hour. */
-const val FREE_TIME_FORGONE_PER_HOUR = 4.0
+val FREE_TIME_FORGONE_PER_HOUR: Double get() = Balancing[BalanceKey.FREE_TIME_FORGONE]
 
 /** The most legacy contracts can pay in one day, together. */
-const val LEGACY_DAILY_CAP = 2.0
+val LEGACY_DAILY_CAP: Double get() = Balancing[BalanceKey.LEGACY_CAP]
 
 /**
  * What breaking a contract costs (step 48): a slot-holder answered "gebrochen",
  * once, whatever is decided after — let go or served out on probation. A legacy
  * contract costs nothing, and neither does a probation not kept again.
  */
-const val CONTRACT_BREACH_PENALTY = 10.0
+val CONTRACT_BREACH_PENALTY: Double get() = Balancing[BalanceKey.CONTRACT_BREACH]
 
 /**
  * One contract's answer in the evening check.
@@ -253,8 +256,8 @@ fun settleDay(
         unplannedHours = unplannedHours,
         droppedHours = droppedHours,
         unplannedPenalty = chargeable * unplannedPenaltyPerHour.coerceAtLeast(0.0),
-        wakeBonus = if (wokeOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
-        bedBonus = if (bedOnTime) PUNCTUAL_SLEEP_POINTS else 0.0,
+        wakeBonus = if (wokeOnTime) PUNCTUAL_WAKE_POINTS else 0.0,
+        bedBonus = if (bedOnTime) PUNCTUAL_BED_POINTS else 0.0,
         contractsBroken = contractsBroken,
         breachPenalty = contractsBroken * CONTRACT_BREACH_PENALTY,
         streakPayout = streaks.sumOf { it.payout },

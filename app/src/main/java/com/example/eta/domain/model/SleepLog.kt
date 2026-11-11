@@ -1,5 +1,7 @@
 package com.example.eta.domain.model
 
+import com.example.eta.domain.reward.Balancing
+import com.example.eta.domain.reward.BalanceKey
 import androidx.room3.Entity
 import androidx.room3.Ignore
 import androidx.room3.PrimaryKey
@@ -11,8 +13,11 @@ import kotlinx.datetime.LocalTime
 /** How long after the hour of getting up still counts as on time. */
 const val PUNCTUAL_WAKE_MINUTES = 5
 
-/** What getting up on time, and going to bed on time, are each worth. */
-const val PUNCTUAL_SLEEP_POINTS = 0.5
+/** What getting up on time is worth — tuned under Balancing (step 58). */
+val PUNCTUAL_WAKE_POINTS: Double get() = Balancing[BalanceKey.PUNCTUAL_WAKE]
+
+/** What going to bed on time is worth. */
+val PUNCTUAL_BED_POINTS: Double get() = Balancing[BalanceKey.PUNCTUAL_BED]
 
 /**
  * What the user said about one day's two ends: when they got up that morning,

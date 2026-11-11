@@ -6,6 +6,8 @@ paths:
 
 ### The weekly planning phase
 
+Since step 58 the scheduled phase opens on a **Wochenrückblick** — see *Step 58*.
+
 `ui/weekplanner/` runs the three parts `Planungsphase.md` names, with the maths in
 `domain/planning/WeekPlanning.kt` and `WeekPlanningService` doing the writing.
 

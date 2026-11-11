@@ -33,6 +33,14 @@ import kotlin.time.Duration
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import kotlinx.datetime.minus
+import com.example.eta.data.local.BlockWithItem
+import com.example.eta.domain.model.NightOverride
+import com.example.eta.domain.model.SleepLog
+import com.example.eta.domain.planning.sleepStretches
+import com.example.eta.domain.setup.UserSetup
+import com.example.eta.domain.stats.WeekReview
+import com.example.eta.domain.stats.weekReview
 
 /** The one question the weekly evaluation field asks. */
 const val WEEKLY_QUESTION = "Was soll in der kommenden Woche besser laufen?"
@@ -72,6 +80,8 @@ class WeekPlannerViewModel(
     setupRepository: SetupRepository,
     private val scope: WeekScope = WeekScope.SCHEDULED,
     private val clock: Clock = Clock.System,
+    /** Step 58: the Wochenrückblick reads the history; null leaves it out. */
+    private val reviewSources: ReviewSources? = null,
 ) : ViewModel() {
 
     /**
@@ -102,6 +112,16 @@ class WeekPlannerViewModel(
 
     private val _banned = MutableStateFlow<Int?>(null)
     val banned: StateFlow<Int?> = _banned.asStateFlow()
+
+    /**
+     * The Wochenrückblick (step 58): the seven days before the week planned,
+     * against every day before them. Null until read, and for a top-up.
+     */
+    private val _review = MutableStateFlow<WeekReview?>(null)
+    val review: StateFlow<WeekReview?> = _review.asStateFlow()
+
+    /** Whether the phase has a Wochenrückblick at all — the scheduled one, with its history. */
+    val hasReview: Boolean get() = reviewSources != null && !isMidWeek
 
     val uiState: StateFlow<WeekPlannerUiState> = combine(
         itemRepository.observeStage(Stage.COLLECTION),
@@ -141,6 +161,23 @@ class WeekPlannerViewModel(
             // monthly rule, and doing it daily would only add noise.
             _banned.value = weekPlanningService.sweepStaleCollectionItems().takeIf { it > 0 }
         }
+        if (hasReview) viewModelScope.launch { _review.value = readReview() }
+    }
+
+    private suspend fun readReview(): WeekReview? {
+        val sources = reviewSources ?: return null
+        val setup = sources.setup() ?: return null
+        val to = weekStart.minus(DatePeriod(days = 1))
+        val from = weekStart.minus(DatePeriod(days = 7))
+        val overrides = sources.overrides()
+        return weekReview(
+            blocks = sources.blocks(REVIEW_EARLIEST, to),
+            logs = sources.logs(REVIEW_EARLIEST, to),
+            from = from,
+            to = to,
+            today = weekPlanningService.today(),
+            sleepMinutesOn = { date -> setup.sleepStretches(date, overrides).sumOf { it.last - it.first + 1 } },
+        )
     }
 
     /**
@@ -212,3 +249,18 @@ class WeekPlannerViewModel(
         }
     }
 }
+
+/** Before anything this app can hold: the Wochenrückblick compares with all of it. */
+private val REVIEW_EARLIEST = LocalDate(2000, 1, 1)
+
+/**
+ * What the Wochenrückblick reads (step 58), as four functions so the view
+ * model needs no further repositories — and the tutorial's practice week, which
+ * has none worth reading, simply passes none.
+ */
+class ReviewSources(
+    val setup: suspend () -> UserSetup?,
+    val overrides: suspend () -> Map<LocalDate, NightOverride>,
+    val blocks: suspend (from: LocalDate, to: LocalDate) -> List<BlockWithItem>,
+    val logs: suspend (from: LocalDate, to: LocalDate) -> List<SleepLog>,
+)

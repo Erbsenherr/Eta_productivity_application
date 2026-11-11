@@ -52,6 +52,7 @@ Room stores enums by name in a TEXT column.
 | 37→38 | `planned_blocks.endedEarly` (`INTEGER NOT NULL DEFAULT 0`), `items.timerMalusBase` (`INTEGER`, nullable seconds) — see *Step 55* |
 | 38→39 | the table `stopwatch_times` — see *Step 56* |
 | 39→40 | `rules.exception` / `consequence` (`TEXT`, nullable), `consequenceOnFreeTime` (`INTEGER NOT NULL DEFAULT 0`), the table `rule_breaches` — see *Step 57* |
+| 40→41 | `user_setup.balancing` (`TEXT NOT NULL DEFAULT ''`) — see *Step 58* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

@@ -1,5 +1,12 @@
 package com.example.eta.ui.settings
 
+import com.example.eta.domain.reward.BalanceKey
+import com.example.eta.domain.reward.decodeBalancing
+import com.example.eta.domain.reward.encodeBalancing
+import com.example.eta.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
+import com.example.eta.domain.setup.DEFAULT_CANCELLATION_PENALTY
+import com.example.eta.domain.reward.WEEKLY_INFLATION_RATE
+import com.example.eta.ui.dashboard.percentOf
 import com.example.eta.domain.tutorial.TutorialId
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
@@ -183,7 +190,7 @@ fun SettingsScreen(
     val setup = draft
 
     // Back leaves a page for the menu before it leaves the tab.
-    BackHandler(enabled = page != null) { pageName = null }
+    BackHandler(enabled = page != null) { pageName = page?.parent?.name }
 
     // Where the menu is scrolled to — its own, so a page and back does not
     // start it at the top again.
@@ -214,9 +221,9 @@ fun SettingsScreen(
                 } else {
                     Row {
                         EtaButton(
-                            text = "‹ Einstellungen",
+                            text = "‹ " + (page.parent?.title ?: "Einstellungen"),
                             style = EtaButtonStyle.Secondary,
-                            onClick = { pageName = null },
+                            onClick = { pageName = page.parent?.name },
                         )
                     }
                     EtaText(text = page.title, style = EtaTheme.typography.title)
@@ -234,6 +241,7 @@ fun SettingsScreen(
                                 SettingsPage.DEBUG -> onDebugReset != null
                                 SettingsPage.TUTORIAL -> onStartTutorial != null
                                 SettingsPage.UPDATE -> updateViewModel != null
+                                SettingsPage.BALANCING, SettingsPage.POINT_BALANCING -> false
                                 else -> true
                             }
                         },
@@ -267,7 +275,19 @@ fun SettingsScreen(
 
                     SettingsPage.UPDATE -> updateViewModel?.let { UpdateBox(it) }
                     SettingsPage.TUTORIAL -> onStartTutorial?.let { TutorialBox(onStart = it) }
-                    SettingsPage.DEBUG -> onDebugReset?.let { DebugBox(onReset = it) }
+                    SettingsPage.DEBUG -> onDebugReset?.let {
+                        DebugBox(onReset = it)
+                        SubPageRow(
+                            title = "Balancing",
+                            hint = "Die Stellschrauben der App, zum Feinjustieren.",
+                            onOpen = { pageName = SettingsPage.BALANCING.name },
+                        )
+                    }
+                    SettingsPage.BALANCING -> SubPageRow(
+                        title = "Punkte-Balancing",
+                        hint = "Jede Punktquelle und jeder Multiplikator, einzeln einstellbar.",
+                        onOpen = { pageName = SettingsPage.POINT_BALANCING.name },
+                    )
 
                     // Everything below edits the draft of the stored answers.
                     else -> if (setup == null) {
@@ -326,6 +346,7 @@ fun SettingsScreen(
                             SettingsPage.STATISTICS -> StatisticsBox(setup, viewModel::setFeature)
                             SettingsPage.INFLATION -> InflationBox(setup, viewModel::update)
                             SettingsPage.CANCELLATION -> CancellationBox(setup, viewModel::update)
+                            SettingsPage.POINT_BALANCING -> PointBalancingBox(setup, viewModel::update)
                             else -> Unit
                         }
 
@@ -389,7 +410,19 @@ private enum class SettingsPage(val title: String, val section: SettingsSection)
     /** Last, as asked: opened once in a long while, by someone looking for it. */
     DEBUG("Debug", SettingsSection.MORE),
     TUTORIAL("Tutorial", SettingsSection.MORE),
+
+    /** Step 58: under Debug, not in the menu — reached through [parent]. */
+    BALANCING("Balancing", SettingsSection.MORE),
+    POINT_BALANCING("Punkte-Balancing", SettingsSection.MORE),
 }
+
+/** The page a sub-page is opened from, and goes back to; null for the menu's own. */
+private val SettingsPage.parent: SettingsPage?
+    get() = when (this) {
+        SettingsPage.BALANCING -> SettingsPage.DEBUG
+        SettingsPage.POINT_BALANCING -> SettingsPage.BALANCING
+        else -> null
+    }
 
 private enum class SettingsSection(val label: String) {
     APP("App"),
@@ -1194,7 +1227,7 @@ private fun InflationBox(setup: UserSetup, onChange: OnSetupChange) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
             EtaText(text = "Wertverfall", style = EtaTheme.typography.heading)
             EtaText(
-                text = "Einmal pro Woche verlieren gesparte Punkte 30 %. Der Abzug wird beim " +
+                text = "Einmal pro Woche verlieren gesparte Punkte ${percentOf(WEEKLY_INFLATION_RATE)}. Der Abzug wird beim " +
                     "ersten Öffnen nach diesem Tag gebucht — auch ohne Wochenplanung.",
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
@@ -1933,3 +1966,130 @@ private fun DueRow(label: String, at: Instant?, offHint: String = "nicht gesetzt
         )
     }
 }
+
+/** A row that leads to a page below this one (step 58). */
+@Composable
+private fun SubPageRow(title: String, hint: String, onOpen: () -> Unit) {
+    EtaSurface(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                EtaText(text = title, style = EtaTheme.typography.bodyStrong)
+                EtaText(text = hint, style = EtaTheme.typography.caption, color = EtaTheme.colors.textSecondary)
+            }
+            EtaText(text = "›", style = EtaTheme.typography.heading, color = EtaTheme.colors.textMuted)
+        }
+    }
+}
+
+/**
+ * The Punkte-Balancing (step 58): every point source and multiplier, each with
+ * its own stepper and its default beside it. Part of the draft — saved with
+ * "Sichern" like every page — and in force from the next figure on.
+ */
+@Composable
+private fun PointBalancingBox(setup: UserSetup, onChange: OnSetupChange) {
+    val values = decodeBalancing(setup.balancing)
+    fun set(key: BalanceKey, value: Double) = onChange { current ->
+        val rounded = Math.round(value.coerceAtLeast(0.0) * 10_000) / 10_000.0
+        current.copy(balancing = encodeBalancing(decodeBalancing(current.balancing) + (key to rounded)))
+    }
+
+    EtaSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+            EtaText(
+                text = "Zum Feinjustieren der Punktvergabe. Neben jedem Wert steht sein Standard; " +
+                    "was davon abweicht, ist markiert. Gilt nach »Sichern« ab der nächsten Abrechnung.",
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            BalanceKey.entries.forEach { key ->
+                key(key) {
+                    val value = values[key] ?: key.default
+                    BalanceRow(
+                        label = key.label,
+                        hint = key.hint,
+                        value = balanceText(value, key.share),
+                        default = balanceText(key.default, key.share),
+                        changed = value != key.default,
+                        onDecrement = { set(key, value - key.step) },
+                        onIncrement = { set(key, value + key.step) },
+                    )
+                }
+            }
+            BalanceRow(
+                label = "Task absagen",
+                hint = "Punkte je abgesagter Stunde (auch unter Einstellungen → Absagen)",
+                value = balanceText(setup.cancellationPenaltyPerHour, false),
+                default = balanceText(DEFAULT_CANCELLATION_PENALTY, false),
+                changed = setup.cancellationPenaltyPerHour != DEFAULT_CANCELLATION_PENALTY,
+                onDecrement = {
+                    onChange { it.copy(cancellationPenaltyPerHour = (it.cancellationPenaltyPerHour - 0.5).coerceAtLeast(0.0)) }
+                },
+                onIncrement = { onChange { it.copy(cancellationPenaltyPerHour = it.cancellationPenaltyPerHour + 0.5) } },
+            )
+            BalanceRow(
+                label = "Unverplante Zeit",
+                hint = "Punkte je unverplanter Stunde über dem Freibetrag" +
+                    if (!setup.unplannedPenalty) " — der Abzug ist unter Flexibilität ausgeschaltet" else "",
+                value = balanceText(setup.unplannedPenaltyPerHour, false),
+                default = balanceText(UNPLANNED_PENALTY_PER_HOUR, false),
+                changed = setup.unplannedPenaltyPerHour != UNPLANNED_PENALTY_PER_HOUR,
+                onDecrement = {
+                    onChange { it.copy(unplannedPenaltyPerHour = (it.unplannedPenaltyPerHour - 0.5).coerceAtLeast(0.5)) }
+                },
+                onIncrement = { onChange { it.copy(unplannedPenaltyPerHour = it.unplannedPenaltyPerHour + 0.5) } },
+            )
+            EtaButton(
+                text = "Alle auf Standard",
+                style = EtaButtonStyle.Secondary,
+                enabled = setup.balancing.isNotEmpty() ||
+                    setup.cancellationPenaltyPerHour != DEFAULT_CANCELLATION_PENALTY ||
+                    setup.unplannedPenaltyPerHour != UNPLANNED_PENALTY_PER_HOUR,
+                onClick = {
+                    onChange {
+                        it.copy(
+                            balancing = "",
+                            cancellationPenaltyPerHour = DEFAULT_CANCELLATION_PENALTY,
+                            unplannedPenaltyPerHour = UNPLANNED_PENALTY_PER_HOUR,
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun BalanceRow(
+    label: String,
+    hint: String,
+    value: String,
+    default: String,
+    changed: Boolean,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            EtaText(
+                text = label,
+                style = EtaTheme.typography.bodyStrong,
+                color = if (changed) EtaTheme.colors.accent else EtaTheme.colors.textPrimary,
+            )
+            EtaText(text = hint, style = EtaTheme.typography.caption, color = EtaTheme.colors.textSecondary)
+            EtaText(text = "Standard: $default", style = EtaTheme.typography.caption, color = EtaTheme.colors.textMuted)
+        }
+        Spacer(Modifier.size(EtaTheme.spacing.sm))
+        EtaStepper(value = value, valueWidth = 72.dp, onDecrement = onDecrement, onIncrement = onIncrement)
+    }
+}
+
+/** A balancing value as the page says it: a share in percent, points to three places at most. */
+private fun balanceText(value: Double, share: Boolean): String =
+    if (share) {
+        percentOf(value)
+    } else {
+        val text = java.math.BigDecimal(value).setScale(3, java.math.RoundingMode.HALF_UP)
+            .stripTrailingZeros().toPlainString()
+        text.replace('.', ',')
+    }

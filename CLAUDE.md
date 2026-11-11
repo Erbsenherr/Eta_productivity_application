@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (778 tests
-as of step 57), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (783 tests
+as of step 58), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -343,7 +343,9 @@ place a points *change* gets its sign; a negative harvest once printed as a gree
 "+-5".
 
 Category multipliers: Fokus 1.0, Nebenbei 0.5, **Achtsam 1.0** (the docs have a
-copy-paste error here; 1.0 is the confirmed value). Imported calendar events pay
+copy-paste error here; 1.0 is the confirmed value). **Since step 58 these and
+every other point value are defaults** that the debug page's Punkte-Balancing
+can tune (`BalanceKey`, `Balancing`) — see *Step 58*. Imported calendar events pay
 per *full* hour and ignore the category.
 
 ### `ItemRole`: what a block is *for*
@@ -424,6 +426,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-55-timer-malus.md` | *Step 55*: "Vorzeitig beenden" (`EarlyEndDialog`, `TimerActions.onEndEarly`, `PlannedBlock.endedEarly`), the malus and its recovery (`withEarlyEndMalus`, `recoveredFromMalus`, `advancedBySitting`, `Item.timerMalusBase`), the three-answer `TimerTickDialog` |
 | `step-56-stopwatch.md` | *Step 56*: the stopwatch in "Gerade" (`StopwatchTime`, `StopwatchRepository`, `StopwatchActions`, `StopwatchLines`, the explanation once) and "Gestoppte Zeiten" in Statistiken (`stopwatchSummaries`, `StatSection.STOPWATCH`, `StopwatchEditDialog`) |
 | `step-57-rule-breaches.md` | *Step 57*: a rule's Ausnahmesituation and Konsequenz (`RuleDraft`, `consequenceOnFreeTime`), "Regelverstoß melden" (`RuleBreach`, `ReportBreachButton`, `ReportBreachDialog`), the red box (`ConsequenceBox`), free time hatched red (`LocalFreeTimeConsequence`, `underConsequence`, `consequenceHatch`, the note), the morning's reminder (`rulesToWatch`, `WatchReminderBox`) |
+| `step-58-review-balancing.md` | *Step 58*: the Wochenrückblick (`weekReview`, `accuracy`, `Trend`, `ReviewSources`, `Step.REVIEW`) and the Punkte-Balancing (`BalanceKey`, `Balancing.values`, `encodeBalancing`, `UserSetup.balancing`, Debug → Balancing → Punkte-Balancing) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -521,7 +524,8 @@ unplanned hours in sight, and the Termin · 53. Rückgängig, a move onto
 occupied time asked about, a routine shown on a tap, one Quick-Add, and the
 Regelwerk · 54. Four bugfixes, help for a conflict, and Ultra-High ·
 55. "Vorzeitig beenden", and the time it costs · 56. The stopwatch ·
-57. A rule broken, and what follows.
+57. A rule broken, and what follows · 58. The Wochenrückblick, and the
+Punkte-Balancing.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and
