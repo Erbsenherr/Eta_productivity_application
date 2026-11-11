@@ -1051,6 +1051,9 @@ private fun StatisticsBox(setup: UserSetup, onChange: OnSetupChange) {
 
                                 StatSection.GOALS ->
                                     "Dasselbe für Timer- und Inkrement-Tasks, mit Verlauf des Pensums."
+
+                                StatSection.STOPWATCH ->
+                                    "Mit der Stoppuhr gemessene Zeiten: Durchschnitt, kürzeste, längste."
                             },
                         )
                     }

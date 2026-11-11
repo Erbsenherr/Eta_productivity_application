@@ -5,6 +5,8 @@ import com.example.eta.domain.model.SubtaskTimer
 import com.example.eta.domain.subtask.isGrowingStep
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.eta.data.repository.StopwatchRepository
+import com.example.eta.domain.model.StopwatchTime
 import com.example.eta.alarm.TaskStartCoordinator
 import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.repository.ConflictRepository
@@ -74,6 +76,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
@@ -83,6 +86,7 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.todayIn
 
 /** A Sammelliste entry close to being banned, with the days it has left. */
@@ -253,6 +257,8 @@ class DashboardViewModel(
      */
     private val sleepLogRepository: SleepLogRepository? = null,
     private val nightService: NightService? = null,
+    /** Step 56: the stopwatch in the "Gerade" box; null hides it. */
+    private val stopwatchRepository: StopwatchRepository? = null,
 ) : ViewModel() {
 
     private val today: LocalDate = clock.todayIn(timeZone)
@@ -269,6 +275,14 @@ class DashboardViewModel(
 
     private val _timerResult = MutableStateFlow<TimerResult?>(null)
     val timerResult: StateFlow<TimerResult?> = _timerResult.asStateFlow()
+
+    /** The stopwatches still being taken (step 56), whatever task is running now. */
+    val stopwatches: StateFlow<List<StopwatchTime>> =
+        (stopwatchRepository?.observeRunning() ?: flowOf(emptyList()))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Whether the stopwatch is offered at all — not in the practice app. */
+    val hasStopwatch: Boolean get() = stopwatchRepository != null
 
     val uiState: StateFlow<DashboardUiState> = combine(
         pointsRepository.observeBalance(),
@@ -913,6 +927,37 @@ class DashboardViewModel(
             taskStartCoordinator.reschedule()
             askFollowUp(entry, billing = null)
         }
+    }
+
+    // --- the stopwatch (step 56) -------------------------------------------------
+
+    /**
+     * Starts the stopwatch on [entry]: from now, or — [fromPlan] — from the
+     * task's start by the plan, as if it had been pressed then. A plan start
+     * still ahead is now.
+     */
+    fun startStopwatch(entry: BlockWithItem, fromPlan: Boolean) {
+        val repository = stopwatchRepository ?: return
+        viewModelScope.launch {
+            val now = clock.now()
+            val from = if (fromPlan) {
+                LocalDateTime(entry.block.date, entry.block.start).toInstant(timeZone)
+            } else {
+                now
+            }
+            repository.start(entry, from, stopwatches.value)
+        }
+    }
+
+    fun pauseStopwatch(id: String) = stopwatchChange { it.pause(id) }
+
+    fun resumeStopwatch(id: String) = stopwatchChange { it.resume(id) }
+
+    fun endStopwatch(id: String) = stopwatchChange { it.end(id) }
+
+    private fun stopwatchChange(change: suspend (StopwatchRepository) -> Unit) {
+        val repository = stopwatchRepository ?: return
+        viewModelScope.launch { change(repository) }
     }
 
     /**

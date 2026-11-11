@@ -8,6 +8,10 @@ import com.example.eta.data.repository.PlanRepository
 import com.example.eta.data.repository.RecurringTaskService
 import com.example.eta.data.repository.SetupRepository
 import com.example.eta.data.repository.SleepLogRepository
+import com.example.eta.data.repository.StopwatchRepository
+import com.example.eta.domain.model.StopwatchTime
+import kotlin.time.Duration
+import kotlinx.coroutines.flow.flowOf
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.SleepLog
@@ -45,7 +49,7 @@ data class StatisticsData(
 /**
  * The Statistiken tab.
  *
- * It writes nothing. The history is read **once per visit** rather than
+ * It writes nothing but the stopwatch's corrections (step 56). The history is read **once per visit** rather than
  * observed: it is every block the database holds, and a statistic does not need
  * to move while it is being looked at.
  */
@@ -55,6 +59,8 @@ class StatisticsViewModel(
     recurringTaskService: RecurringTaskService,
     setupRepository: SetupRepository,
     nightService: NightService,
+    /** Step 56: the stopwatch's times — the one thing this tab corrects and deletes. */
+    private val stopwatchRepository: StopwatchRepository? = null,
     clock: Clock = Clock.System,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
@@ -80,8 +86,23 @@ class StatisticsViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatisticsData(today = today))
 
+    /** Every time the stopwatch finished, newest first — observed, since they can be edited here. */
+    val stopwatchTimes: StateFlow<List<StopwatchTime>> =
+        (stopwatchRepository?.observeEnded() ?: flowOf(emptyList()))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
         refresh()
+    }
+
+    fun correctStopwatch(id: String, worked: Duration) {
+        val repository = stopwatchRepository ?: return
+        viewModelScope.launch { repository.correct(id, worked) }
+    }
+
+    fun deleteStopwatch(id: String) {
+        val repository = stopwatchRepository ?: return
+        viewModelScope.launch { repository.delete(id) }
     }
 
     /** Reads the history again — on every visit to the tab. */

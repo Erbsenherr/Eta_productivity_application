@@ -203,6 +203,8 @@ fun NowBox(
      * the question whether to pull that task forward.
      */
     onPullForward: ((BlockWithItem) -> Unit)? = null,
+    /** Step 56: the stopwatch — "⏱" on the running task, and those being taken. */
+    stopwatch: StopwatchActions? = null,
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
 
@@ -231,6 +233,22 @@ fun NowBox(
                     color = if (greeting != null) EtaTheme.colors.accent else EtaTheme.colors.textSecondary,
                     modifier = Modifier.weight(1f),
                 )
+                // "⏱" on the task running now, unless it is being measured already.
+                val measurable = current?.entry?.takeIf { entry ->
+                    pagerState.currentPage == 0 &&
+                        stopwatch?.running?.none { it.blockId == entry.block.id } == true
+                }
+                if (stopwatch != null && measurable != null) {
+                    val request by rememberUpdatedState(stopwatch.onRequest)
+                    EtaText(
+                        text = "⏱",
+                        style = EtaTheme.typography.heading,
+                        color = EtaTheme.colors.accent,
+                        modifier = Modifier
+                            .padding(horizontal = EtaTheme.spacing.sm)
+                            .clickable { request(measurable) },
+                    )
+                }
                 repeat(2) { page ->
                     Box(
                         modifier = Modifier
@@ -309,6 +327,7 @@ fun NowBox(
                     }
                 }
             }
+            stopwatch?.let { StopwatchLines(it) }
         }
     }
 }

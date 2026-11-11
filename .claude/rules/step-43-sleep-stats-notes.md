@@ -119,6 +119,7 @@ the screen cuts that history per range, since there are several pickers on it.
 - **The plot** (`PensumChart`, a `Canvas` with the foundation's text measurer):
   `timerPensum` / `quantityPensum`, the x-axis always days, lettered with month
   names where `monthsFitBetter` (more than 62 days).
+- **Since step 56 a fourth card, "Gestoppte Zeiten"** — see *Step 56*.
 - **`StatSection`** is what the settings hide. `UserSetup.statsHidden` holds the
   **hidden** names, so a section added later is on for everyone.
   `SettingsPage.STATISTICS`, applied at once.

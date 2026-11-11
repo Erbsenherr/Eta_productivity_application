@@ -40,6 +40,8 @@ import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
+import com.example.eta.ui.components.LocalFeatures
+import com.example.eta.ui.components.rememberFold
 import com.example.eta.ui.components.tutorialSpot
 import com.example.eta.domain.tutorial.TutorialSpot
 import com.example.eta.ui.components.EtaButton
@@ -327,6 +329,49 @@ private fun TodayPage(
             onEndEarly = { earlyEndingId = it },
         )
         var tickingTimerId by remember { mutableStateOf<String?>(null) }
+
+        // The stopwatch (step 56): explained the first time, then asked from when.
+        // Only where its times can be read — the Statistiken tab.
+        val runningStopwatches by viewModel.stopwatches.collectAsStateWithLifecycle()
+        val stopwatchExplained = rememberFold("hint.stopwatch")
+        var stopwatchFor by remember { mutableStateOf<String?>(null) }
+        var explainingStopwatch by remember { mutableStateOf(false) }
+        val stopwatchActions = StopwatchActions(
+            now = now,
+            running = runningStopwatches,
+            onRequest = { entry ->
+                stopwatchFor = entry.block.id
+                explainingStopwatch = !stopwatchExplained.open
+            },
+            onPause = viewModel::pauseStopwatch,
+            onResume = viewModel::resumeStopwatch,
+            onEnd = viewModel::endStopwatch,
+        ).takeIf { viewModel.hasStopwatch && LocalFeatures.current.statistics }
+        stopwatchFor?.let { id ->
+            val entry = state.todayBlocks.firstOrNull { it.block.id == id }
+            when {
+                entry == null -> stopwatchFor = null
+                explainingStopwatch -> StopwatchExplainDialog(
+                    onDismiss = {
+                        explainingStopwatch = false
+                        stopwatchFor = null
+                    },
+                    onUnderstood = {
+                        if (!stopwatchExplained.open) stopwatchExplained.toggle()
+                        explainingStopwatch = false
+                    },
+                )
+                else -> StopwatchStartDialog(
+                    entry = entry,
+                    now = now,
+                    onDismiss = { stopwatchFor = null },
+                    onStart = { fromPlan ->
+                        viewModel.startStopwatch(entry, fromPlan)
+                        stopwatchFor = null
+                    },
+                )
+            }
+        }
         val timerOverflow by viewModel.timerOverflow.collectAsStateWithLifecycle()
         val timerResult by viewModel.timerResult.collectAsStateWithLifecycle()
 
@@ -368,6 +413,7 @@ private fun TodayPage(
             onConfirm = { confirming = it },
             onOpenRoutine = { routineShownId = it },
             onPullForward = viewModel::offerPullForward,
+            stopwatch = stopwatchActions,
             timer = timerActions,
             stepTimers = state.stepTimers,
             stepTimer = StepTimerActions(

@@ -693,6 +693,7 @@ internal fun dashboardViewModelFactory(container: AppContainer): ViewModelProvid
                 // Not in the practice app: its day is simulated.
                 sleepLogRepository = container.sleepLogRepository.takeIf { !container.sandbox },
                 nightService = container.nightService.takeIf { !container.sandbox },
+                stopwatchRepository = container.stopwatchRepository.takeIf { !container.sandbox },
             )
         }
     }
@@ -929,6 +930,7 @@ internal fun statisticsViewModelFactory(container: AppContainer): ViewModelProvi
                 recurringTaskService = container.recurringTaskService,
                 setupRepository = container.setupRepository,
                 nightService = container.nightService,
+                stopwatchRepository = container.stopwatchRepository,
                 clock = container.clock,
             )
         }

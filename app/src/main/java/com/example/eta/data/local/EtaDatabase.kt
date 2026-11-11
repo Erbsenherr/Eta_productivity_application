@@ -30,6 +30,7 @@ import com.example.eta.domain.model.Vacation
 import com.example.eta.domain.model.VacationRule
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.model.Rule
+import com.example.eta.domain.model.StopwatchTime
 
 @Database(
     entities = [
@@ -57,8 +58,9 @@ import com.example.eta.domain.model.Rule
         HabitStreak::class,
         SubtaskTimer::class,
         Rule::class,
+        StopwatchTime::class,
     ],
-    version = 38,
+    version = 39,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -80,6 +82,7 @@ abstract class EtaDatabase : RoomDatabase() {
     abstract fun trackingDao(): TrackingDao
     abstract fun streakDao(): StreakDao
     abstract fun ruleDao(): RuleDao
+    abstract fun stopwatchDao(): StopwatchDao
     abstract fun resetDao(): ResetDao
 
     companion object {
@@ -1127,5 +1130,17 @@ val MIGRATION_37_38 = object : Migration(37, 38) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `endedEarly` INTEGER NOT NULL DEFAULT 0")
         connection.execSQL("ALTER TABLE `items` ADD COLUMN `timerMalusBase` INTEGER")
+    }
+}
+
+/** Step 56: the stopwatch's times. */
+val MIGRATION_38_39 = object : Migration(38, 39) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `stopwatch_times` (`id` TEXT NOT NULL, `itemId` TEXT NOT NULL, " +
+                "`blockId` TEXT NOT NULL, `name` TEXT NOT NULL, `date` TEXT NOT NULL, " +
+                "`worked` INTEGER NOT NULL, `runningSince` INTEGER, `endedAt` INTEGER, " +
+                "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
     }
 }

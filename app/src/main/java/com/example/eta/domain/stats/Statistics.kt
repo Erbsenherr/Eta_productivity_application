@@ -51,6 +51,8 @@ enum class StatSection(val label: String) {
     CATEGORIES("Zeit je Kategorie"),
     RECURRING("Wiederkehrende Tasks"),
     GOALS("Timer- und Inkrement-Tasks"),
+    /** Step 56: the stopwatch's times. */
+    STOPWATCH("Gestoppte Zeiten"),
 }
 
 private fun UserSetup.hiddenStats(): Set<String> =

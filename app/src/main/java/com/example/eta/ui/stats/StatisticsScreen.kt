@@ -56,6 +56,16 @@ import com.example.eta.domain.stats.showsStat
 import com.example.eta.domain.stats.taskStats
 import com.example.eta.domain.stats.tasksByName
 import com.example.eta.domain.stats.timerPensum
+import com.example.eta.domain.stats.StopwatchSummary
+import com.example.eta.domain.stats.stopwatchSummaries
+import com.example.eta.domain.model.StopwatchTime
+import com.example.eta.ui.components.ConfirmDialog
+import com.example.eta.ui.components.EtaDialog
+import com.example.eta.ui.components.EtaDurationPicker
+import com.example.eta.ui.components.EtaField
+import com.example.eta.ui.format.formatWithYear
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaScreen
@@ -158,7 +168,189 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
                     }
                 }
             }
+            if (shows(StatSection.STOPWATCH)) {
+                val times by viewModel.stopwatchTimes.collectAsStateWithLifecycle()
+                val summaries = remember(times) { stopwatchSummaries(times) }
+                FoldCard(
+                    title = "Gestoppte Zeiten",
+                    count = summaries.size,
+                    tint = EtaTheme.colors.accent,
+                ) {
+                    if (summaries.isEmpty()) {
+                        EtaText(
+                            text = "Noch nichts gestoppt — die Stoppuhr ist das ⏱ in der Box »Gerade«.",
+                            style = EtaTheme.typography.body,
+                            color = EtaTheme.colors.textMuted,
+                        )
+                    }
+                    summaries.forEach { summary ->
+                        key("watch:" + summary.name.lowercase()) {
+                            StopwatchFold(
+                                summary = summary,
+                                onCorrect = viewModel::correctStopwatch,
+                                onDelete = viewModel::deleteStopwatch,
+                            )
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.size(EtaTheme.spacing.xl))
+        }
+    }
+}
+
+/**
+ * One task's stopped times (step 56): how often, the average, the shortest and
+ * the longest — and behind "Alle Zeiten" every one of them, newest first; a tap
+ * on one corrects or deletes it.
+ */
+@Composable
+private fun StopwatchFold(
+    summary: StopwatchSummary,
+    onCorrect: (id: String, worked: Duration) -> Unit,
+    onDelete: (id: String) -> Unit,
+) {
+    var expanded by rememberSaveable(summary.name) { mutableStateOf(false) }
+    var allShown by rememberSaveable(summary.name) { mutableStateOf(false) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    StatTile(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { expanded = !expanded },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                EtaText(
+                    text = summary.name,
+                    style = EtaTheme.typography.bodyStrong,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                EtaText(
+                    text = if (summary.count == 1) "1-mal gestoppt" else "${summary.count}-mal gestoppt",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+            EtaText(
+                text = if (expanded) "▴" else "▾",
+                style = EtaTheme.typography.label,
+                color = EtaTheme.colors.textMuted,
+            )
+        }
+        if (expanded) {
+            StatLine("Durchschnitt", summary.average.formatShort())
+            Hairline()
+            StatLine("Kürzeste", summary.shortest.formatShort())
+            Hairline()
+            StatLine("Längste", summary.longest.formatShort())
+            Hairline()
+            EtaText(
+                text = (if (allShown) "▴ " else "▾ ") + "Alle Zeiten",
+                style = EtaTheme.typography.label,
+                color = EtaTheme.colors.accent,
+                modifier = Modifier.clickable { allShown = !allShown },
+            )
+            if (allShown) {
+                summary.times.forEach { time ->
+                    key(time.id) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { editingId = time.id },
+                        ) {
+                            EtaText(
+                                text = time.date.formatWithYear(),
+                                style = EtaTheme.typography.body,
+                                color = EtaTheme.colors.textSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            EtaText(text = time.worked.formatShort(), style = EtaTheme.typography.bodyStrong)
+                        }
+                    }
+                }
+                EtaText(
+                    text = "Antippen, um eine Zeit zu ändern oder zu löschen.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+            }
+        }
+    }
+
+    editingId?.let { id ->
+        val time = summary.times.firstOrNull { it.id == id }
+        if (time == null) {
+            editingId = null
+        } else {
+            StopwatchEditDialog(
+                time = time,
+                onDismiss = { editingId = null },
+                onSave = {
+                    onCorrect(id, it)
+                    editingId = null
+                },
+                onDelete = {
+                    onDelete(id)
+                    editingId = null
+                },
+            )
+        }
+    }
+}
+
+/** One stopped time, corrected or deleted. Deleting asks first. */
+@Composable
+private fun StopwatchEditDialog(
+    time: StopwatchTime,
+    onDismiss: () -> Unit,
+    onSave: (Duration) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var worked by remember(time.id) { mutableStateOf(time.worked) }
+    var confirmingDelete by remember(time.id) { mutableStateOf(false) }
+
+    if (confirmingDelete) {
+        ConfirmDialog(
+            title = "Zeit löschen?",
+            message = "${time.worked.formatShort()} vom ${time.date.formatWithYear()} " +
+                "fällt aus »${time.name}« heraus.",
+            confirm = "Löschen",
+            onDismiss = { confirmingDelete = false },
+            onConfirm = onDelete,
+        )
+        return
+    }
+    EtaDialog(title = time.name, onDismiss = onDismiss) {
+        EtaText(
+            text = time.date.formatWithYear(),
+            style = EtaTheme.typography.caption,
+            color = EtaTheme.colors.textSecondary,
+        )
+        EtaField(label = "Gestoppte Zeit") {
+            EtaDurationPicker(
+                value = worked,
+                onValueChange = { worked = it },
+                step = 1.minutes,
+                minimum = 1.seconds,
+                precise = true,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaButton(
+                text = "Löschen",
+                style = EtaButtonStyle.Secondary,
+                onClick = { confirmingDelete = true },
+            )
+            Spacer(Modifier.weight(1f))
+            EtaButton(text = "Sichern", onClick = { onSave(worked) })
         }
     }
 }

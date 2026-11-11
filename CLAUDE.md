@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (770 tests
-as of step 55), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (774 tests
+as of step 56), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -422,6 +422,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-53-undo-kinds-rulebook.md` | *Step 53*: "Rückgängig" in the day planner (`PlanSnapshot`, `planRestore`, `undoable`, `forgetUndo`), a move onto occupied time asks (`MovePrompt`, `MoveDialog`), a routine's steps on a tap (`RoutineDetailDialog`), a routine's rest "Erledigt" / "Verfallen", one Quick-Add and the switch "Einmalig · Wiederkehrend" (`KindSwitch`, `Item.asKind`), notifications that replace one another (`clearEarlierNotifications`), the Regelwerk (`Rule`, `EtaTab.Rules`) |
 | `step-54-fixes-ultra-high.md` | *Step 54*: the planning alarm past midnight (`planningWindowOpen`), "Anfahr-/Vorbereitungszeit", reordering steps (`key`), a start time in "Heute anstehend" always written (`BlockEditFeedback.Overlapping`), help for a block in a conflict (`blockConflict`, `ConflictHelp`), pulling forward from an empty "Gerade" (`offerPullForward`), Ultra-High (`Item.ultraHigh`) |
 | `step-55-timer-malus.md` | *Step 55*: "Vorzeitig beenden" (`EarlyEndDialog`, `TimerActions.onEndEarly`, `PlannedBlock.endedEarly`), the malus and its recovery (`withEarlyEndMalus`, `recoveredFromMalus`, `advancedBySitting`, `Item.timerMalusBase`), the three-answer `TimerTickDialog` |
+| `step-56-stopwatch.md` | *Step 56*: the stopwatch in "Gerade" (`StopwatchTime`, `StopwatchRepository`, `StopwatchActions`, `StopwatchLines`, the explanation once) and "Gestoppte Zeiten" in Statistiken (`stopwatchSummaries`, `StatSection.STOPWATCH`, `StopwatchEditDialog`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -518,7 +519,7 @@ GitHub releases · 51. Every sound chosen, and a negative balance in red ·
 unplanned hours in sight, and the Termin · 53. Rückgängig, a move onto
 occupied time asked about, a routine shown on a tap, one Quick-Add, and the
 Regelwerk · 54. Four bugfixes, help for a conflict, and Ultra-High ·
-55. "Vorzeitig beenden", and the time it costs.
+55. "Vorzeitig beenden", and the time it costs · 56. The stopwatch.
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

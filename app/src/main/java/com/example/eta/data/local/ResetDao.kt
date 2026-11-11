@@ -40,12 +40,16 @@ abstract class ResetDao {
         clearSleepLogs()
         clearNotes()
         clearRules()
+        clearStopwatch()
         clearStreaks()
         clearSetup()
     }
 
     @Query("DELETE FROM rules")
     abstract suspend fun clearRules()
+
+    @Query("DELETE FROM stopwatch_times")
+    abstract suspend fun clearStopwatch()
 
     @Query("DELETE FROM streaks")
     abstract suspend fun clearStreaks()
