@@ -304,6 +304,59 @@ data class MovePrompt(
     val canReturn: Boolean,
 )
 
+/**
+ * A block that already stands in a conflict, and the two ways out the edit
+ * window offers for it (step 54) — the answers of [MovePrompt], for a block
+ * that is not being moved but is already in the way of something.
+ */
+data class BlockConflict(
+    val span: PlacementSpan,
+    /** What is in the way, and what "Überschreiben" would make of each. */
+    val relief: List<PlanRelief>,
+    /** Where it fits next on the day; null when nothing does or it cannot move. */
+    val nextFree: Int?,
+    /** False for a standing occurrence or an import: those are not moved. */
+    val movable: Boolean,
+)
+
+/**
+ * Whether [entry] overlaps anything on its day, read off [blocks] — null when
+ * it does not, or when it holds no time (done, called off).
+ */
+fun blockConflict(entry: BlockWithItem, blocks: List<BlockWithItem>): BlockConflict? {
+    if (!entry.claimsItsSlot()) return null
+    val block = entry.block
+    val others = blocks.filter { it.block.id != block.id && it.block.date == block.date }.standing()
+    val span = PlacementSpan(
+        startMinute = block.startMinute(),
+        duration = block.effectiveDuration,
+        travelBefore = block.travelBefore,
+        returnAfter = block.returnAfter,
+        breakAfter = block.breakAfter,
+    )
+    val relief = planRelief(others, span)
+    if (relief.isEmpty()) return null
+    val movable = block.isMovable
+    return BlockConflict(
+        span = span,
+        relief = relief,
+        nextFree = if (!movable) {
+            null
+        } else {
+            firstFreeStart(
+                others,
+                block.effectiveDuration,
+                block.startMinute(),
+                ignoreId = block.id,
+                leadIn = block.travelBefore,
+                tailOut = block.returnAfter,
+                tailOutExtra = block.breakAfter,
+            )
+        },
+        movable = movable,
+    )
+}
+
 /** What becomes of a block "Plan anpassen" or "Ganzen Tag absagen" clears away. */
 enum class RemovalFate { DELETED, BACK_TO_WEEK, CALLED_OFF }
 
@@ -421,9 +474,16 @@ class DayPlannerViewModel(
         nightService.observeDismissed(date),
     ) { setup, overrides, dismissed -> DayFrame(setup, overrides, dismissed) }
 
+    // The week list, and every "Ultra-High" card of the Sammelliste: those do
+    // not wait for the week to take them on (step 54).
+    private val revolverItems = combine(
+        itemRepository.observeStage(Stage.WEEK),
+        itemRepository.observeStage(Stage.COLLECTION),
+    ) { week, collection -> week + collection.filter { it.ultraHigh } }
+
     val uiState: StateFlow<PlannerUiState> = combine(
         dayState,
-        itemRepository.observeStage(Stage.WEEK),
+        revolverItems,
         frame,
         skippedTiers,
         itemRepository.observeFoldCandidates(),
@@ -441,9 +501,12 @@ class DayPlannerViewModel(
         // The item behind a finished block is still placed: it must not come back
         // out of the revolver because its stretch was released.
         val placed = accounted.map { it.item.id }.toSet()
-        val candidates = weekItems.filter {
-            it.id !in placed && it.isConcretized && it.isAvailableOn(date)
+        val available = weekItems.filter {
+            it.id !in placed && it.isConcretized && (it.ultraHigh || it.isAvailableOn(date))
         }
+        // "Ultra-High" goes in front of whatever tier is on offer, and is not
+        // part of the gate: it would otherwise hold its own tier shut.
+        val (ultra, candidates) = available.partition { it.ultraHigh }
         // Only the highest outstanding priority is offered; the rest waits — a
         // tier of which nothing fits the day any more is passed by itself, and
         // by hand only where the settings allow that.
@@ -465,13 +528,13 @@ class DayPlannerViewModel(
             date = date,
             blocks = blocks,
             freed = freed,
-            revolver = tier.items,
+            revolver = ultra + tier.items,
             revolverPriority = tier.priority,
             lockedPriorities = tier.lockedBelow,
             passedPriorities = tier.passedAbove,
             canSkipPriority = canSkip,
             prioritySkipped = canSkip && skipped > 0,
-            canCreateTodo = setup?.allowTodoBesideWeek == true || candidates.none(fits),
+            canCreateTodo = setup?.allowTodoBesideWeek == true || available.none(fits),
             sleep = setup?.sleepStretches(date, frame.overrides).orEmpty(),
             setup = setup,
             nightOverrides = frame.overrides,
@@ -908,6 +971,35 @@ class DayPlannerViewModel(
         val prompt = _movePrompt.value ?: return
         _movePrompt.value = null
         if (prompt.canReturn) returnToWeek(prompt.blockId)
+    }
+
+    /**
+     * The edit window's "Nächster freier Platz", for a block already standing
+     * in a conflict: it goes to the next stretch it fits, from where it stands.
+     */
+    fun resolveToNextFree(blockId: String) {
+        val entry = uiState.value.blocks.firstOrNull { it.block.id == blockId } ?: return
+        val conflict = blockConflict(entry, uiState.value.blocks) ?: return
+        val start = conflict.nextFree
+        if (start == null) {
+            _feedback.value = PlacementFeedback.NoRoom(entry.item.name)
+            return
+        }
+        undoable {
+            planRepository.addBlock(
+                entry.block.copy(start = minuteToLocalTime(start), updatedAt = clock.now()),
+            )
+        }
+    }
+
+    /**
+     * The edit window's "Überschreiben": the block stays, and what is in its
+     * way is cut or cleared — as [moveOverwriting] does for a moved one.
+     */
+    fun resolveOverwriting(blockId: String) {
+        val entry = uiState.value.blocks.firstOrNull { it.block.id == blockId } ?: return
+        val conflict = blockConflict(entry, uiState.value.blocks) ?: return
+        undoable { makeRoomFor(conflict.span, clock.now(), ignoreId = blockId) }
     }
 
     /** The dialog closed beside its buttons: nothing moves. */

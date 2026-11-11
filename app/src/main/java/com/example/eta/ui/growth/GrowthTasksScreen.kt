@@ -203,7 +203,7 @@ private fun ReorderableList(
     val step = rememberUpdatedState(gap)
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-        order.forEachIndexed { index, group ->
+        order.forEachIndexed { index, group -> key(group.representative.id) {
             val id = group.representative.id
             val dragging = draggingId == id
 
@@ -256,7 +256,7 @@ private fun ReorderableList(
                         )
                     },
             )
-        }
+        } }
     }
 }
 

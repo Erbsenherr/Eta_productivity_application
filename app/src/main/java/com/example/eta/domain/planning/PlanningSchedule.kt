@@ -93,6 +93,22 @@ fun nextWake(
 fun shouldRing(appInForeground: Boolean, phaseCompleted: Boolean): Boolean =
     !appInForeground && !phaseCompleted
 
+/**
+ * Whether the phase can still be done at [now].
+ *
+ * The evening's reevaluation is always of the calendar day, so once midnight
+ * has passed the evening that was asked about cannot be finished any more —
+ * and the new day's own phase is not due until its hour. A retry that crossed
+ * midnight used to go on ringing all through the next day, asking about a day
+ * whose settlement had become impossible. The weekly phase stays open: it
+ * books the week, and a day late is still that week.
+ */
+fun planningWindowOpen(setup: UserSetup, phase: PlanningPhase, now: LocalDateTime): Boolean =
+    when (phase) {
+        PlanningPhase.DAILY -> now.time >= setup.dailyPlanningTime
+        PlanningPhase.WEEKLY -> true
+    }
+
 /** Where a snooze puts the next ring. */
 fun snoozedFrom(now: Instant): Instant = now + PLANNING_SNOOZE
 

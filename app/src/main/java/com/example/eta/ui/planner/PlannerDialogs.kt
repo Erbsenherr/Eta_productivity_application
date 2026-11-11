@@ -155,6 +155,15 @@ fun BlockEditDialog(
      * still waits for the dialog's own.
      */
     onSubtasks: (SubtaskSetting) -> Unit = {},
+    /**
+     * The conflict this block already stands in, or null (step 54). The help
+     * offered for it is the move question's: the next free place, or the plan
+     * giving way. [conflictBlocks] names what is in the way.
+     */
+    conflict: BlockConflict? = null,
+    conflictBlocks: List<BlockWithItem> = emptyList(),
+    onResolveNextFree: () -> Unit = {},
+    onResolveOverwrite: () -> Unit = {},
 ) {
     var name by remember(entry.block.id) { mutableStateOf(entry.item.name) }
     var category by remember(entry.block.id) { mutableStateOf(entry.item.category) }
@@ -185,6 +194,16 @@ fun BlockEditDialog(
     var confirmingExcuse by remember(entry.block.id) { mutableStateOf(false) }
 
     PlannerDialog(title = "Bearbeiten", onDismiss = onDismiss) {
+        conflict?.let {
+            ConflictHelp(
+                name = entry.item.name,
+                conflict = it,
+                blocks = conflictBlocks,
+                costs = cancellationCosts,
+                onNextFree = onResolveNextFree,
+                onOverwrite = onResolveOverwrite,
+            )
+        }
         EtaField(label = "Name") {
             EtaTextField(value = name, onValueChange = { name = it })
         }
@@ -264,20 +283,20 @@ fun BlockEditDialog(
             },
         ) {
             MarginField(
-                label = "Anfahrtszeit",
+                label = "Anfahr-/Vorbereitungszeit",
                 hint = "Liegt vor der Aufgabe und wird mitverschoben. Gilt für diesen Termin.",
                 value = travel,
                 onValueChange = { travel = it },
             )
             MarginField(
-                label = "Rückweg",
+                label = "Rückfahr-/Nachbereitungszeit",
                 hint = "Liegt direkt hinter der Aufgabe, vor der Pause. Gilt für diesen Termin.",
                 value = returnAfter,
                 onValueChange = { returnAfter = it },
             )
             MarginField(
                 label = "Pause danach",
-                hint = "Liegt ganz am Ende, hinter dem Rückweg. Gilt für diesen Termin.",
+                hint = "Liegt ganz am Ende, hinter der Rückfahr-/Nachbereitungszeit. Gilt für diesen Termin.",
                 value = breakAfter,
                 onValueChange = { breakAfter = it },
             )
@@ -814,6 +833,68 @@ fun MoveDialog(
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textMuted,
             )
+        }
+    }
+}
+
+/**
+ * The help for a block already in a conflict, at the top of its edit window.
+ *
+ * The answers of [MoveDialog] without the third: leaving it as it is is what
+ * closing the window does, and the Überschneidung box keeps reporting it.
+ */
+@Composable
+private fun ConflictHelp(
+    name: String,
+    conflict: BlockConflict,
+    blocks: List<BlockWithItem>,
+    costs: Boolean,
+    onNextFree: () -> Unit,
+    onOverwrite: () -> Unit,
+) {
+    val entries = conflict.relief.mapNotNull { relief ->
+        blocks.firstOrNull { it.block.id == relief.block.id }?.let { relief to it }
+    }
+    val pointsVisible = LocalPointsVisible.current
+    EtaSurface(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = EtaTheme.colors.warning,
+        contentPadding = EtaTheme.spacing.md,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
+            EtaText(text = "Überschneidung", style = EtaTheme.typography.label)
+            EtaText(
+                text = "Von ${clockAt(conflict.span.startMinute)} bis ${clockAt(conflict.span.endMinute)} " +
+                    "liegt zugleich " +
+                    entries.joinToString(separator = ", ", postfix = ".") { "»${it.second.item.name}«" },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textSecondary,
+            )
+            val nextFree = conflict.nextFree
+            EtaButton(
+                text = "Nächster freier Platz",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = nextFree != null,
+                onClick = onNextFree,
+            )
+            EtaText(
+                text = when {
+                    !conflict.movable -> "»$name« steht fest und wird nicht verschoben."
+                    nextFree == null -> "An diesem Tag ist keine Lücke mehr frei, in die »$name« passt."
+                    else -> "»$name« beginnt dann um ${clockAt(nextFree)}. Der Plan bleibt, wie er ist."
+                },
+                style = EtaTheme.typography.caption,
+                color = EtaTheme.colors.textMuted,
+            )
+            EtaButton(
+                text = "Überschreiben",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = entries.any { it.first !is PlanRelief.Kept },
+                onClick = onOverwrite,
+            )
+            ReliefLines(entries = entries, costs = costs && pointsVisible)
         }
     }
 }

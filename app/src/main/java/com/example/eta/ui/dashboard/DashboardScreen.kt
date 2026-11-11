@@ -47,6 +47,7 @@ import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.planner.BlockEditDialog
+import com.example.eta.ui.planner.blockConflict
 import com.example.eta.ui.planner.DayPlannerViewModel
 import com.example.eta.ui.subtasks.foldCandidatesExcept
 import com.example.eta.ui.format.formatLong
@@ -345,6 +346,7 @@ private fun TodayPage(
             onCheckSubtask = viewModel::setSubtaskChecked,
             onConfirm = { confirming = it },
             onOpenRoutine = { routineShownId = it },
+            onPullForward = viewModel::offerPullForward,
             timer = timerActions,
             stepTimers = state.stepTimers,
             stepTimer = StepTimerActions(
@@ -622,6 +624,18 @@ private fun TodayBlockEditor(
         },
         // This list is today's, and today's plan is a promise already made.
         cancellationCosts = true,
+        // Only once the planner holds this day: its rows are what the help reads.
+        conflict = planner.blocks.takeIf { planner.date == entry.block.date }
+            ?.let { blockConflict(entry, it) },
+        conflictBlocks = planner.blocks,
+        onResolveNextFree = {
+            plannerViewModel.resolveToNextFree(entry.block.id)
+            onDone()
+        },
+        onResolveOverwrite = {
+            plannerViewModel.resolveOverwriting(entry.block.id)
+            onDone()
+        },
     )
 }
 
@@ -700,6 +714,10 @@ private fun BlockEditFeedbackLine(
 
                     is BlockEditFeedback.NoRoom ->
                         "»${feedback.name}« passt heute nirgends mehr hin."
+
+                    is BlockEditFeedback.Overlapping ->
+                        "»${feedback.name}« ist verschoben, überschneidet sich dort aber " +
+                            "mit etwas anderem — siehe »Überschneidung«."
                 },
                 style = EtaTheme.typography.caption,
                 color = EtaTheme.colors.textSecondary,

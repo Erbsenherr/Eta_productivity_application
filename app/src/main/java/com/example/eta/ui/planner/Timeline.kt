@@ -367,14 +367,14 @@ private fun MarginContainer(entry: BlockWithItem, minutePx: Float, offsetPx: Flo
             .border(1.dp, accent.copy(alpha = 0.45f), EtaTheme.shapes.medium),
     ) {
         MarginStrip(
-            label = "Anfahrt",
+            label = "Anfahrt/Vorbereitung",
             duration = block.travelBefore,
             fromMinute = 0,
             minutePx = minutePx,
             accent = accent,
         )
         MarginStrip(
-            label = "Rückweg",
+            label = "Rückfahrt/Nachbereitung",
             duration = block.returnAfter,
             fromMinute = block.returnStartMinute() - from,
             minutePx = minutePx,
@@ -495,8 +495,8 @@ private fun NameBubble(
                 if (block.hasMargins) {
                     EtaText(
                         text = listOfNotNull(
-                            block.travelBefore?.let { "Anfahrt ${it.inWholeMinutes} min" },
-                            block.returnAfter?.let { "Rückweg ${it.inWholeMinutes} min" },
+                            block.travelBefore?.let { "Anfahrt/Vorbereitung ${it.inWholeMinutes} min" },
+                            block.returnAfter?.let { "Rückfahrt/Nachbereitung ${it.inWholeMinutes} min" },
                             block.breakAfter?.let { "Pause ${it.inWholeMinutes} min" },
                         ).joinToString(" · "),
                         style = EtaTheme.typography.caption,

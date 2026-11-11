@@ -187,6 +187,13 @@ data class Item(
      * nothing for a task without steps.
      */
     val routineMode: Boolean = false,
+    /**
+     * "Ultra-High" (step 54): a ToDo that goes straight to the front of the
+     * next revolver — out of the Sammelliste or the week list alike, past the
+     * priority gate and the unlock day. Not a fifth `Priority`: the card keeps
+     * the one it has, and this only says it is not to wait for its turn.
+     */
+    val ultraHigh: Boolean = false,
     /** SPEND only, signed: Custom Earn is positive (+1.5/h), Custom Spend negative (-5/h). */
     val pointsPerHour: Double? = null,
     /**

@@ -3,6 +3,7 @@ package com.example.eta.data.repository
 import com.example.eta.domain.planning.PLANNING_RETRY
 import com.example.eta.domain.planning.PlanningPhase
 import com.example.eta.domain.planning.nextPlanning
+import com.example.eta.domain.planning.planningWindowOpen
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
@@ -46,6 +47,15 @@ class PlanningPhaseService(
         val setup = setupRepository.find() ?: return null
         val now = clock.now().toLocalDateTime(timeZone)
         return nextPlanning(setup, phase, now).toInstant(timeZone)
+    }
+
+    /**
+     * Whether the phase can still be done now — false for the evening's phase
+     * once midnight has passed and today's hour has not yet come.
+     */
+    suspend fun isOpenNow(phase: PlanningPhase): Boolean {
+        val setup = setupRepository.find() ?: return false
+        return planningWindowOpen(setup, phase, clock.now().toLocalDateTime(timeZone))
     }
 
     /** When to ask again while the phase is still open. */

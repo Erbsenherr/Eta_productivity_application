@@ -379,6 +379,15 @@ fun TodoAttributeFields(
             onSelect = { onChange(value.copy(priority = it)) },
         )
     }
+    // Step 54: not a fifth priority but a way past the queue — the card keeps
+    // the priority above, and this decides it does not wait for its turn.
+    CheckRow(
+        checked = value.extras.ultraHigh,
+        onCheckedChange = { onChange(value.copy(extras = value.extras.copy(ultraHigh = it))) },
+        label = "Ultra-High",
+        hint = "Kommt sofort ganz vorn in den nächsten Revolver — auch aus der " +
+            "Sammelliste, an jeder Prioritätsstufe vorbei.",
+    )
     if (showTargetDate) {
         var picking by remember { mutableStateOf(false) }
         val unlock = value.unlockFrom
@@ -1036,14 +1045,14 @@ fun ExtrasBox(
             verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md),
         ) {
             MarginRow(
-                label = "Anfahrtszeit",
+                label = "Anfahr-/Vorbereitungszeit",
                 hint = "Liegt vor der Aufgabe und gehört zu ihr — sie wird mitverschoben.",
                 value = travel,
                 onValueChange = onTravel,
             )
             MarginRow(
-                label = "Rückweg",
-                hint = "Der Weg zurück, direkt hinter der Aufgabe und noch vor der Pause.",
+                label = "Rückfahr-/Nachbereitungszeit",
+                hint = "Der Weg zurück oder das Aufräumen danach, direkt hinter der Aufgabe und noch vor der Pause.",
                 value = returnAfter,
                 onValueChange = onReturnAfter,
             )
@@ -1337,7 +1346,7 @@ private fun ReminderRow(extras: ItemExtras, onExtras: (ItemExtras) -> Unit) {
                 )
             },
             label = "Erinnerung",
-            hint = "Meldet sich vor dem Beginn — bei einer Anfahrt vor der Anfahrt. " +
+            hint = "Meldet sich vor dem Beginn — bei einer Anfahr-/Vorbereitungszeit vor dieser. " +
                 "Steht danach im Reiter Erinnerungen.",
         )
         if (extras.hasReminder) {

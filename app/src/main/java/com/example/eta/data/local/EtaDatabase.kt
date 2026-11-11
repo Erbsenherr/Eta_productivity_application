@@ -58,7 +58,7 @@ import com.example.eta.domain.model.Rule
         SubtaskTimer::class,
         Rule::class,
     ],
-    version = 36,
+    version = 37,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1112,5 +1112,12 @@ val MIGRATION_35_36 = object : Migration(35, 36) {
                 "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         )
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `rulebook` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** Step 54: `items.ultraHigh`, off for every card there is. */
+val MIGRATION_36_37 = object : Migration(36, 37) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `items` ADD COLUMN `ultraHigh` INTEGER NOT NULL DEFAULT 0")
     }
 }

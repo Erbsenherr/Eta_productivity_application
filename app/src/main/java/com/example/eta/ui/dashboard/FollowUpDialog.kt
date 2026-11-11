@@ -46,7 +46,11 @@ fun FollowUpDialog(
     val next = question.next
 
     EtaDialog(
-        title = if (billing != null) "Früher fertig" else "Und weiter?",
+        title = when {
+            billing != null -> "Früher fertig"
+            question.idle -> "Gerade ist frei"
+            else -> "Und weiter?"
+        },
         onDismiss = onKeepPlan,
     ) {
         if (billing != null) {

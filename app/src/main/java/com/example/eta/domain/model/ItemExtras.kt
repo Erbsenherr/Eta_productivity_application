@@ -68,6 +68,8 @@ data class ItemExtras(
      * on a new task; a ToDo carries none.
      */
     val rhythm: Rhythm? = null,
+    /** "Ultra-High" — see [Item.ultraHigh]. A ToDo's; the form asks it under the priority. */
+    val ultraHigh: Boolean = false,
 ) {
     val hasPomodoro: Boolean get() = pomodoroWork != null && pomodoroPause != null
 
@@ -90,6 +92,7 @@ data class ItemExtras(
             timer = item.timerSetting,
             color = item.color,
             rhythm = item.recurrenceRule?.let(Rhythm::of),
+            ultraHigh = item.ultraHigh,
         )
     }
 }
@@ -107,6 +110,8 @@ fun Item.withExtras(extras: ItemExtras): Item = copy(
     repeatUntil = extras.repeatUntil,
     routineMode = extras.routineMode,
     color = extras.color,
+    // A standing task has no revolver to jump in.
+    ultraHigh = extras.ultraHigh && recurrenceRule == null,
 ).withQuantity(extras.quantity).withTimer(extras.timer)
 
 /**

@@ -46,7 +46,9 @@ class PlanningAlarmCoordinator(
      * is done, and books the next attempt either way.
      */
     suspend fun onRing(phase: PlanningPhase) {
-        val completed = phaseService.isCompleted(phase)
+        // A phase that can no longer be done counts as done: past midnight the
+        // evening asked about is gone, and the next one has its own hour.
+        val completed = phaseService.isCompleted(phase) || !phaseService.isOpenNow(phase)
 
         if (shouldRing(isAppInForeground(), completed)) {
             PlanningNotifications.show(context, phase)

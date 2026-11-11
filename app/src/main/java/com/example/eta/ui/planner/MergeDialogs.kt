@@ -58,7 +58,7 @@ private fun BlockWithItem.mergePart() = MergePart(
 private fun BlockWithItem.lostAttributes(): List<String> = listOfNotNull(
     item.category?.let { "Kategorie" },
     item.priority?.let { "Priorität" },
-    "Anfahrt/Pause".takeIf {
+    "Vor-/Nachbereitung/Pause".takeIf {
         block.travelBefore != null || block.returnAfter != null || block.breakAfter != null
     },
     "Erinnerung".takeIf { item.reminderLeadHours != null },

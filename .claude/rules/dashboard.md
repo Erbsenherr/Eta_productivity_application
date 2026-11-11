@@ -71,9 +71,9 @@ above everything when it has something to say.
   and stays as it was.
 - **Small corrections happen in "Heute anstehend" without leaving the screen** — a
   duration, or a start time whose "07:00 · 1 h" caption opens
-  `EtaTimePickerDialog`. `setStart` runs the same `canPlace` / `firstFreeStart` pair
-  the planner uses, so the dashboard cannot become a back door around the one rule
-  the planner enforces. The button below the list is for what needs the planner:
+  `EtaTimePickerDialog`. **Since step 54 `setStart` writes the time where it was
+  put**, onto occupied time too, and the Überschneidung box reports it — see
+  *Step 54*. The button below the list is for what needs the planner:
   calling something off, moving it by more than a nudge, adding what was not
   foreseen. That is `AppFlow.PlannerToday` — a flow, not a tab.
 - **A long press on an open row opens the planner's "Bearbeiten" window** (step

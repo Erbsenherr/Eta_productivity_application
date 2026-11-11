@@ -38,7 +38,6 @@ import com.example.eta.domain.planning.standing
 import com.example.eta.domain.planning.PlanningPhase
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.planning.canPlace
-import com.example.eta.domain.planning.firstFreeStart
 import com.example.eta.domain.planning.minuteOfDay
 import com.example.eta.domain.planning.minuteToLocalTime
 import com.example.eta.domain.planning.nextPlanning
@@ -186,6 +185,9 @@ sealed interface BlockEditFeedback {
     data class Moved(val name: String, val to: LocalTime) : BlockEditFeedback
     data class NoRoom(val name: String) : BlockEditFeedback
 
+    /** A start time kept although something else stands there — see `setStart`. */
+    data class Overlapping(val name: String) : BlockEditFeedback
+
     /** A cancellation could not be taken back: the hours are somebody else's now. */
     data class SlotTaken(val name: String) : BlockEditFeedback
 
@@ -205,6 +207,11 @@ data class FollowUpQuestion(
     val next: NextTask? = null,
     /** How the task just finished is billed, or null when it was not finished early. */
     val billing: BillingChoice? = null,
+    /**
+     * Asked from the "Als Nächstes" page while nothing is running (step 54),
+     * not after a tick: there is no task just finished to speak of.
+     */
+    val idle: Boolean = false,
 )
 
 data class NextTask(
@@ -526,6 +533,18 @@ class DashboardViewModel(
     }
 
     /**
+     * A tap on the "Als Nächstes" page while "Gerade" is empty (step 54): the
+     * follow-up question, about that task, without a tick before it.
+     */
+    fun offerPullForward(entry: BlockWithItem) {
+        if (entry.block.date != today || entry.block.isCompleted) return
+        _followUp.value = FollowUpQuestion(
+            next = NextTask(entry.block.id, entry.item.name, entry.block.start),
+            idle = true,
+        )
+    }
+
+    /**
      * "Task vorziehen", with or without a break in front of it.
      *
      * Only the next task moves, and only as far as it fits — see [pullForward]. It
@@ -591,11 +610,12 @@ class DashboardViewModel(
     /**
      * Moving something the day already holds, without opening the planner.
      *
-     * The list only offered the duration before, which meant the one correction
-     * a running day most often needs — this starts later than planned — had to go
-     * through the planner. It runs the planner's own `canPlace` / `firstFreeStart`
-     * pair rather than writing the time blindly: the list must not become a way
-     * around the one rule the planner enforces.
+     * **Written where the user put it, whatever stands there** (step 54). It
+     * used to run the planner's `canPlace` / `firstFreeStart` pair and slide the
+     * block — or refuse outright — so a time chosen onto occupied minutes, or a
+     * block already in a conflict, was simply not saved. Now the time is kept,
+     * and a collision is what the Überschneidung box is for: it reads the blocks
+     * and reports it like any other, with "Lösen" to the planner.
      */
     fun setStart(entry: BlockWithItem, start: LocalTime) {
         viewModelScope.launch {
@@ -607,33 +627,12 @@ class DashboardViewModel(
                 start = minuteToLocalTime(wanted),
                 updatedAt = clock.now(),
             )
-
-            if (canPlace(onTheDay, moved)) {
-                planRepository.addBlock(moved)
-                // The dashboard is the one place a block moves outside a flow, so
-                // the alarm cannot wait for `rescheduleAlarms` to come round.
-                taskStartCoordinator.reschedule()
-                return@launch
+            planRepository.addBlock(moved)
+            if (!canPlace(onTheDay, moved)) {
+                _blockEditFeedback.value = BlockEditFeedback.Overlapping(entry.item.name)
             }
-            val free = firstFreeStart(
-                existing = onTheDay,
-                duration = entry.block.effectiveDuration,
-                preferredStart = wanted,
-                ignoreId = entry.block.id,
-                // The whole container has to fit, journeys and break included —
-                // the same rule the planner enforces, so this stays a correction
-                // rather than a back door around it.
-                leadIn = entry.block.travelBefore,
-                tailOut = entry.block.returnAfter,
-                tailOutExtra = entry.block.breakAfter,
-            )
-            if (free == null) {
-                _blockEditFeedback.value = BlockEditFeedback.NoRoom(entry.item.name)
-                return@launch
-            }
-            planRepository.addBlock(moved.copy(start = minuteToLocalTime(free)))
-            _blockEditFeedback.value =
-                BlockEditFeedback.Moved(entry.item.name, minuteToLocalTime(free))
+            // The dashboard is the one place a block moves outside a flow, so
+            // the alarm cannot wait for `rescheduleAlarms` to come round.
             taskStartCoordinator.reschedule()
         }
     }

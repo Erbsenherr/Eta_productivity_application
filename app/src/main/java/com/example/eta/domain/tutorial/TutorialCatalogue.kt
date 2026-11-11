@@ -227,9 +227,9 @@ val EXTRAS_STEPS: List<TutorialStep> = listOf(
     ),
     text(
         TutorialStage.EXTRAS,
-        "Anfahrt und Rückweg",
-        "Zum Zahnarzt musst du erst hinkommen. Anfahrt und Rückweg gehören zur " +
-            "Aufgabe: Sie belegen Zeit im Tag, werden mit ihr verschoben und zählen " +
+        "Vor- und Nachbereitung",
+        "Zum Zahnarzt musst du erst hinkommen. Anfahr-/Vorbereitungszeit und " +
+            "Rückfahr-/Nachbereitungszeit gehören zur Aufgabe: Sie belegen Zeit im Tag, werden mit ihr verschoben und zählen " +
             "nicht für Punkte. »Als Nächstes« zeigt dann, wann du losmusst.",
         spot = TutorialSpot.EXTRA_TRAVEL,
     ),

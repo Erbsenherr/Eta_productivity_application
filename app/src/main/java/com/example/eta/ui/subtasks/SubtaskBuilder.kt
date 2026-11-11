@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -382,7 +383,10 @@ private fun SubtaskRows(
     val step = rememberUpdatedState(gap)
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
-        rows.forEachIndexed { index, row ->
+        // Keyed, so the row's composition — and with it the running gesture —
+        // moves with it. Unkeyed, a swap handed the slot a new key, the
+        // `pointerInput` restarted, and every drag ended after one place.
+        rows.forEachIndexed { index, row -> key(row.key) {
             val dragging = draggingKey == row.key
             SubtaskRow(
                 row = row,
@@ -425,7 +429,7 @@ private fun SubtaskRows(
                         )
                     },
             )
-        }
+        } }
     }
 }
 

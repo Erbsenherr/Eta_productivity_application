@@ -198,6 +198,11 @@ fun NowBox(
      * made of, every step tickable. Handed the block's id.
      */
     onOpenRoutine: ((blockId: String) -> Unit)? = null,
+    /**
+     * A tap on the "Als Nächstes" page while nothing is running (step 54):
+     * the question whether to pull that task forward.
+     */
+    onPullForward: ((BlockWithItem) -> Unit)? = null,
 ) {
     val pagerState = rememberPagerState(initialPage = if (current == null) 1 else 0) { 2 }
 
@@ -271,11 +276,16 @@ fun NowBox(
                     // it launched with, and the entry it closed over goes stale.
                     val latestEntry by rememberUpdatedState(entry.entry)
                     val latestOnLongPress by rememberUpdatedState(onLongPress)
+                    // Only with nothing running: during a task the next one is
+                    // pulled forward by confirming the first.
+                    val pull = onPullForward.takeIf { !running && current == null }
+                    val latestPull by rememberUpdatedState(pull)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .pointerInput(entry.entry.block.id, running) {
                                 detectTapGestures(
+                                    onTap = { latestPull?.invoke(latestEntry) },
                                     onLongPress = { latestOnLongPress(latestEntry, running) },
                                 )
                             },
@@ -313,8 +323,8 @@ fun NowBox(
  */
 private fun phaseLabel(phase: BlockPhase): String? = when (phase) {
     BlockPhase.TASK -> null
-    BlockPhase.TRAVEL -> "Anfahrt"
-    BlockPhase.RETURN -> "Rückweg"
+    BlockPhase.TRAVEL -> "Anfahrt/Vorbereitung"
+    BlockPhase.RETURN -> "Rückfahrt/Nachbereitung"
     BlockPhase.BREAK -> "Pause"
 }
 

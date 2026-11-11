@@ -347,7 +347,7 @@ private fun ConflictCard(
             }
             if (conflict.shortened != null || conflict.pushed != null) {
                 EtaText(
-                    text = "Die Aktivität selbst ändert sich — Anfahrt, Rückweg und Pause " +
+                    text = "Die Aktivität selbst ändert sich — Vor- und Nachbereitung und Pause " +
                         "behalten ihre Länge.",
                     style = EtaTheme.typography.caption,
                     color = EtaTheme.colors.textMuted,

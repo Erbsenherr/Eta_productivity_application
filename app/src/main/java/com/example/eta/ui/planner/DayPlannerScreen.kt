@@ -512,6 +512,16 @@ fun DayPlannerScreen(
             // Tomorrow has not started, so calling something off is still
             // planning and costs nothing. Today's plan is a promise already made.
             cancellationCosts = state.isToday,
+            conflict = blockConflict(entry, state.blocks),
+            conflictBlocks = state.blocks,
+            onResolveNextFree = {
+                viewModel.resolveToNextFree(entry.block.id)
+                editing = null
+            },
+            onResolveOverwrite = {
+                viewModel.resolveOverwriting(entry.block.id)
+                editing = null
+            },
         )
     }
 
