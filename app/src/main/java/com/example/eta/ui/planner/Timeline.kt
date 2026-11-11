@@ -64,6 +64,8 @@ import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.components.consequenceHatch
+import com.example.eta.ui.components.underConsequence
 import com.example.eta.ui.theme.colorOf
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
@@ -724,6 +726,9 @@ private fun TimelineBlock(
     // tasks that share an hour on alternating weeks can both be read where the
     // standing week draws them on top of each other.
     val parity = (entry.item.recurrenceRule as? RecurrenceRule.Biweekly)?.parity
+    // Free time under a broken rule's consequence (step 57): hatched red.
+    val underConsequence = entry.underConsequence()
+    val danger = EtaTheme.colors.danger
 
     Box(
         modifier = Modifier
@@ -741,6 +746,7 @@ private fun TimelineBlock(
                 color = if (imported && !selected) accent.copy(alpha = 0.6f) else accent,
                 shape = shape,
             )
+            .consequenceHatch(underConsequence, danger)
             .drawBehind {
                 if (parity == null) return@drawBehind
                 val step = 9.dp.toPx()

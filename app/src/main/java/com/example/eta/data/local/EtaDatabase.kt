@@ -30,6 +30,7 @@ import com.example.eta.domain.model.Vacation
 import com.example.eta.domain.model.VacationRule
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.model.Rule
+import com.example.eta.domain.model.RuleBreach
 import com.example.eta.domain.model.StopwatchTime
 
 @Database(
@@ -59,8 +60,9 @@ import com.example.eta.domain.model.StopwatchTime
         SubtaskTimer::class,
         Rule::class,
         StopwatchTime::class,
+        RuleBreach::class,
     ],
-    version = 39,
+    version = 40,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1141,6 +1143,20 @@ val MIGRATION_38_39 = object : Migration(38, 39) {
                 "`blockId` TEXT NOT NULL, `name` TEXT NOT NULL, `date` TEXT NOT NULL, " +
                 "`worked` INTEGER NOT NULL, `runningSince` INTEGER, `endedAt` INTEGER, " +
                 "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+    }
+}
+
+/** Step 57: a rule's exception and consequence, and the breaches reported. */
+val MIGRATION_39_40 = object : Migration(39, 40) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `rules` ADD COLUMN `exception` TEXT")
+        connection.execSQL("ALTER TABLE `rules` ADD COLUMN `consequence` TEXT")
+        connection.execSQL("ALTER TABLE `rules` ADD COLUMN `consequenceOnFreeTime` INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL(
+            "CREATE TABLE IF NOT EXISTS `rule_breaches` (`id` TEXT NOT NULL, `ruleId` TEXT NOT NULL, " +
+                "`date` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))",
         )
     }
 }

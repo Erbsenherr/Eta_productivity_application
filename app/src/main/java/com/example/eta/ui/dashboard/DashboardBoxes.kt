@@ -77,6 +77,8 @@ import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.alertRed
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.components.consequenceHatch
+import com.example.eta.ui.components.underConsequence
 import com.example.eta.ui.theme.colorOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -368,7 +370,11 @@ private fun NowLine(
     val timed = timer != null && entry.item.timerTask
     val routine = entry.item.routineMode && steps.isNotEmpty()
 
-    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
+    Column(
+        // Free time under a broken rule's consequence (step 57).
+        modifier = Modifier.consequenceHatch(entry.underConsequence(), EtaTheme.colors.danger),
+        verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -991,6 +997,7 @@ private fun TaskRow(
         // Keyed by what the lambdas depend on, so nothing in them can go stale.
         modifier = Modifier
             .fillMaxWidth()
+            .consequenceHatch(entry.underConsequence(), EtaTheme.colors.danger)
             .pointerInput(blockId, canUncancel, canEdit, isRoutine) {
                 detectTapGestures(
                     // A routine's row opens what it is made of (step 53).

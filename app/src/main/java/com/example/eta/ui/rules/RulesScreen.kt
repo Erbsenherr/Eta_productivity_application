@@ -22,7 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.eta.data.repository.RuleDraft
 import com.example.eta.domain.model.Rule
+import com.example.eta.ui.attributes.CheckRow
 import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
@@ -93,8 +95,8 @@ fun RulesScreen(viewModel: RulesViewModel) {
         RuleEditDialog(
             rule = current.rule,
             onDismiss = { editing = null },
-            onSave = { question, answer ->
-                viewModel.save(current.rule?.id, question, answer)
+            onSave = { draft ->
+                viewModel.save(current.rule?.id, draft)
                 editing = null
             },
             onDelete = current.rule?.let { rule ->
@@ -157,6 +159,21 @@ private fun RuleCard(rule: Rule, onLongPress: () -> Unit) {
                     style = EtaTheme.typography.body,
                     color = if (rule.answer.isBlank()) EtaTheme.colors.textMuted else EtaTheme.colors.textSecondary,
                 )
+                rule.exception?.let {
+                    EtaText(
+                        text = "Ausnahmesituation: $it",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textSecondary,
+                    )
+                }
+                rule.consequence?.let {
+                    EtaText(
+                        text = "Konsequenz: $it" +
+                            if (rule.consequenceOnFreeTime) " · an die Freizeit geknüpft" else "",
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.danger,
+                    )
+                }
             }
         }
     }
@@ -167,12 +184,15 @@ private fun RuleCard(rule: Rule, onLongPress: () -> Unit) {
 private fun RuleEditDialog(
     rule: Rule?,
     onDismiss: () -> Unit,
-    onSave: (question: String, answer: String) -> Unit,
+    onSave: (RuleDraft) -> Unit,
     /** Null for a new rule, which has nothing to delete. */
     onDelete: (() -> Unit)?,
 ) {
     var question by remember(rule?.id) { mutableStateOf(rule?.question.orEmpty()) }
     var answer by remember(rule?.id) { mutableStateOf(rule?.answer.orEmpty()) }
+    var exception by remember(rule?.id) { mutableStateOf(rule?.exception.orEmpty()) }
+    var consequence by remember(rule?.id) { mutableStateOf(rule?.consequence.orEmpty()) }
+    var onFreeTime by remember(rule?.id) { mutableStateOf(rule?.consequenceOnFreeTime ?: false) }
 
     EtaDialog(title = if (rule == null) "Neue Regel" else "Regel bearbeiten", onDismiss = onDismiss) {
         EtaField(label = "Frage") {
@@ -190,6 +210,34 @@ private fun RuleEditDialog(
                 singleLine = false,
             )
         }
+        EtaField(label = "Ausnahmesituation", hint = "Wann gilt die Regel nicht? Optional.") {
+            EtaTextField(
+                value = exception,
+                onValueChange = { exception = it },
+                placeholder = "Außer, wenn …",
+                singleLine = false,
+            )
+        }
+        EtaField(
+            label = "Konsequenz",
+            hint = "Was gilt am Tag eines Verstoßes? Steht dann rot auf dem Dashboard. Optional.",
+        ) {
+            EtaTextField(
+                value = consequence,
+                onValueChange = { consequence = it },
+                placeholder = "z. B. heute keine Bildschirmzeit",
+                singleLine = false,
+            )
+        }
+        if (consequence.isNotBlank()) {
+            CheckRow(
+                checked = onFreeTime,
+                onCheckedChange = { onFreeTime = it },
+                label = "An die Freizeit knüpfen",
+                hint = "Am Tag des Verstoßes ist die Freizeit überall rot schraffiert und trägt " +
+                    "die Konsequenz als Notiz.",
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             if (onDelete != null) {
                 EtaButton(text = "Löschen", style = EtaButtonStyle.Secondary, onClick = onDelete)
@@ -200,7 +248,9 @@ private fun RuleEditDialog(
             EtaButton(
                 text = "Sichern",
                 enabled = question.isNotBlank(),
-                onClick = { onSave(question, answer) },
+                onClick = {
+                    onSave(RuleDraft(question, answer, exception, consequence, onFreeTime))
+                },
             )
         }
     }

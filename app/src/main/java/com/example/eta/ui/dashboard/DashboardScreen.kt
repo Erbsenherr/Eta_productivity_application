@@ -40,6 +40,11 @@ import com.example.eta.ui.components.ConfirmDialog
 import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.LocalEtaClock
 import com.example.eta.ui.components.LocalPointsVisible
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import com.example.eta.ui.rules.ConsequenceBox
+import com.example.eta.ui.rules.RulesViewModel
+import com.example.eta.ui.rules.WatchReminderBox
 import com.example.eta.ui.components.LocalFeatures
 import com.example.eta.ui.components.rememberFold
 import com.example.eta.ui.components.tutorialSpot
@@ -100,6 +105,8 @@ fun DashboardScreen(
      * dashboard has none, there being nothing in its script to do there.
      */
     weekPage: (@Composable () -> Unit)? = null,
+    /** Step 57: the Regelwerk's red box and morning reminder; null while it is off. */
+    rulesViewModel: RulesViewModel? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val editFeedback by viewModel.blockEditFeedback.collectAsStateWithLifecycle()
@@ -125,6 +132,7 @@ fun DashboardScreen(
                         onCloseDay = onCloseDay,
                         onPlanTomorrow = onPlanTomorrow,
                         onReplanToday = onReplanToday,
+                        rulesViewModel = rulesViewModel,
                     )
 
                     DashboardPage.TOMORROW -> TomorrowPage(state, onPlanTomorrow, onPlanWeek)
@@ -206,6 +214,7 @@ private fun TodayPage(
     onCloseDay: () -> Unit,
     onPlanTomorrow: () -> Unit,
     onReplanToday: () -> Unit,
+    rulesViewModel: RulesViewModel? = null,
 ) {
     // Held as an id and resolved against the list as it is now: the row may
     // have been ticked off or called off while the dialog stood open.
@@ -219,6 +228,28 @@ private fun TodayPage(
         verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.lg),
     ) {
         PageHeader(title = "Heute", subtitle = state.today.formatLong())
+
+        // Step 57: a rule broken today, in red — and in the morning, the rules
+        // of the last two weeks to keep in mind, until noon or until thanked.
+        if (rulesViewModel != null) {
+            val rulebook by rulesViewModel.state.collectAsStateWithLifecycle()
+            ConsequenceBox(active = rulebook.today, onWithdraw = rulesViewModel::withdraw)
+            val prefs = LocalContext.current.getSharedPreferences("rules", Context.MODE_PRIVATE)
+            val todayKey = state.today.toString()
+            var reminded by remember(todayKey) {
+                mutableStateOf(prefs.getString(REMINDED_KEY, null) == todayKey)
+            }
+            val morning = now.toLocalDateTime(TimeZone.currentSystemDefault()).hour < REMINDER_UNTIL_HOUR
+            if (!reminded && morning) {
+                WatchReminderBox(
+                    rules = rulebook.toWatch,
+                    onDismiss = {
+                        prefs.edit().putString(REMINDED_KEY, todayKey).apply()
+                        reminded = true
+                    },
+                )
+            }
+        }
 
         // First of all, because two things at the same time is the one thing on
         // this screen that cannot wait until the evening to be noticed.
@@ -844,3 +875,9 @@ private fun RoutineTickDialog(
         EtaButton(text = "Abbrechen", style = EtaButtonStyle.Secondary, onClick = onDismiss)
     }
 }
+
+/** The morning's reminder of the rules to mind (step 57) stands until this hour. */
+private const val REMINDER_UNTIL_HOUR = 12
+
+/** The day the reminder was last thanked for, in the "rules" preferences. */
+private const val REMINDED_KEY = "reminded"

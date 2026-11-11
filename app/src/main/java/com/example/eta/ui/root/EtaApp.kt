@@ -53,6 +53,9 @@ import com.example.eta.domain.planning.PlanningPhase
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaIcon
 import com.example.eta.ui.components.EtaTabBar
+import com.example.eta.ui.components.LocalFreeTimeConsequence
+import com.example.eta.ui.rules.ReportBreachButton
+import com.example.eta.ui.rules.ReportBreachDialog
 import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.calendar.CalendarStepScreen
 import com.example.eta.ui.components.EtaTabItem
@@ -221,6 +224,33 @@ fun EtaApp(
 private fun MainScaffold(
     container: AppContainer,
     rootViewModel: RootViewModel,
+    openPhase: PlanningPhase? = null,
+    onOpenHandled: () -> Unit = {},
+) {
+    // Step 57: the Regelwerk is read here, once, for the "!" button, the
+    // dashboard's red box and the free time hatched red in every screen and
+    // flow — the tab's own view model, by key.
+    val rulesViewModel: RulesViewModel = viewModel(key = "rules", factory = rulesViewModelFactory(container))
+    val rulebook by rulesViewModel.state.collectAsStateWithLifecycle()
+    val rulebookOn = LocalFeatures.current.rulebook
+    CompositionLocalProvider(
+        LocalFreeTimeConsequence provides if (rulebookOn) rulebook.freeTimeDays else emptySet(),
+    ) {
+        MainScaffoldContent(
+            container = container,
+            rootViewModel = rootViewModel,
+            rulesViewModel = rulesViewModel.takeIf { rulebookOn },
+            openPhase = openPhase,
+            onOpenHandled = onOpenHandled,
+        )
+    }
+}
+
+@Composable
+private fun MainScaffoldContent(
+    container: AppContainer,
+    rootViewModel: RootViewModel,
+    rulesViewModel: RulesViewModel?,
     openPhase: PlanningPhase? = null,
     onOpenHandled: () -> Unit = {},
 ) {
@@ -404,6 +434,7 @@ private fun MainScaffold(
                     onPlanTomorrow = { flow = AppFlow.Planner },
                     onReplanToday = { flow = AppFlow.PlannerToday },
                     onPlanWeek = { flow = AppFlow.WeekPlanner },
+                    rulesViewModel = rulesViewModel,
                     onCloseDay = { flow = AppFlow.Reevaluation },
                     weekPage = {
                         WeekTabScreen(
@@ -483,6 +514,7 @@ private fun MainScaffold(
                     viewModel = viewModel(key = "rules", factory = rulesViewModelFactory(container)),
                 )
 
+
                 EtaTab.Settings -> SettingsScreen(
                     viewModel = viewModel(factory = settingsViewModelFactory(container)),
                     calendarViewModel = viewModel(
@@ -512,6 +544,27 @@ private fun MainScaffold(
                     onStartTutorial = { id -> container.tutorialStore.request(id?.name) },
                 )
             }
+            }
+            // "Regelverstoß melden" (step 57), over every tab.
+            if (rulesViewModel != null) {
+                var reporting by remember { mutableStateOf(false) }
+                ReportBreachButton(
+                    onClick = { reporting = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(EtaTheme.spacing.lg),
+                )
+                if (reporting) {
+                    val rules by rulesViewModel.rules.collectAsStateWithLifecycle()
+                    ReportBreachDialog(
+                        rules = rules,
+                        onDismiss = { reporting = false },
+                        onReport = { rule ->
+                            rulesViewModel.report(rule.id)
+                            reporting = false
+                        },
+                    )
+                }
             }
         }
 
@@ -938,7 +991,7 @@ internal fun statisticsViewModelFactory(container: AppContainer): ViewModelProvi
 
 internal fun rulesViewModelFactory(container: AppContainer): ViewModelProvider.Factory =
     viewModelFactory {
-        initializer { RulesViewModel(ruleRepository = container.ruleRepository) }
+        initializer { RulesViewModel(ruleRepository = container.ruleRepository, clock = container.clock) }
     }
 
 internal fun notesViewModelFactory(container: AppContainer): ViewModelProvider.Factory =

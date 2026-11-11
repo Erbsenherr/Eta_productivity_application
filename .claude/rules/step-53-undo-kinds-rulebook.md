@@ -121,7 +121,8 @@ Streaks). `Rule` (`rules`: `question`, `answer`, `position`), `RuleDao`,
 `RuleRepository`, `ui/rules/`. A tap folds the answer out and back
 (`rememberSaveable` per rule), a long press opens `RuleEditDialog` (Frage,
 Regel, "Löschen" → `ConfirmDialog`), "Regel hinzufügen" writes one last in the
-list. Nothing in the app reads a rule. Cleared by the debug reset; off in the
+list. Nothing in the app reads a rule — **until step 57**, which adds an
+exception, a consequence and breaches; see *Step 57*. Cleared by the debug reset; off in the
 tutorial.
 
 **Verified by the compiler, the suite (754; 7 in `Step53Test`),
