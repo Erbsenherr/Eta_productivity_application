@@ -54,7 +54,7 @@ import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaIcon
 import com.example.eta.ui.components.EtaTabBar
 import com.example.eta.ui.components.LocalFreeTimeConsequence
-import com.example.eta.ui.rules.ReportBreachButton
+import com.example.eta.ui.rules.ReportBreachTab
 import com.example.eta.ui.rules.ReportBreachDialog
 import com.example.eta.ui.calendar.CalendarEventsViewModel
 import com.example.eta.ui.calendar.CalendarStepScreen
@@ -546,14 +546,14 @@ private fun MainScaffoldContent(
                 )
             }
             }
-            // "Regelverstoß melden" (step 57), over every tab.
+            // "Regelverstoß melden" (step 57): a tab at the right edge, pulled out for the "!".
             if (rulesViewModel != null) {
                 var reporting by remember { mutableStateOf(false) }
-                ReportBreachButton(
-                    onClick = { reporting = true },
+                ReportBreachTab(
+                    onReport = { reporting = true },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(EtaTheme.spacing.lg),
+                        .padding(bottom = EtaTheme.spacing.xl),
                 )
                 if (reporting) {
                     val rules by rulesViewModel.rules.collectAsStateWithLifecycle()

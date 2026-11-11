@@ -64,6 +64,7 @@ import com.example.eta.ui.components.QuantityText
 import com.example.eta.ui.format.formatClock
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.signalRed
 import com.example.eta.ui.components.consequenceHatch
 import com.example.eta.ui.components.underConsequence
 import com.example.eta.ui.theme.colorOf
@@ -728,7 +729,7 @@ private fun TimelineBlock(
     val parity = (entry.item.recurrenceRule as? RecurrenceRule.Biweekly)?.parity
     // Free time under a broken rule's consequence (step 57): hatched red.
     val underConsequence = entry.underConsequence()
-    val danger = EtaTheme.colors.danger
+    val danger = EtaTheme.colors.signalRed
 
     Box(
         modifier = Modifier

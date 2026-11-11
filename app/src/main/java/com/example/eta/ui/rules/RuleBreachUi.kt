@@ -1,5 +1,18 @@
 package com.example.eta.ui.rules
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -37,6 +50,7 @@ import com.example.eta.ui.components.EtaDialog
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.signalRed
 
 /**
  * "Regelverstoß melden" (step 57): the "!" in the lower right corner of every
@@ -49,12 +63,12 @@ fun ReportBreachButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(EtaTheme.colors.danger)
+            .background(EtaTheme.colors.signalRed)
             .clickable(onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        EtaText(text = "!", style = EtaTheme.typography.title, color = EtaTheme.colors.background)
+        EtaText(text = "!", style = EtaTheme.typography.title, color = Color.White)
     }
 }
 
@@ -106,7 +120,7 @@ fun ReportBreachDialog(
                                 text = rule.consequence?.let { "Konsequenz: $it" } ?: "Ohne Konsequenz",
                                 style = EtaTheme.typography.caption,
                                 color = if (rule.consequence != null) {
-                                    EtaTheme.colors.danger
+                                    EtaTheme.colors.signalRed
                                 } else {
                                     EtaTheme.colors.textMuted
                                 },
@@ -132,14 +146,14 @@ fun ConsequenceBox(active: List<ActiveConsequence>, onWithdraw: (breachId: Strin
 
     EtaSurface(
         modifier = Modifier.fillMaxWidth(),
-        borderColor = EtaTheme.colors.danger,
+        borderColor = EtaTheme.colors.signalRed,
         contentPadding = EtaTheme.spacing.md,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
             EtaText(
                 text = if (active.any { it.rule.consequence != null }) "Konsequenz aktiv" else "Regelverstoß",
                 style = EtaTheme.typography.label,
-                color = EtaTheme.colors.danger,
+                color = EtaTheme.colors.signalRed,
             )
             active.forEach { entry ->
                 key(entry.breach.id) {
@@ -154,7 +168,7 @@ fun ConsequenceBox(active: List<ActiveConsequence>, onWithdraw: (breachId: Strin
                         EtaText(
                             text = entry.rule.consequence ?: entry.rule.question,
                             style = EtaTheme.typography.bodyStrong,
-                            color = EtaTheme.colors.danger,
+                            color = EtaTheme.colors.signalRed,
                         )
                         EtaText(
                             text = if (entry.rule.consequence != null) {
@@ -226,6 +240,81 @@ fun WatchReminderBox(rules: List<Rule>, onDismiss: () -> Unit) {
                 Spacer(Modifier.size(EtaTheme.spacing.sm))
                 EtaButton(text = "Danke", style = EtaButtonStyle.Secondary, onClick = onDismiss)
             }
+        }
+    }
+}
+
+/** How wide the tab is that stays at the edge, and how far the panel slides out. */
+private val TAB_WIDTH = 18.dp
+private val PANEL_WIDTH = 64.dp
+
+/**
+ * The way to "Regelverstoß melden" (step 58's round): a small tab at the right
+ * edge, to be pulled out — by a drag to the left, or a tap — which uncovers
+ * the "!". Pushed back, or after a report, it tucks itself away again. Only
+ * the tab stands in front of the screen the rest of the time, so the button no
+ * longer covers what lies under it.
+ */
+@Composable
+fun ReportBreachTab(onReport: () -> Unit, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val panelPx = with(density) { PANEL_WIDTH.toPx() }
+    // 0 is pulled out all the way; panelPx is tucked away.
+    val offset = remember { Animatable(panelPx) }
+    val scope = rememberCoroutineScope()
+    val report by rememberUpdatedState(onReport)
+    val red = EtaTheme.colors.signalRed
+    val open = offset.value < panelPx / 2
+
+    fun settle(out: Boolean) {
+        scope.launch { offset.animateTo(if (out) 0f else panelPx) }
+    }
+
+    Row(
+        modifier = modifier
+            .offset { IntOffset(offset.value.roundToInt(), 0) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { settle(offset.value < panelPx / 2) },
+                    onDragCancel = { settle(offset.value < panelPx / 2) },
+                ) { change, amount ->
+                    change.consume()
+                    scope.launch { offset.snapTo((offset.value + amount).coerceIn(0f, panelPx)) }
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val tabLabel = if (open) "Lasche einklappen" else "Regelverstoß melden — Lasche ausklappen"
+        Box(
+            modifier = Modifier
+                .width(TAB_WIDTH)
+                .height(56.dp)
+                .clip(RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp))
+                .background(red)
+                .clickable { settle(!open) }
+                .semantics { contentDescription = tabLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            EtaText(
+                text = if (open) "›" else "‹",
+                style = EtaTheme.typography.label,
+                color = Color.White,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .width(PANEL_WIDTH)
+                .height(64.dp)
+                .background(EtaTheme.colors.surfaceRaised)
+                .border(1.dp, EtaTheme.colors.border),
+            contentAlignment = Alignment.Center,
+        ) {
+            ReportBreachButton(
+                onClick = {
+                    settle(false)
+                    report()
+                },
+            )
         }
     }
 }

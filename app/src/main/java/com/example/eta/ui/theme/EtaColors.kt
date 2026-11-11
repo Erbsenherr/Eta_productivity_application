@@ -132,6 +132,18 @@ val AlertRedOnDark = Color(0xFFF2564F)
 val EtaColors.alertRed: Color
     get() = if (isDark) AlertRedOnDark else danger
 
+/** A plain, strong red by day — not the light palettes' wine, which reads as pink. */
+val SignalRedOnLight = Color(0xFFD32222)
+
+/**
+ * The Regelwerk's red (step 58's round): the "!" and its tab, a consequence in
+ * force, the free time hatched under one. Clearly red by day and by night —
+ * the user found [EtaColors.danger] too pink for it, and changing that token
+ * would repaint every locked contract slot and every "Ausgefallen" bar too.
+ */
+val EtaColors.signalRed: Color
+    get() = if (isDark) AlertRedOnDark else SignalRedOnLight
+
 /**
  * The palette of the [AppDesign.ETA] design by day: the app icon turned into a screen —
  * white, with its red wherever the app answers a touch.

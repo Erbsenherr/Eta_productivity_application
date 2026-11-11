@@ -35,6 +35,7 @@ import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTextField
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.signalRed
 
 /** The rule in the editor: an existing one, or a new one that has no row yet. */
 private data class Editing(val rule: Rule?)
@@ -171,7 +172,7 @@ private fun RuleCard(rule: Rule, onLongPress: () -> Unit) {
                         text = "Konsequenz: $it" +
                             if (rule.consequenceOnFreeTime) " · an die Freizeit geknüpft" else "",
                         style = EtaTheme.typography.caption,
-                        color = EtaTheme.colors.danger,
+                        color = EtaTheme.colors.signalRed,
                     )
                 }
             }

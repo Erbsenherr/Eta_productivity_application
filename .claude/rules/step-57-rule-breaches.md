@@ -32,9 +32,18 @@ per rule**, not sections of their own. Database **version 40**:
 breaches by hand. Pure parts in `domain/rules/RuleBreaches.kt`, pinned in
 `Step57Test`.
 
-- **The "!" button** (`ReportBreachButton`): bottom right over **every tab**
-  while the Regelwerk is on — not over a flow, which covers the tabs.
-  `ReportBreachDialog` ("Verstoßen gegen …") lists the rules; **a rule is
+- **The "!" sits behind a tab** (`ReportBreachTab`, since the round after step
+  58, at the user's request): a small red tab at the right edge, low down,
+  over **every tab** while the Regelwerk is on — not over a flow. A drag to
+  the left or a tap pulls the panel out and uncovers the round "!"
+  (`ReportBreachButton`); a drag back, a tap on the tab or a report tucks it
+  away. The offset is an `Animatable`, snapped while the finger moves and
+  settled to the nearer end on release.
+- **Its red is `signalRed`** (`EtaColors.kt`) — a plain red by day
+  (`SignalRedOnLight`) and `AlertRedOnDark` by night — for the tab, the "!",
+  the red box, a consequence on its card and the hatching. The palettes'
+  `danger` read as pink; the token itself stays, as for `alertRed`.
+- `ReportBreachDialog` ("Verstoßen gegen …") lists the rules; **a rule is
   chosen by holding it**, a tap only says so (the hint turns amber). The
   breach is for today.
 - **On that day**, `ConsequenceBox` stands in red right under the Heute page's
@@ -63,8 +72,7 @@ are in the red box already — most recent first, each once. `WatchReminderBox`
 stands on the Heute page **until noon** (`REMINDER_UNTIL_HOUR`) or until
 "Danke", remembered per day in `SharedPreferences` ("rules", `reminded`).
 
-**Known limits.** The "!" button can cover the last line of a tab's content.
-A consequence tied to the free time is written into the notes when reported;
+**Known limits.** A consequence tied to the free time is written into the notes when reported;
 a free-time block laid down later that day does not get it. Nothing checks
 the Ausnahmesituation.
 

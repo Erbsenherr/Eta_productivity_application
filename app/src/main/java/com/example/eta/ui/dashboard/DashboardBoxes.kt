@@ -77,6 +77,7 @@ import com.example.eta.ui.format.formatSignedPoints
 import com.example.eta.ui.format.formatShort
 import com.example.eta.ui.theme.alertRed
 import com.example.eta.ui.theme.EtaTheme
+import com.example.eta.ui.theme.signalRed
 import com.example.eta.ui.components.consequenceHatch
 import com.example.eta.ui.components.underConsequence
 import com.example.eta.ui.theme.colorOf
@@ -372,7 +373,7 @@ private fun NowLine(
 
     Column(
         // Free time under a broken rule's consequence (step 57).
-        modifier = Modifier.consequenceHatch(entry.underConsequence(), EtaTheme.colors.danger),
+        modifier = Modifier.consequenceHatch(entry.underConsequence(), EtaTheme.colors.signalRed),
         verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -997,7 +998,7 @@ private fun TaskRow(
         // Keyed by what the lambdas depend on, so nothing in them can go stale.
         modifier = Modifier
             .fillMaxWidth()
-            .consequenceHatch(entry.underConsequence(), EtaTheme.colors.danger)
+            .consequenceHatch(entry.underConsequence(), EtaTheme.colors.signalRed)
             .pointerInput(blockId, canUncancel, canEdit, isRoutine) {
                 detectTapGestures(
                     // A routine's row opens what it is made of (step 53).
