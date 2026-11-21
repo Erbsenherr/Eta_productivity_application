@@ -3,6 +3,7 @@ package com.example.eta.domain.planning
 import com.example.eta.domain.model.NightOverride
 import com.example.eta.domain.model.PUNCTUAL_WAKE_MINUTES
 import com.example.eta.domain.model.SleepLog
+import com.example.eta.domain.model.SLEEP_LATE_CAP_MINUTES
 import com.example.eta.domain.setup.UserSetup
 import com.example.eta.domain.setup.nightEndingOn
 import kotlinx.datetime.DatePeriod
@@ -41,8 +42,12 @@ data class SleepPrompts(
     val eveningOf: LocalDate? = null,
     /** "Gehe nun schlafen" has been pressed for [eveningOf]. */
     val eveningAnswered: Boolean = false,
+    /** The answer given for [eveningOf], for the box to say what it is worth. */
+    val eveningAnswer: SleepLog? = null,
     /** Yesterday's bedtime was never answered: "Schlafenszeit – Vortag". */
     val bedOwedFor: LocalDate? = null,
+    /** That bedtime — what the box's time picker starts at (step 59). */
+    val bedDue: LocalTime? = null,
     /** Minutes past the hour that still count as on time — what the boxes say. */
     val tolerance: Int = PUNCTUAL_WAKE_MINUTES,
 )
@@ -88,20 +93,24 @@ fun sleepPrompts(
     val inMorning = !morningDone &&
         minute >= wake - MORNING_WINDOW_MINUTES && minute <= wake + MORNING_WINDOW_MINUTES
     val tolerance = setup.punctualTolerance.coerceAtLeast(0)
+    // Step 59: going to bed late is graded up to two hours past the bedtime,
+    // so "Gehe nun schlafen" stays on offer that long — pressed late, it
+    // records the hour it was pressed at.
+    val eveningReach = maxOf(tolerance, SLEEP_LATE_CAP_MINUTES)
 
     // Winding down, as minutes from today's midnight, for each night in reach.
     val evening = listOf(
-        Triple(yesterday, endingToday.bedPrepOffset(), endingToday.sleepOffset() + tolerance),
+        Triple(yesterday, endingToday.bedPrepOffset(), endingToday.sleepOffset() + eveningReach),
         Triple(
             today,
             endingTomorrow.bedPrepOffset() + MINUTES_PER_DAY,
-            endingTomorrow.sleepOffset() + MINUTES_PER_DAY + tolerance,
+            endingTomorrow.sleepOffset() + MINUTES_PER_DAY + eveningReach,
         ),
     ).firstOrNull { (_, from, until) -> minute in from until until }?.first
 
     // Yesterday's evening is asked about once its bedtime has passed — which a
     // bedtime before midnight has, all day, and one after it only from then on.
-    val bedOwed = logs[yesterday]?.bedOnTime == null && minute >= endingToday.sleepOffset() + tolerance
+    val bedOwed = logs[yesterday]?.bedOnTime == null && minute >= endingToday.sleepOffset() + eveningReach
 
     return SleepPrompts(
         morning = inMorning,
@@ -110,8 +119,10 @@ fun sleepPrompts(
         morningOwed = answer == null &&
             (minute > wake + MORNING_WINDOW_MINUTES || (morningDone && minute >= wake - MORNING_WINDOW_MINUTES)),
         eveningOf = evening,
-        eveningAnswered = evening != null && logs[evening]?.bedOnTime == true,
+        eveningAnswered = evening != null && logs[evening]?.bedOnTime != null,
+        eveningAnswer = evening?.let { logs[it] }?.takeIf { it.bedOnTime != null },
         bedOwedFor = yesterday.takeIf { bedOwed },
+        bedDue = endingToday.sleep,
         tolerance = tolerance,
     )
 }

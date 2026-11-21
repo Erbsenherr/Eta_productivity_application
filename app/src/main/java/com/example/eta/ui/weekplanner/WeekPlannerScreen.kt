@@ -1,5 +1,7 @@
 package com.example.eta.ui.weekplanner
 
+import com.example.eta.domain.stats.moodOf
+import com.example.eta.ui.stats.AffirmationBox
 import com.example.eta.domain.reward.WEEKLY_INFLATION_RATE
 import com.example.eta.ui.dashboard.percentOf
 import androidx.activity.compose.BackHandler
@@ -597,6 +599,10 @@ private fun ReviewStep(review: WeekReview?) {
                 color = EtaTheme.colors.textSecondary,
             )
         }
+    }
+    // Step 59: a word for the week, encouraging or praising.
+    moodOf(review.figures)?.let { mood ->
+        AffirmationBox(mood = mood, seed = review.from.toEpochDays().toInt())
     }
     review.figures.forEach { figure ->
         key(figure.label) { ReviewLine(figure) }

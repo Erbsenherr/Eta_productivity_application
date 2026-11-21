@@ -216,3 +216,21 @@ fun firstFreeGrowthStart(
     }
     return null
 }
+
+/**
+ * "Stand setzen" (step 59): the time on the timer put by hand, for what was
+ * worked outside the app — within [MIN_GROWTH_DURATION] and the target, the
+ * buffer kept behind it. The completions counted towards the next step start
+ * again, and a malus from an early end is lifted: the user has said where the
+ * task stands. Not a completion — nothing is billed and nothing grows by it.
+ */
+fun Item.withTimeSetTo(time: Duration): Item {
+    if (!isGrowthTask) return this
+    val target = growthTarget ?: return this
+    val set = time.coerceIn(minOf(MIN_GROWTH_DURATION, target), target)
+    return copy(
+        estimatedDuration = set + timerBufferOrZero,
+        growthProgress = 0,
+        timerMalusBase = null,
+    )
+}

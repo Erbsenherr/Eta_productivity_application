@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.eta.domain.growth.growthSetting
 import com.example.eta.domain.recurrence.RecurringGroup
 import com.example.eta.ui.components.EtaButton
+import com.example.eta.ui.components.EtaButtonStyle
+import com.example.eta.domain.growth.hasQuantity
 import com.example.eta.ui.components.EtaScreen
 import com.example.eta.ui.components.EtaSurface
 import com.example.eta.ui.components.EtaText
@@ -68,6 +70,9 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<RecurringGroup?>(null) }
+    // Step 59: "Stand setzen" for a task, or for a routine's step.
+    var standing by remember { mutableStateOf<RecurringGroup?>(null) }
+    var standingStep by remember { mutableStateOf<StepGoal?>(null) }
 
     EtaScreen(bottomInset = false) {
         Column(
@@ -104,6 +109,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                     ReorderableList(
                         groups = state.groups,
                         onOpen = { editing = it },
+                        onStand = { standing = it },
                         onReorder = viewModel::reorder,
                     )
                     EtaText(
@@ -114,7 +120,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                         color = EtaTheme.colors.textMuted,
                     )
                 }
-                StepGoalRows(state.growingSteps, onOpen = { editing = it })
+                StepGoalRows(state.growingSteps, onOpen = { editing = it }, onStand = { standingStep = it })
             }
 
             EtaButton(text = "Timer-Task mit Zielzeit erstellen", onClick = { creating = true })
@@ -132,10 +138,10 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
                 Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
                     state.counted.forEach { group ->
                         key(group.representative.id) {
-                            CountedRow(group = group, onClick = { editing = group })
+                            CountedRow(group = group, onClick = { editing = group }, onStand = { standing = group })
                         }
                     }
-                    StepGoalRows(state.countedSteps, onOpen = { editing = it })
+                    StepGoalRows(state.countedSteps, onOpen = { editing = it }, onStand = { standingStep = it })
                 }
             }
             Spacer(Modifier.size(EtaTheme.spacing.xl))
@@ -150,6 +156,38 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
             onCreate = { name, note, attributes ->
                 viewModel.create(name, note, attributes)
                 creating = false
+            },
+        )
+    }
+
+    standing?.let { group ->
+        val item = group.representative
+        GoalStandDialog(
+            name = item.name,
+            time = item.growthCurrent,
+            target = item.growthTarget.takeIf { item.isGrowthTask },
+            count = item.quantity.takeIf { item.hasQuantity },
+            countTarget = item.quantityTarget,
+            onDismiss = { standing = null },
+            onConfirm = { time, count ->
+                viewModel.setStand(group, time, count)
+                standing = null
+            },
+        )
+    }
+
+    standingStep?.let { goal ->
+        val step = goal.step.asItem()
+        GoalStandDialog(
+            name = goal.step.name,
+            time = step.growthCurrent,
+            target = step.growthTarget.takeIf { step.isGrowthTask },
+            count = step.quantity.takeIf { step.hasQuantity },
+            countTarget = step.quantityTarget,
+            onDismiss = { standingStep = null },
+            onConfirm = { time, count ->
+                viewModel.setStepStand(goal, time, count)
+                standingStep = null
             },
         )
     }
@@ -188,6 +226,7 @@ fun GrowthTasksScreen(viewModel: GrowthTasksViewModel) {
 private fun ReorderableList(
     groups: List<RecurringGroup>,
     onOpen: (RecurringGroup) -> Unit,
+    onStand: (RecurringGroup) -> Unit,
     onReorder: (List<RecurringGroup>) -> Unit,
 ) {
     // The order being shown: the stored one, except while a drag rearranges it.
@@ -201,6 +240,7 @@ private fun ReorderableList(
     val currentOrder = rememberUpdatedState(order)
     val commit = rememberUpdatedState(onReorder)
     val open = rememberUpdatedState(onOpen)
+    val stand = rememberUpdatedState(onStand)
     val step = rememberUpdatedState(gap)
 
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
@@ -213,6 +253,7 @@ private fun ReorderableList(
                 position = index + 1,
                 dragging = dragging,
                 onClick = { open.value(group) },
+                onStand = { stand.value(group) },
                 modifier = Modifier
                     .onSizeChanged { if (rowHeight.intValue == 0) rowHeight.intValue = it.height }
                     .offset {
@@ -263,7 +304,7 @@ private fun ReorderableList(
 
 /** A task with a Mengen-Inkrement: when it happens, and where its count stands. */
 @Composable
-private fun CountedRow(group: RecurringGroup, onClick: () -> Unit) {
+private fun CountedRow(group: RecurringGroup, onClick: () -> Unit, onStand: () -> Unit) {
     val item = group.representative
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -292,8 +333,16 @@ private fun CountedRow(group: RecurringGroup, onClick: () -> Unit) {
                 color = EtaTheme.colors.textSecondary,
             )
             QuantityText(item)
+            StandButton(onStand)
         }
     }
+}
+
+/** "Stand setzen" under a goal's figures (step 59). */
+@Composable
+private fun StandButton(onClick: () -> Unit) {
+    Spacer(Modifier.size(EtaTheme.spacing.xs))
+    EtaButton(text = "Stand setzen", style = EtaButtonStyle.Secondary, onClick = onClick)
 }
 
 /** One Timer-Task with a target: where it stands, where it is going, and when it happens. */
@@ -303,6 +352,7 @@ private fun GrowthRow(
     position: Int,
     dragging: Boolean,
     onClick: () -> Unit,
+    onStand: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val item = group.representative
@@ -367,6 +417,7 @@ private fun GrowthRow(
                         color = EtaTheme.colors.warning,
                     )
                 }
+                StandButton(onStand)
             }
             if (growth?.dynamic == true) {
                 EtaText(
@@ -392,19 +443,23 @@ private fun GrowthRow(
  * settings, which the row says instead.
  */
 @Composable
-private fun StepGoalRows(goals: List<StepGoal>, onOpen: (RecurringGroup) -> Unit) {
+private fun StepGoalRows(
+    goals: List<StepGoal>,
+    onOpen: (RecurringGroup) -> Unit,
+    onStand: (StepGoal) -> Unit,
+) {
     if (goals.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
         goals.forEach { goal ->
             key(goal.parent.representative.id, goal.step.id) {
-                StepGoalRow(goal, onOpen)
+                StepGoalRow(goal, onOpen, onStand = { onStand(goal) })
             }
         }
     }
 }
 
 @Composable
-private fun StepGoalRow(goal: StepGoal, onOpen: (RecurringGroup) -> Unit) {
+private fun StepGoalRow(goal: StepGoal, onOpen: (RecurringGroup) -> Unit, onStand: () -> Unit) {
     val step = goal.step
     val parent = goal.parent.representative
     // The morning's and the evening's steps are edited in the settings.
@@ -453,6 +508,7 @@ private fun StepGoalRow(goal: StepGoal, onOpen: (RecurringGroup) -> Unit) {
                     color = EtaTheme.colors.textMuted,
                 )
             }
+            StandButton(onStand)
         }
     }
 }

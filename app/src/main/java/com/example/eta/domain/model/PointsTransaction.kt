@@ -31,9 +31,19 @@ enum class PointsReason {
     /** Free time given up, which pays. */
     FREE_TIME_FORGONE,
 
-    /** Half a point each for getting up, and for going to bed, on time. */
+    /**
+     * Half a point each for getting up, and for going to bed, on time — and
+     * since step 59 a deduction under the same reason when it was late.
+     */
     PUNCTUAL_WAKE,
     PUNCTUAL_BED,
+
+    /**
+     * Step 59: a task the user committed to in the evening ("Sich der Task
+     * verschreiben"), done after its day was closed and paid with the next
+     * settlement. Not HARVEST: the ledger has to tell the two apart.
+     */
+    DEFERRED_TASK,
 
     /** Step 48: a slot-holding contract broken, ten points. */
     CONTRACT_BREACH,

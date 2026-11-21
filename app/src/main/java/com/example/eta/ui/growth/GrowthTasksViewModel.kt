@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 /**
  * A routine's step working towards something (step 49): a "Zielzeit" or a
@@ -143,6 +144,21 @@ class GrowthTasksViewModel(
                 ids = group.ids,
                 edit = attributes.toEdit(name, note),
             )
+        }
+    }
+
+    /**
+     * "Stand setzen" (step 59): where a task stands, put by hand for what was
+     * done outside the app — every row of the task at once.
+     */
+    fun setStand(group: RecurringGroup, time: Duration?, count: Int?) {
+        viewModelScope.launch { growthService.setStand(group.representative, time, count) }
+    }
+
+    /** The same for a routine's step. */
+    fun setStepStand(goal: StepGoal, time: Duration?, count: Int?) {
+        viewModelScope.launch {
+            growthService.setStepStand(goal.parent.representative, goal.step, time, count)
         }
     }
 

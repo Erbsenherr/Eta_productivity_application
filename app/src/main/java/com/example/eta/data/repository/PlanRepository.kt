@@ -136,6 +136,37 @@ class PlanRepository(
         )
     }
 
+    /** Step 59: commitments from evenings before [date] still owed an answer. */
+    suspend fun owedCommitments(date: LocalDate): List<BlockWithItem> =
+        blockDao.findOwedCommitmentsWithItems(date)
+
+    /**
+     * "Sich der Task verschreiben" (step 59) — or, [committed] false, taken
+     * back. Read fresh, so a tick given meanwhile is not written over.
+     */
+    suspend fun commit(blockId: String, committed: Boolean) {
+        val block = blockDao.findById(blockId) ?: return
+        val now = clock.now()
+        blockDao.upsert(block.copy(committedAt = if (committed) now else null, updatedAt = now))
+    }
+
+    /**
+     * A commitment settled by the evening of [on]. A block still open then was
+     * not done: it is let go — called off, at no cost, the evening that would
+     * have charged it being long over.
+     */
+    suspend fun settleCommitment(blockId: String, on: LocalDate) {
+        val block = blockDao.findById(blockId) ?: return
+        val now = clock.now()
+        blockDao.upsert(
+            block.copy(
+                committedSettledOn = on,
+                discardedAt = if (block.isOpen) now else block.discardedAt,
+                updatedAt = now,
+            ),
+        )
+    }
+
     suspend fun reopen(block: PlannedBlock) {
         // An early end belongs to the tick being taken back (step 55).
         blockDao.upsert(block.copy(completedAt = null, endedEarly = false, updatedAt = clock.now()))

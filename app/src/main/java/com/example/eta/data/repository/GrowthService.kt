@@ -1,5 +1,6 @@
 package com.example.eta.data.repository
 
+import com.example.eta.data.local.BlockWithItem
 import com.example.eta.data.local.ItemDao
 import com.example.eta.domain.growth.GrowthFamily
 import com.example.eta.domain.growth.QuantityFamily
@@ -11,6 +12,9 @@ import com.example.eta.domain.growth.hasQuantity
 import com.example.eta.domain.growth.isGrowthTask
 import com.example.eta.domain.growth.quantityFamily
 import com.example.eta.domain.growth.workedInFull
+import com.example.eta.domain.growth.withQuantitySetTo
+import com.example.eta.domain.growth.withTimeSetTo
+import com.example.eta.domain.subtask.withItemFields
 import com.example.eta.domain.model.Item
 import com.example.eta.domain.model.Subtask
 import com.example.eta.domain.subtask.StepFamily
@@ -108,7 +112,6 @@ class GrowthService(
     suspend fun advanceFor(date: LocalDate): List<Item> {
         if (planRepository.findDayPlan(date)?.isSettled == true) return emptyList()
 
-        val now = clock.now()
         // Counted once per **task**, not per row. A task on Tuesday and Thursday is
         // two definitions; advancing only the one that was completed would give the
         // two different lengths and counts, which the standing schedule then shows
@@ -119,7 +122,27 @@ class GrowthService(
         // — unless the settings say otherwise. See `workedInFull`.
         val lenient = allowPartialGrowth()
         advanceSteps(date, lenient)
-        val completed = planRepository.completedOn(date)
+        return advanceCompleted(planRepository.completedOn(date), lenient)
+    }
+
+    /**
+     * Step 59: tasks committed to on an earlier evening and done since, counted
+     * with the evening that pays them — their own day was settled before they
+     * happened, so [advanceFor] never saw them. Steps of a routine among them
+     * count as well.
+     */
+    suspend fun advanceDeferred(entries: List<BlockWithItem>): List<Item> {
+        val done = entries.filter { it.block.isCompleted }
+        if (done.isEmpty()) return emptyList()
+        val lenient = allowPartialGrowth()
+        done.map { it.block.date }.distinct().forEach { day ->
+            advanceSteps(day, lenient, only = done.filter { it.block.date == day }.map { it.block.id }.toSet())
+        }
+        return advanceCompleted(done, lenient)
+    }
+
+    private suspend fun advanceCompleted(completed: List<BlockWithItem>, lenient: Boolean): List<Item> {
+        val now = clock.now()
         // The count each was done with, before it moves on: the definition only
         // knows where it stands now, and the statistics draw where it stood.
         planRepository.addBlocks(
@@ -170,6 +193,48 @@ class GrowthService(
     }
 
     /**
+     * "Stand setzen" (step 59): where a task stands, put by hand — for what was
+     * done outside the app. [time] is the time on the timer of a task with a
+     * "Zielzeit", [count] the count of a Mengen-Inkrement; null leaves either
+     * as it is. Written to every row of the task, like an increment, and the
+     * occurrences ahead are laid down again when the time moved. Not a
+     * completion: nothing is billed.
+     */
+    suspend fun setStand(task: Item, time: kotlin.time.Duration?, count: Int?) {
+        val now = clock.now()
+        val key = task.familyKey
+        val changed = itemDao.findRecurringDefinitions()
+            .filter { it.familyKey == key }
+            .mapNotNull { row ->
+                var next = row
+                if (time != null) next = next.withTimeSetTo(time)
+                if (count != null) next = next.withQuantitySetTo(count)
+                next.takeIf { it != row }?.copy(updatedAt = now)
+            }
+        if (changed.isEmpty()) return
+        itemDao.upsertAll(changed)
+        if (time != null) scheduleMaintenance.relayOccurrences(changed.map { it.id })
+    }
+
+    /** The same for a routine's step (step 49's goals), on every row of its family. */
+    suspend fun setStepStand(parent: Item, step: Subtask, time: kotlin.time.Duration?, count: Int?) {
+        val repository = subtaskRepository ?: return
+        val now = clock.now()
+        var source = step.asItem()
+        if (time != null) source = source.withTimeSetTo(time)
+        if (count != null) source = source.withQuantitySetTo(count)
+        val next = step.withItemFields(source)
+        val family = step.familyIn(parent)
+        val parents = itemDao.findRecurringDefinitions().associateBy { it.id }
+        val rows = repository.stepsByItem().flatMap { (itemId, list) ->
+            val owner = parents[itemId] ?: return@flatMap emptyList()
+            list.filter { it.familyIn(owner) == family }
+                .mapNotNull { row -> row.withProgressOf(next).takeIf { it != row }?.copy(updatedAt = now) }
+        }
+        repository.update(rows)
+    }
+
+    /**
      * The steps of routines ticked off on [date], one completion counted for
      * each (step 49) — by the task's rules: the time only for a sitting whose
      * timer counted the whole goal, unless [lenient]; the count either way.
@@ -179,13 +244,17 @@ class GrowthService(
      * morning routine's "Duschen" grow as one. Nothing is relaid: a step's time
      * lies inside its routine's.
      */
-    private suspend fun advanceSteps(date: LocalDate, lenient: Boolean) {
+    private suspend fun advanceSteps(date: LocalDate, lenient: Boolean, only: Set<String>? = null) {
         val repository = subtaskRepository ?: return
         val now = clock.now()
         val steps = repository.stepsByItem()
         val checks = repository.checkedByBlock(date)
         val timers = repository.timersBetween(date, date).associateBy { it.blockId to it.subtaskId }
-        val day = planRepository.findDay(date).filter { it.item.routineMode }
+        val day = planRepository.findDay(date)
+            .filter { it.item.routineMode && (only == null || it.block.id in only) }
+            // Committed to and still open (step 59): its steps count with the
+            // evening that settles the commitment, not twice.
+            .filter { only != null || !(it.block.isCommitmentOwed && it.block.isOpen) }
 
         val advanced = mutableMapOf<StepFamily, Subtask>()
         day.forEach { entry ->

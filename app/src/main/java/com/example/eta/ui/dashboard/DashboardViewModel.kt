@@ -80,6 +80,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
+import com.example.eta.domain.setup.nightEndingOn
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -744,10 +745,27 @@ class DashboardViewModel(
         }
     }
 
-    /** "Gehe nun schlafen", or the next day's answer about [day]'s evening. */
-    fun recordBed(day: LocalDate, onTime: Boolean) {
+    /**
+     * "Gehe nun schlafen" ([at] null: now), or the next day's answer about
+     * [day]'s evening — [punctual], or an hour of one's own. Stored with the
+     * bedtime and the tolerance that applied, so the points can be graded
+     * (step 59).
+     */
+    fun recordBed(day: LocalDate, at: LocalTime?, punctual: Boolean) {
         val repository = sleepLogRepository ?: return
-        viewModelScope.launch { repository.recordBed(day, onTime) }
+        val check = sleepCheck.value
+        viewModelScope.launch {
+            val setup = check?.setup ?: setupRepository.find()
+            val overrides = check?.overrides ?: nightService?.overrides().orEmpty()
+            val due = setup?.nightEndingOn(day.plus(DatePeriod(days = 1)), overrides)?.sleep
+            val tolerance = setup?.punctualTolerance ?: DEFAULT_PUNCTUAL_TOLERANCE
+            val time = when {
+                punctual -> due
+                at != null -> at
+                else -> clock.now().toLocalDateTime(timeZone).time.let { LocalTime(it.hour, it.minute) }
+            }
+            repository.recordBed(day, time, due, tolerance)
+        }
     }
 
     // --- Timer-Tasks ---------------------------------------------------------

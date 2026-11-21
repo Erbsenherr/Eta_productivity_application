@@ -150,6 +150,15 @@ data class PlannedBlock(
      */
     val endedEarly: Boolean = false,
     /**
+     * "Sich der Task verschreiben" (step 59): pressed in the evening for a
+     * block not over yet when its day was closed. The evening counts it as
+     * answered; done afterwards, it is paid with the next settlement, and the
+     * next evening asks about it if it was not ticked by then.
+     */
+    val committedAt: Instant? = null,
+    /** The evening that settled a committed block — paid or let go. Null: still owed. */
+    val committedSettledOn: LocalDate? = null,
+    /**
      * By how much a late start lengthened this block, so the timer does not run
      * into time nobody planned. Part of [plannedDuration], and **not** part of
      * what the timer counts or the evening bills — see `fullTimerGoal`.
@@ -178,6 +187,10 @@ data class PlannedBlock(
 
     @get:Ignore
     val isDiscarded: Boolean get() = discardedAt != null
+
+    /** Committed to in the evening (step 59), and not yet settled by a later one. */
+    @get:Ignore
+    val isCommitmentOwed: Boolean get() = committedAt != null && committedSettledOn == null
 
     /** Still awaiting a decision in the evening reevaluation. */
     @get:Ignore

@@ -15,6 +15,7 @@ import com.example.eta.domain.model.PointsReason
 import com.example.eta.domain.planning.MINUTES_PER_DAY
 import com.example.eta.domain.reevaluation.ContractVerdict
 import com.example.eta.domain.reevaluation.DailySettlement
+import com.example.eta.domain.reevaluation.DeferredTask
 import com.example.eta.domain.reevaluation.UNPLANNED_PENALTY_PER_HOUR
 import com.example.eta.domain.reevaluation.settleDay
 import com.example.eta.domain.reward.Earning
@@ -113,9 +114,25 @@ class ReevaluationService(
             unplannedPenaltyPerHour = setup?.unplannedRate ?: UNPLANNED_PENALTY_PER_HOUR,
             wokeOnTime = wokeOnTime(date),
             bedOnTime = bedOnTime(date),
+            wakePoints = wakePoints(date),
+            bedPoints = bedPoints(date),
             streaks = streaks ?: previewStreaks(date),
+            deferred = deferredTasks(date),
         )
     }
+
+    /**
+     * Step 59: commitments from earlier evenings still owed — what tonight's
+     * first page asks about, done or not.
+     */
+    suspend fun owedCommitments(date: LocalDate): List<BlockWithItem> =
+        planRepository.owedCommitments(date)
+
+    /** Of [owedCommitments], those done since: "Verzögerte Tasks", each with its yield. */
+    private suspend fun deferredTasks(date: LocalDate): List<DeferredTask> =
+        owedCommitments(date)
+            .filter { it.block.isCompleted }
+            .map { DeferredTask(it.block.id, it.item.name, yieldOf(it.item, it.block)) }
 
     /**
      * What tonight does to every streak, without writing anything (step 48).
@@ -145,7 +162,10 @@ class ReevaluationService(
      * no reward being filled there is nothing to watch fill.
      */
     suspend fun previewRewards(date: LocalDate): RewardOutlook =
-        rewardRepository.outlook(blockDao.findForDateWithItems(date), sleepEarningsOf(date))
+        rewardRepository.outlook(
+            blockDao.findForDateWithItems(date) + owedCommitments(date).filter { it.block.isCompleted },
+            sleepEarningsOf(date),
+        )
 
     /**
      * The evening's two half points as the Belohn-o-mat sees them (step 48) —
@@ -157,11 +177,19 @@ class ReevaluationService(
             verdicts = emptyList(),
             sleepMinutes = 0,
             freeTimeAllowanceMinutes = 0,
-            wokeOnTime = wokeOnTime(date),
-            bedOnTime = bedOnTime(date),
+            wakePoints = wakePoints(date),
+            bedPoints = bedPoints(date),
         )
         return sleepEarnings(settlement.wakeBonus, settlement.bedBonus)
     }
+
+    /** This morning, graded (step 59) — negative when late. */
+    private suspend fun wakePoints(date: LocalDate): Double =
+        sleepLogRepository?.find(date)?.wakePoints ?: 0.0
+
+    /** Last night, graded — filed under the day before. */
+    private suspend fun bedPoints(date: LocalDate): Double =
+        sleepLogRepository?.find(date.minus(DatePeriod(days = 1)))?.bedPoints ?: 0.0
 
     /** This morning's answer. */
     private suspend fun wokeOnTime(date: LocalDate): Boolean =
@@ -201,6 +229,11 @@ class ReevaluationService(
 
         if (settlement.harvest != 0.0) {
             pointsRepository.record(settlement.harvest, PointsReason.HARVEST, note = date.toString())
+        }
+        settlement.deferred.forEach { task ->
+            if (task.points != 0.0) {
+                pointsRepository.record(task.points, PointsReason.DEFERRED_TASK, note = task.name)
+            }
         }
         if (settlement.contractPayout != 0.0) {
             pointsRepository.record(settlement.contractPayout, PointsReason.CONTRACT)
@@ -253,10 +286,22 @@ class ReevaluationService(
         // The Belohn-o-mat fills from the same blocks the harvest was just read
         // off, and here rather than anywhere else for the same reason HARVEST is
         // written here: a day is settled once, so a reward is filled once.
+        // Step 59: what was committed to on an earlier evening is settled
+        // tonight — done ones poured and grown with tonight's, the rest let go.
+        val owed = owedCommitments(date)
+        val deferredDone = owed.filter { it.block.isCompleted }
         rewardRepository.pour(
-            blockDao.findForDateWithItems(date),
+            blockDao.findForDateWithItems(date) + deferredDone,
             sleepEarnings(settlement.wakeBonus, settlement.bedBonus),
         )
+        growthService.advanceDeferred(deferredDone)
+        owed.forEach { planRepository.settleCommitment(it.block.id, date) }
+        deferredDone.map { it.block.date }.distinct().forEach { itemRepository.retireCompletedTodos(it) }
+        // Committed to tonight and answered before closing after all: paid
+        // tonight like any other block, so nothing is owed tomorrow.
+        blockDao.findForDateWithItems(date)
+            .filter { it.block.committedAt != null && !it.block.isOpen }
+            .forEach { planRepository.settleCommitment(it.block.id, date) }
 
         val answered = journal.filterValues { it.isNotBlank() }
         if (answered.isNotEmpty()) {
@@ -311,6 +356,8 @@ class ReevaluationService(
     suspend fun harvestLate(entry: BlockWithItem): Double {
         val date = entry.block.date
         if (planRepository.findDayPlan(date)?.isSettled != true) return 0.0
+        // Committed to (step 59): paid with the next settlement, as promised.
+        if (planRepository.findBlock(entry.block.id)?.isCommitmentOwed == true) return 0.0
         val amount = yieldOf(entry.item, entry.block)
         if (amount != 0.0) {
             pointsRepository.record(amount, PointsReason.HARVEST, note = "$date nachgetragen")

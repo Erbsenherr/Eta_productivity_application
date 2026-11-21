@@ -1,5 +1,6 @@
 package com.example.eta.ui.reevaluation
 
+import com.example.eta.ui.stats.AffirmationBox
 import com.example.eta.domain.sound.SoundEvent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -60,6 +61,9 @@ import com.example.eta.domain.reevaluation.DailySettlement
 import com.example.eta.domain.reevaluation.FREE_UNPLANNED_HOURS
 import com.example.eta.domain.reevaluation.CONTRACT_BREACH_PENALTY
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import com.example.eta.domain.planning.minuteOfDay
+import com.example.eta.domain.planning.containerEndMinute
 import com.example.eta.ui.components.EtaButton
 import com.example.eta.ui.components.EtaButtonStyle
 import com.example.eta.ui.components.EtaDialog
@@ -141,7 +145,10 @@ fun ReevaluationScreen(
     // The settlement rests on every block having been answered: one left open is
     // neither harvest nor forfeit, and costs the points either way. A day with
     // nothing planned has nothing to answer, so it does not trap anyone.
-    val openBlocks = state.blocks.count { it.block.isOpen }
+    // Committed to for later (step 59) counts as answered; a commitment from an
+    // earlier evening wants its answer tonight.
+    val openBlocks = state.blocks.count { it.block.isOpen && it.block.committedAt == null } +
+        state.deferred.count { it.block.isOpen }
     val tasksPending = currentStep == Step.TASKS && openBlocks > 0
     // In the tutorial the page only turns when its step has come.
     val mayTurn = tutorialAllows(TutorialGate.REEVALUATION_NEXT)
@@ -198,7 +205,11 @@ fun ReevaluationScreen(
                             // not when the pager composes it a page early.
                             active = currentStep == Step.REWARD_FILL,
                         )
-                        Step.JOURNAL -> JournalStep(journal, viewModel::answer)
+                        Step.JOURNAL -> {
+                            // Step 59: a word on how today went against the usual.
+                            state.mood?.let { AffirmationBox(it, seed = state.date.toEpochDays().toInt()) }
+                            JournalStep(journal, viewModel::answer)
+                        }
                         Step.RECURRING -> RecurringStep(state, viewModel)
                     }
                     Spacer(Modifier.size(EtaTheme.spacing.xl))
@@ -262,7 +273,7 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
     var tickingTimerId by remember { mutableStateOf<String?>(null) }
     val clock = LocalEtaClock.current
     tickingTimerId?.let { id ->
-        val entry = state.blocks.firstOrNull { it.block.id == id && it.block.isOpen }
+        val entry = (state.blocks + state.deferred).firstOrNull { it.block.id == id && it.block.isOpen }
         if (entry == null) {
             tickingTimerId = null
         } else {
@@ -298,10 +309,19 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                 )
             }
 
+            // Step 59: what is not over yet can be committed to.
+            val nowAt = clock.now().toLocalDateTime(TimeZone.currentSystemDefault())
             state.blocks.forEach { entry ->
+                val later = entry.block.isOpen && entry.block.date == nowAt.date &&
+                    entry.block.containerEndMinute() > nowAt.time.minuteOfDay()
                 BlockRow(
                     entry = entry,
                     mayDiscard = tutorialAllows(TutorialGate.REEVALUATION_DISCARD + entry.item.id),
+                    onCommit = if (later || entry.block.committedAt != null) {
+                        { on -> viewModel.commit(entry, on) }
+                    } else {
+                        null
+                    },
                     onToggle = {
                         // A Timer-Task that was never started is asked about
                         // before it counts as worked in full.
@@ -319,6 +339,43 @@ private fun TasksStep(state: ReevaluationUiState, viewModel: ReevaluationViewMod
                     onDiscard = { viewModel.discard(entry) },
                     onExcuse = { reason -> viewModel.excuse(entry, reason) },
                 )
+            }
+        }
+    }
+
+    if (state.deferred.isNotEmpty()) {
+        val pointsShown = LocalPointsVisible.current
+        EtaSurface(modifier = Modifier.fillMaxWidth(), borderColor = EtaTheme.colors.accent) {
+            Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.md)) {
+                EtaText(text = "Verzögerte Tasks", style = EtaTheme.typography.heading)
+                EtaText(
+                    text = "Bei einem früheren Tagesabschluss hast du dich ihnen verschrieben. " +
+                        (if (pointsShown) "Erledigt? Dann kommen ihre Punkte mit dieser Abrechnung. " else "") +
+                        "Nicht erledigt kostet nichts.",
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.textMuted,
+                )
+                state.deferred.forEach { entry ->
+                    key(entry.block.id) {
+                        BlockRow(
+                            entry = entry,
+                            showDate = true,
+                            discardLabel = "Nicht erledigt",
+                            onToggle = {
+                                val short = entry.block.timerWasUsed &&
+                                    !entry.block.timerDone(clock.now())
+                                if (entry.item.timerTask && entry.block.isOpen &&
+                                    (!entry.block.timerWasUsed || short)
+                                ) {
+                                    tickingTimerId = entry.block.id
+                                } else {
+                                    viewModel.toggleCompleted(entry)
+                                }
+                            },
+                            onDiscard = { viewModel.discard(entry) },
+                        )
+                    }
+                }
             }
         }
     }
@@ -450,6 +507,14 @@ private fun BlockRow(
     onExcuse: (String) -> Unit = {},
     /** False only in the tutorial, before the step that asks for it. */
     mayDiscard: Boolean = true,
+    /**
+     * Step 59: the block is not over yet, so the user may commit to it —
+     * "Sich der Task verschreiben". Null where that is not on offer.
+     */
+    onCommit: ((Boolean) -> Unit)? = null,
+    discardLabel: String = "Fällt aus",
+    /** A commitment from an earlier evening says its day. */
+    showDate: Boolean = false,
 ) {
     val cancelled = entry.block.isDiscarded
     var asking by remember(entry.block.id) { mutableStateOf(false) }
@@ -474,6 +539,8 @@ private fun BlockRow(
     val wash = EtaTheme.colors.warning
     val pointsVisible = LocalPointsVisible.current
 
+    val committed = entry.block.isOpen && entry.block.committedAt != null
+    Column(verticalArrangement = Arrangement.spacedBy(EtaTheme.spacing.xs)) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -522,6 +589,7 @@ private fun BlockRow(
             )
             EtaText(
                 text = buildString {
+                    if (showDate) append("${entry.block.date.formatLong()} · ")
                     append(entry.block.start.formatClock())
                     append(" · ")
                     append(entry.block.effectiveDuration.formatShort())
@@ -548,14 +616,43 @@ private fun BlockRow(
                 )
             }
         }
-        if (entry.block.isOpen) {
+        if (entry.block.isOpen && !committed) {
             EtaButton(
-                text = "Fällt aus",
+                text = discardLabel,
                 style = EtaButtonStyle.Secondary,
                 enabled = mayDiscard,
                 onClick = onDiscard,
             )
         }
+    }
+    if (onCommit != null && entry.block.isOpen) {
+        if (committed) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EtaText(
+                    text = if (pointsVisible) {
+                        "Verschrieben — erledigt, kommen die Punkte mit der nächsten Abrechnung."
+                    } else {
+                        "Verschrieben — der nächste Tagesabschluss fragt nach."
+                    },
+                    style = EtaTheme.typography.caption,
+                    color = EtaTheme.colors.accent,
+                    modifier = Modifier.weight(1f),
+                )
+                EtaButton(
+                    text = "Zurück",
+                    style = EtaButtonStyle.Secondary,
+                    onClick = { onCommit(false) },
+                )
+            }
+        } else {
+            EtaButton(
+                text = "Sich der Task verschreiben",
+                style = EtaButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onCommit(true) },
+            )
+        }
+    }
     }
 
     if (asking) {
@@ -782,9 +879,26 @@ private fun RewardStep(settlement: DailySettlement?) {
             if (settlement.streakPayout != 0.0) {
                 LedgerLine("Streaks", settlement.streakPayout, fine = true)
             }
-            if (settlement.wakeBonus != 0.0) LedgerLine("Pünktlich aufgestanden", settlement.wakeBonus)
+            if (settlement.deferred.isNotEmpty()) {
+                // Step 59: committed to on an earlier evening, done since.
+                EtaText(text = "Verzögerte Tasks", style = EtaTheme.typography.bodyStrong)
+                settlement.deferred.forEach { LedgerLine("  ${it.name}", it.points) }
+            }
+            if (settlement.wakeBonus != 0.0) {
+                LedgerLine(
+                    if (settlement.wakeBonus > 0.0) "Pünktlich aufgestanden" else "Zu spät aufgestanden",
+                    settlement.wakeBonus,
+                )
+            }
             if (settlement.bedBonus != 0.0) {
-                LedgerLine("Pünktlich schlafen gegangen (Vortag)", settlement.bedBonus)
+                LedgerLine(
+                    if (settlement.bedBonus > 0.0) {
+                        "Pünktlich schlafen gegangen (Vortag)"
+                    } else {
+                        "Zu spät schlafen gegangen (Vortag)"
+                    },
+                    settlement.bedBonus,
+                )
             }
             if (settlement.breachPenalty != 0.0) {
                 LedgerLine(

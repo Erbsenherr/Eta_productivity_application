@@ -62,7 +62,7 @@ import com.example.eta.domain.model.StopwatchTime
         StopwatchTime::class,
         RuleBreach::class,
     ],
-    version = 41,
+    version = 42,
     exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
@@ -1165,5 +1165,19 @@ val MIGRATION_39_40 = object : Migration(39, 40) {
 val MIGRATION_40_41 = object : Migration(40, 41) {
     override suspend fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE `user_setup` ADD COLUMN `balancing` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+/**
+ * Step 59: the hour gone to bed, with the bedtime and tolerance it was given
+ * under, for graded points; and "Sich der Task verschreiben" on a block.
+ */
+val MIGRATION_41_42 = object : Migration(41, 42) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `sleep_logs` ADD COLUMN `bedAt` INTEGER")
+        connection.execSQL("ALTER TABLE `sleep_logs` ADD COLUMN `bedDue` INTEGER")
+        connection.execSQL("ALTER TABLE `sleep_logs` ADD COLUMN `bedTolerance` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `committedAt` INTEGER")
+        connection.execSQL("ALTER TABLE `planned_blocks` ADD COLUMN `committedSettledOn` TEXT")
     }
 }

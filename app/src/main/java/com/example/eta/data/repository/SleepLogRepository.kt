@@ -1,6 +1,7 @@
 package com.example.eta.data.repository
 
 import com.example.eta.data.local.TrackingDao
+import com.example.eta.domain.model.PUNCTUAL_WAKE_MINUTES
 import com.example.eta.domain.model.SleepLog
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
@@ -36,9 +37,23 @@ class SleepLogRepository(
         dao.upsert(row.copy(wokeAt = at, wakeDue = due, tolerance = tolerance, updatedAt = clock.now()))
     }
 
-    /** "Gehe nun schlafen", or the next day's "Pünktlich" / "Unpünktlich". */
-    suspend fun recordBed(date: LocalDate, onTime: Boolean) {
+    /**
+     * "Gehe nun schlafen", or the next day's answer. With [at] and [due] the
+     * hour is kept for the graded points (step 59), and [SleepLog.bedOnTime]
+     * says whether it lay within [tolerance]; without them the plain answer
+     * [onTime] is all there is.
+     */
+    suspend fun recordBed(
+        date: LocalDate,
+        at: LocalTime?,
+        due: LocalTime?,
+        tolerance: Int?,
+        onTime: Boolean = false,
+    ) {
         val row = dao.findSleepLog(date) ?: SleepLog(date = date, updatedAt = clock.now())
-        dao.upsert(row.copy(bedOnTime = onTime, updatedAt = clock.now()))
+        val answered = row.copy(bedAt = at, bedDue = due, bedTolerance = tolerance)
+        val late = answered.bedLateMinutes
+        val kept = if (late != null) late <= (tolerance ?: PUNCTUAL_WAKE_MINUTES) else onTime
+        dao.upsert(answered.copy(bedOnTime = kept, updatedAt = clock.now()))
     }
 }

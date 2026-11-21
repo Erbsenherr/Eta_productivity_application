@@ -24,6 +24,7 @@ enum class BalanceKey(
     CALENDAR("Kalendertermin", "Punkte je volle Stunde", 0.5, 0.1),
     PUNCTUAL_WAKE("Pünktlich aufstehen", "Punkte am Abend", 0.5, 0.1),
     PUNCTUAL_BED("Pünktlich schlafen gehen", "Punkte, mit dem Tag danach", 0.5, 0.1),
+    SLEEP_LATE("Zu spät auf / ins Bett", "Punkte Abzug je angefangene Viertelstunde", 0.5, 0.1),
     FREE_TIME_FORGONE("Freizeit aufgeben", "Punkte je Stunde verzichteter Freizeit", 4.0, 0.5),
     FREE_UNPLANNED_HOURS("Unverplante Zeit frei", "Stunden am Tag ohne Abzug", 2.0, 0.5),
     LEGACY_CAP("Altverträge", "höchstens so viele Punkte am Tag, zusammen", 2.0, 0.5),

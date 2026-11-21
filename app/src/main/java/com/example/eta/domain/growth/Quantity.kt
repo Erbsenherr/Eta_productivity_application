@@ -169,3 +169,14 @@ fun Item.quantityLabel(): String? {
     if (!hasQuantity) return null
     return quantityTarget?.let { "Anzahl $current / $it" } ?: "Anzahl $current"
 }
+
+/**
+ * "Stand setzen" (step 59): the count put by hand — at least [MIN_QUANTITY], at
+ * most the target where there is one. The completions counted towards the next
+ * step start again. Not a completion.
+ */
+fun Item.withQuantitySetTo(count: Int): Item {
+    if (!hasQuantity) return this
+    val set = count.coerceAtLeast(MIN_QUANTITY).let { c -> quantityTarget?.let { minOf(c, it) } ?: c }
+    return copy(quantity = set, quantityProgress = 0)
+}

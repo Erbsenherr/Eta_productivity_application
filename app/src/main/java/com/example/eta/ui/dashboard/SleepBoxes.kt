@@ -19,6 +19,10 @@ import com.example.eta.ui.components.EtaText
 import com.example.eta.ui.components.EtaTimePickerDialog
 import com.example.eta.ui.components.LocalPointsVisible
 import com.example.eta.ui.format.formatClock
+import com.example.eta.ui.format.formatPoints
+import com.example.eta.domain.model.PUNCTUAL_WAKE_POINTS
+import com.example.eta.domain.model.SLEEP_LATE_PENALTY
+import com.example.eta.domain.model.SLEEP_ZERO_MINUTES
 import com.example.eta.ui.theme.EtaTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -35,7 +39,7 @@ import kotlinx.datetime.LocalTime
 fun SleepGreeting(
     prompts: SleepPrompts,
     onWake: (at: LocalTime?, due: LocalTime) -> Unit,
-    onBed: (day: LocalDate, onTime: Boolean) -> Unit,
+    onBed: (day: LocalDate, at: LocalTime?, punctual: Boolean) -> Unit,
 ) {
     val due = prompts.wakeDue
     val pointsVisible = LocalPointsVisible.current
@@ -52,8 +56,7 @@ fun SleepGreeting(
                 WakeButtons(due = due, offerNow = true, onWake = onWake)
                 if (pointsVisible) {
                     EtaText(
-                        text = "Pünktlich heißt: höchstens ${prompts.tolerance} Minuten nach der " +
-                            "Aufstehzeit. Dafür gibt es am Abend einen halben Punkt.",
+                        text = gradingText(prompts.tolerance, "Aufstehzeit"),
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
@@ -61,7 +64,8 @@ fun SleepGreeting(
             } else {
                 EtaText(
                     text = "Aufgestanden um ${answer.wokeAt?.formatClock().orEmpty()} — " +
-                        if (answer.wokeOnTime == true) "pünktlich." else "nicht pünktlich.",
+                        (if (answer.wokeOnTime == true) "pünktlich." else "nicht pünktlich.") +
+                        if (pointsVisible) " ${pointsSentence(answer.wakePoints)}" else "",
                     style = EtaTheme.typography.body,
                     color = if (answer.wokeOnTime == true) {
                         EtaTheme.colors.success
@@ -75,18 +79,26 @@ fun SleepGreeting(
         val evening = prompts.eveningOf
         if (evening != null) {
             if (prompts.eveningAnswered) {
+                val points = prompts.eveningAnswer?.bedPoints ?: 0.0
                 EtaText(
                     text = "Schlaf gut!" +
-                        if (pointsVisible) " Der halbe Punkt kommt mit der nächsten Abrechnung." else "",
+                        if (pointsVisible) " ${pointsSentence(points)} Mit der nächsten Abrechnung." else "",
                     style = EtaTheme.typography.body,
-                    color = EtaTheme.colors.success,
+                    color = if (points < 0.0) EtaTheme.colors.textSecondary else EtaTheme.colors.success,
                 )
             } else {
                 EtaButton(
                     text = "Gehe nun schlafen",
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { onBed(evening, true) },
+                    onClick = { onBed(evening, null, false) },
                 )
+                if (pointsVisible) {
+                    EtaText(
+                        text = gradingText(prompts.tolerance, "Schlafenszeit"),
+                        style = EtaTheme.typography.caption,
+                        color = EtaTheme.colors.textMuted,
+                    )
+                }
             }
         }
     }
@@ -103,7 +115,7 @@ fun SleepGreeting(
 fun SleepCatchUpBoxes(
     prompts: SleepPrompts,
     onWake: (at: LocalTime?, due: LocalTime) -> Unit,
-    onBed: (day: LocalDate, onTime: Boolean) -> Unit,
+    onBed: (day: LocalDate, at: LocalTime?, punctual: Boolean) -> Unit,
 ) {
     val due = prompts.wakeDue
     if (prompts.morningOwed && due != null) {
@@ -136,7 +148,8 @@ fun SleepCatchUpBoxes(
                 if (info) {
                     EtaText(
                         text = "»Pünktlich« heißt: Du lagst spätestens ${prompts.tolerance} " +
-                            "Minuten nach deiner Schlafenszeit im Bett und hast zu schlafen versucht.",
+                            "Minuten nach deiner Schlafenszeit im Bett und hast zu schlafen versucht. " +
+                            gradingText(prompts.tolerance, "Schlafenszeit"),
                         style = EtaTheme.typography.caption,
                         color = EtaTheme.colors.textMuted,
                     )
@@ -146,17 +159,26 @@ fun SleepCatchUpBoxes(
                     style = EtaTheme.typography.body,
                     color = EtaTheme.colors.textSecondary,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(EtaTheme.spacing.sm)) {
-                    EtaButton(
-                        text = "Pünktlich",
-                        modifier = Modifier.weight(1f),
-                        onClick = { onBed(bedDay, true) },
-                    )
-                    EtaButton(
-                        text = "Unpünktlich",
-                        style = EtaButtonStyle.Secondary,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onBed(bedDay, false) },
+                var pickingBed by remember { mutableStateOf(false) }
+                EtaButton(
+                    text = "Pünktlich",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onBed(bedDay, null, true) },
+                )
+                EtaButton(
+                    text = "Bin um … Uhr schlafen gegangen",
+                    style = EtaButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { pickingBed = true },
+                )
+                if (pickingBed) {
+                    EtaTimePickerDialog(
+                        initial = prompts.bedDue ?: LocalTime(23, 0),
+                        onDismiss = { pickingBed = false },
+                        onConfirm = {
+                            onBed(bedDay, it, false)
+                            pickingBed = false
+                        },
                     )
                 }
             }
@@ -205,4 +227,21 @@ private fun WakeButtons(
             },
         )
     }
+}
+
+/**
+ * The grading in one sentence (step 59), for the hour of getting up or the
+ * bedtime: full points within the tolerance, five minutes of nothing, then
+ * a deduction per quarter begun, up to two hours.
+ */
+private fun gradingText(tolerance: Int, what: String): String =
+    "Bis $tolerance Minuten nach der $what gibt es ${formatPoints(PUNCTUAL_WAKE_POINTS)} Punkte, " +
+        "die nächsten $SLEEP_ZERO_MINUTES Minuten 0, danach −${formatPoints(SLEEP_LATE_PENALTY)} " +
+        "je angefangene Viertelstunde, höchstens bis zwei Stunden danach."
+
+/** "Das gibt +0,5 Punkte." / "Das kostet 1 Punkt." */
+private fun pointsSentence(points: Double): String = when {
+    points > 0.0 -> "Das gibt +${formatPoints(points)} Punkte."
+    points < 0.0 -> "Das kostet ${formatPoints(-points)} Punkte."
+    else -> "Das gibt keine Punkte."
 }

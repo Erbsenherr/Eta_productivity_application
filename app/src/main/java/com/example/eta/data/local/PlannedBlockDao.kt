@@ -103,6 +103,17 @@ interface PlannedBlockDao {
     @Query("SELECT * FROM planned_blocks WHERE date = :date ORDER BY start")
     suspend fun findForDateWithItems(date: LocalDate): List<BlockWithItem>
 
+    /**
+     * Step 59: blocks committed to on an evening before [date] ("Sich der Task
+     * verschreiben") that no later evening has settled yet.
+     */
+    @Transaction
+    @Query(
+        "SELECT * FROM planned_blocks WHERE date < :date AND committedAt IS NOT NULL " +
+            "AND committedSettledOn IS NULL ORDER BY date, start",
+    )
+    suspend fun findOwedCommitmentsWithItems(date: LocalDate): List<BlockWithItem>
+
     /** Completed blocks of a day — the input for the evening reward calculation. */
     @Transaction
     @Query("SELECT * FROM planned_blocks WHERE date = :date AND completedAt IS NOT NULL")

@@ -93,15 +93,25 @@ data class DailySettlement(
     val streakPayout: Double = 0.0,
     val streaksBroken: Int = 0,
     val streakPenalty: Double = 0.0,
+    /**
+     * Step 59: "Verzögerte Tasks" — committed to on an earlier evening, done
+     * since, and paid tonight. Each with its own line in the Abrechnung.
+     */
+    val deferred: List<DeferredTask> = emptyList(),
 ) {
+    val deferredTotal: Double get() = deferred.sumOf { it.points }
+
     /** Legacy contracts earned more than the cap allows — the dashboard's crown. */
     val crowned: Boolean get() = legacyGross > LEGACY_DAILY_CAP
 
     val total: Double
         get() = harvest + contractPayout + legacyCredited + freeTimeForgone +
-            wakeBonus + bedBonus + streakPayout -
+            wakeBonus + bedBonus + streakPayout + deferredTotal -
             unplannedPenalty - cancellationPenalty - breachPenalty - streakPenalty
 }
+
+/** One line of "Verzögerte Tasks" (step 59). */
+data class DeferredTask(val blockId: String, val name: String, val points: Double)
 
 /**
  * Whether a block actually accounted for the time it occupied.
@@ -125,7 +135,10 @@ data class DailySettlement(
  * is free.
  */
 fun BlockWithItem.heldItsTime(): Boolean =
-    block.isCompleted || item.role == ItemRole.FREE_TIME
+    block.isCompleted || item.role == ItemRole.FREE_TIME ||
+        // Step 59: committed to for later that evening — its hours are spoken
+        // for, and whether it happened is the next evening's question.
+        (block.isOpen && block.committedAt != null)
 
 /**
  * How much of [date]'s available time carries a block, counting overlaps once.
@@ -199,6 +212,14 @@ fun settleDay(
     /** Up on time this morning, and in bed on time the night before. */
     wokeOnTime: Boolean = false,
     bedOnTime: Boolean = false,
+    /**
+     * Step 59: the same two, graded — `SleepLog.wakePoints` / `bedPoints`,
+     * negative when late. Given, they stand in for the two booleans' half points.
+     */
+    wakePoints: Double? = null,
+    bedPoints: Double? = null,
+    /** Step 59: tasks committed to on an earlier evening and done since. */
+    deferred: List<DeferredTask> = emptyList(),
     /** Tonight's streaks, already worked out — see `streakOutcomes`. */
     streaks: List<StreakOutcome> = emptyList(),
 ): DailySettlement {
@@ -256,8 +277,9 @@ fun settleDay(
         unplannedHours = unplannedHours,
         droppedHours = droppedHours,
         unplannedPenalty = chargeable * unplannedPenaltyPerHour.coerceAtLeast(0.0),
-        wakeBonus = if (wokeOnTime) PUNCTUAL_WAKE_POINTS else 0.0,
-        bedBonus = if (bedOnTime) PUNCTUAL_BED_POINTS else 0.0,
+        wakeBonus = wakePoints ?: if (wokeOnTime) PUNCTUAL_WAKE_POINTS else 0.0,
+        bedBonus = bedPoints ?: if (bedOnTime) PUNCTUAL_BED_POINTS else 0.0,
+        deferred = deferred,
         contractsBroken = contractsBroken,
         breachPenalty = contractsBroken * CONTRACT_BREACH_PENALTY,
         streakPayout = streaks.sumOf { it.payout },

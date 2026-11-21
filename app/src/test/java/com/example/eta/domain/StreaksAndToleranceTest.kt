@@ -320,8 +320,8 @@ class StreaksAndToleranceTest {
     fun `the tolerance keeps the bed button on offer past the bedtime`() {
         val wide = setup.copy(punctualTolerance = 15)
         fun at(hour: Int, minute: Int) = LocalDateTime(tuesday, LocalTime(hour, minute))
-        assertEquals(tuesday, sleepPrompts(wide, emptyMap(), emptyMap(), at(23, 14)).eveningOf)
-        assertNull(sleepPrompts(wide, emptyMap(), emptyMap(), at(23, 15)).eveningOf)
+        // Step 59: past the tolerance it stays on offer — late is graded — for two hours.
+        assertEquals(tuesday, sleepPrompts(wide, emptyMap(), emptyMap(), at(23, 15)).eveningOf)
         assertEquals(15, sleepPrompts(wide, emptyMap(), emptyMap(), at(9, 0)).tolerance)
     }
 

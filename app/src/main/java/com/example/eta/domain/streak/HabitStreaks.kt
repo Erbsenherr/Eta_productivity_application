@@ -71,6 +71,9 @@ fun taskDoneOn(name: String, blocks: List<BlockWithItem>, timeZone: TimeZone): B
     val due = blocks
         .filter { it.item.type == ItemType.RECURRING && it.item.normalizedName == name }
         .filterNot { it.block.isExcused || it.block.cancelledInAdvance(timeZone) }
+        // Committed to for later that evening (step 59) and not done yet: the
+        // streak stands still rather than break on what is still to come.
+        .filterNot { it.block.isOpen && it.block.committedAt != null }
     if (due.isEmpty()) return null
     return due.any { it.block.isCompleted }
 }

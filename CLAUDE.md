@@ -58,8 +58,8 @@ app and a force-stop land in the middle of whatever they are testing. It was
 used once, to find and confirm the settings crash of step 44 (the crash buffer,
 `adb logcat -b crash -d`, named the line); that is the whole of what has been
 seen: the settings tab opens, its Design and Navigation pages draw, and the menu
-keeps its scroll position. Everything else is still verified by compilation, the unit suite (783 tests
-as of step 58), `assembleRelease` and `lint` — and the sounds not at all: channel
+keeps its scroll position. Everything else is still verified by compilation, the unit suite (794 tests
+as of step 59), `assembleRelease` and `lint` — and the sounds not at all: channel
 setup, stream choice and whether an alarm really fires can only be judged on
 hardware. Assume that of every screen, colour and sound described below unless it
 says otherwise, and check them on the phone before trusting them.
@@ -427,6 +427,7 @@ convenience, not a guarantee. A cross-reference like "see *The Heute tab*" or
 | `step-56-stopwatch.md` | *Step 56*: the stopwatch in "Gerade" (`StopwatchTime`, `StopwatchRepository`, `StopwatchActions`, `StopwatchLines`, the explanation once) and "Gestoppte Zeiten" in Statistiken (`stopwatchSummaries`, `StatSection.STOPWATCH`, `StopwatchEditDialog`) |
 | `step-57-rule-breaches.md` | *Step 57*: a rule's Ausnahmesituation and Konsequenz (`RuleDraft`, `consequenceOnFreeTime`), "Regelverstoß melden" (`RuleBreach`, `ReportBreachButton`, `ReportBreachDialog`), the red box (`ConsequenceBox`), free time hatched red (`LocalFreeTimeConsequence`, `underConsequence`, `consequenceHatch`, the note), the morning's reminder (`rulesToWatch`, `WatchReminderBox`) |
 | `step-58-review-balancing.md` | *Step 58*: the Wochenrückblick (`weekReview`, `accuracy`, `Trend`, `ReviewSources`, `Step.REVIEW`) and the Punkte-Balancing (`BalanceKey`, `Balancing.values`, `encodeBalancing`, `UserSetup.balancing`, Debug → Balancing → Punkte-Balancing) |
+| `step-59-sleep-grading-commitments.md` | *Step 59*: "Stand setzen" in the "Ziele" tab (`withTimeSetTo`, `withQuantitySetTo`, `GrowthService.setStand`), graded points for getting up and going to bed (`sleepPoints`, `SleepLog.bedAt`, `wakePoints` / `bedPoints`, the two-hour evening), affirmations (`Mood`, `moodOf`, `dayReview`, `AffirmationBox`), and "Sich der Task verschreiben" (`committedAt`, `owedCommitments`, "Verzögerte Tasks", `DeferredTask`, `PointsReason.DEFERRED_TASK`) |
 | `step-27-early-billing.md` | *Step 27*: what a task finished early is billed at — the question in the follow-up dialog, capped at twice the time used |
 
 **When writing up a new round**, put each item into the file its subject belongs
@@ -458,7 +459,9 @@ These came out of discussion with the user and are not all derivable from `Eta_d
   its time**, won back 2 % at a time by full sittings (step 55).
 - **Getting up and going to bed on time pay half a point each, on the user's
   word**, booked with the evening's settlement — the bedtime's with the
-  settlement of the day after (step 43). See *Step 43*.
+  settlement of the day after (step 43). See *Step 43*. **Since step 59 it
+  is graded**: within the tolerance in full, five minutes nothing, then −0.5
+  per quarter begun up to two hours. See *Step 59*.
 - **Breaking costs 10 points** (step 48): a slot contract answered "gebrochen",
   and a streak that goes out — the Tagesabschluss-Serie included, which runs
   as a streak while the Streaks feature is on. Off, no streak is counted at all.
@@ -525,7 +528,8 @@ occupied time asked about, a routine shown on a tap, one Quick-Add, and the
 Regelwerk · 54. Four bugfixes, help for a conflict, and Ultra-High ·
 55. "Vorzeitig beenden", and the time it costs · 56. The stopwatch ·
 57. A rule broken, and what follows · 58. The Wochenrückblick, and the
-Punkte-Balancing.
+Punkte-Balancing · 59. Graded sleep points, "Stand setzen", affirmations,
+and "Sich der Task verschreiben".
 
 **The list is finished**; what follows are rounds of real use, each written up from an
 `update.txt` in the repo root. Every screen the concept names exists. Steps 11–14 and

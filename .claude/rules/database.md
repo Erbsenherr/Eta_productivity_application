@@ -7,7 +7,7 @@ paths:
 
 ### The database and its migrations
 
-**Version 36.** When changing an entity, diff the hand-written SQL against the
+**Version 42.** When changing an entity, diff the hand-written SQL against the
 matching `app/schemas/…/N.json`: Room validates at open time and a mismatch is a
 runtime crash, not a compile error. A new *enum value* needs no migration at all —
 Room stores enums by name in a TEXT column.
@@ -53,6 +53,7 @@ Room stores enums by name in a TEXT column.
 | 38→39 | the table `stopwatch_times` — see *Step 56* |
 | 39→40 | `rules.exception` / `consequence` (`TEXT`, nullable), `consequenceOnFreeTime` (`INTEGER NOT NULL DEFAULT 0`), the table `rule_breaches` — see *Step 57* |
 | 40→41 | `user_setup.balancing` (`TEXT NOT NULL DEFAULT ''`) — see *Step 58* |
+| 41→42 | `sleep_logs.bedAt` / `bedDue` / `bedTolerance` (`INTEGER`, nullable), `planned_blocks.committedAt` (`INTEGER`) / `committedSettledOn` (`TEXT`), nullable — see *Step 59* |
 | 19→20 | `user_setup.taskAnnouncement` (`TEXT NOT NULL DEFAULT 'SOUND'`, an enum by name) and `speakNotes` (0) — see *Reading a task's name aloud* |
 
 `items.endSound` defaults to 0 for existing rows on purpose: the setup's frame —

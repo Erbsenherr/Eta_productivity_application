@@ -32,6 +32,14 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.minus
+import com.example.eta.domain.stats.Mood
+import com.example.eta.domain.stats.dayReview
+import com.example.eta.domain.stats.moodOf
+
+/** Far enough back to hold every day the app has known. */
+private val HISTORY_START = LocalDate(2000, 1, 1)
 
 /** The self-reflection questions, in the order `Tägliche Reevaluation.md` asks them. */
 object JournalQuestions {
@@ -73,6 +81,11 @@ data class RemainderOffer(
 data class ReevaluationUiState(
     val date: LocalDate,
     val blocks: List<BlockWithItem> = emptyList(),
+    /**
+     * Step 59: blocks committed to on an earlier evening and not settled yet —
+     * "Verzögerte Tasks". Each wants an answer tonight: done, or not.
+     */
+    val deferred: List<BlockWithItem> = emptyList(),
     val contracts: List<Contract> = emptyList(),
     val verdicts: Map<String, Boolean> = emptyMap(),
     /**
@@ -101,6 +114,11 @@ data class ReevaluationUiState(
     /** Broken streaks the user wants to start again, by id; unanswered ones are let go. */
     val restarts: Map<String, Boolean> = emptyMap(),
     val settled: DailySettlement? = null,
+    /**
+     * Step 59: today against every day before, for a word of encouragement or
+     * praise. Null where there is nothing to compare.
+     */
+    val mood: Mood? = null,
     val loading: Boolean = true,
 ) {
     /**
@@ -153,6 +171,9 @@ class ReevaluationViewModel(
      */
     private val dismissedRemainders = mutableSetOf<String>()
 
+    /** Every day before this one, read once — what today is compared with (step 59). */
+    private var earlier: List<BlockWithItem>? = null
+
     init {
         refresh()
     }
@@ -160,6 +181,10 @@ class ReevaluationViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val blocks = reevaluationService.blocksOf(date)
+            val deferred = reevaluationService.owedCommitments(date)
+            val before = earlier ?: planRepository
+                .findRange(HISTORY_START, date.minus(DatePeriod(days = 1)))
+                .also { earlier = it }
             val contracts = reevaluationService.contractsAwaitingCheck(date)
             val steps = subtaskRepository.stepsByItem()
             val ticks = subtaskRepository.checkedByBlock(date)
@@ -184,6 +209,8 @@ class ReevaluationViewModel(
             _state.update {
                 it.copy(
                     blocks = blocks,
+                    deferred = deferred,
+                    mood = moodOf(dayReview(blocks, before)),
                     contracts = contracts,
                     remainders = remainders,
                     // Unanswered contracts count as kept until said otherwise: the
@@ -244,6 +271,18 @@ class ReevaluationViewModel(
             } else {
                 planRepository.complete(entry.block)
             }
+            refresh()
+        }
+    }
+
+    /**
+     * "Sich der Task verschreiben" (step 59), or taken back: a block not over
+     * yet counts as answered tonight, and is paid with the next settlement once
+     * it is done.
+     */
+    fun commit(entry: BlockWithItem, committed: Boolean) {
+        viewModelScope.launch {
+            planRepository.commit(entry.block.id, committed)
             refresh()
         }
     }
